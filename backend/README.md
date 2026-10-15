@@ -233,7 +233,8 @@ Everything under `/api/v1` except auth and the webhook requires
 | Method | Path                  | Notes                                   |
 | ------ | --------------------- | --------------------------------------- |
 | POST   | `/webhooks/bmoni`     | HMAC-SHA256 verified, idempotent by id  |
-| GET    | `/health`             | liveness + DB ping                      |
+| GET    | `/health`, `/healthz` | liveness + DB ping                      |
+| GET    | `/meta`               | active AI + B Moni modes                |
 
 ---
 

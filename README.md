@@ -43,6 +43,7 @@ campuspot/
 │   │            AI, ledger, webhooks)
 │   ├── cmd/api          HTTP server entry point
 │   ├── cmd/seed         demo-data seeder
+│   ├── cmd/webhook-subscribe  registers the B Moni webhook subscription
 │   ├── common/          response envelope + money (kobo) helpers
 │   ├── config/          env-driven configuration
 │   ├── database/        GORM setup (Postgres or SQLite)
@@ -94,7 +95,7 @@ GOTOOLCHAIN=local go run ./cmd/seed    # creates + seeds campuspot.db, prints lo
 GOTOOLCHAIN=local go run ./cmd/api     # serves http://localhost:8080
 ```
 
-Health check: `curl http://localhost:8080/health`
+Health check: `curl http://localhost:8080/healthz` (or `/health`)
 
 > Prefer Postgres? `docker compose up -d db` then set `DB_DRIVER=postgres` and the
 > `DB_*` vars. See `backend/README.md`.
@@ -144,6 +145,7 @@ All responses share the envelope `{ success, data, error, meta }`.
 | Area        | Endpoints |
 |-------------|-----------|
 | Auth        | `POST /auth/register`, `POST /auth/login`, `GET /auth/me` |
+| Meta        | `GET /meta` (active AI + B Moni modes) |
 | Groups      | `POST /groups`, `GET /groups`, `POST /groups/join`, `GET /groups/:id`, `GET /groups/:id/members`, `POST /groups/:id/invite` |
 | Levies      | `POST/GET /groups/:id/levies`, `POST /groups/:id/levies/:levyId/close` |
 | Payments    | `GET /groups/:id/payments`, `POST /groups/:id/payments/manual`, `POST /groups/:id/deposits`, `GET /groups/:id/ledger` |
@@ -165,7 +167,73 @@ All responses share the envelope `{ success, data, error, meta }`.
   provisions wallets/virtual accounts so the demo never depends on live
   availability.
 - **The AI degrades to rules.** With no `AI_API_KEY`, a deterministic
-  rule-based treasurer answers outstanding/summary questions offline.
+  rule-based treasurer answers outstanding/summary questions offline. See
+  **[AI_DISCLOSURE.md](AI_DISCLOSURE.md)** for the full AI disclosure.
+
+---
+
+## B Moni integration
+
+Everything CampusPot needs from B Moni goes through one Go interface
+(`internal/bmoni.Client`). There are two implementations and a wrapper:
+
+- **`HTTPClient`** — the real Embedded API. Base URL is **origin-only**
+  (`https://embedded-dev.bmoni.com` for sandbox); every request carries the
+  partner key in the `x-api-key` header. Never append `/v1` to the base URL.
+- **`MockClient`** — synthetic wallets, virtual accounts, banks and payouts.
+  The default when `BMONI_API_KEY` is empty, so the demo runs offline.
+- **`FallbackClient`** — uses the real API first and transparently falls back
+  to the mock if a call fails. This keeps the demo alive for endpoints that
+  require on-device owner-wallet signing, which a backend-only integration
+  cannot perform.
+
+### Webhooks
+
+B Moni signs every delivery with the subscription's `secretKey`:
+`X-Webhook-Signature` is the hex HMAC-SHA256 of the **raw** request body (the
+`X-Webhook-Id` header equals the body `id`). CampusPot verifies it in constant
+time, deduplicates on the event `id` (primary key), and returns `401` for a bad
+signature and `5xx` (never `4xx`) for transient failures so B Moni retries.
+
+Money-movement events arrive under **partner-scoped `employee.*` names** when
+the subscription supplies a `partnerId` — subscribing to `wallet.*` silently
+receives nothing:
+
+| Event | Action |
+|-------|--------|
+| `employee.deposit.completed` | reconcile the deposit against a member reference/name |
+| `employee.withdrawal.processing` | mark the payout in-flight |
+| `employee.withdrawal.completed` | debit the ledger, mark the payout complete |
+| `employee.withdrawal.failed` | mark the payout failed |
+
+Register the subscription once (it prints the `secretKey` to store as
+`BMONI_WEBHOOK_SECRET`):
+
+```bash
+cd backend
+BMONI_API_KEY=... BMONI_PARTNER_ID=... \
+  GOTOOLCHAIN=local go run ./cmd/webhook-subscribe \
+  -url https://<your-api>/api/v1/webhooks/bmoni
+```
+
+### Mock vs live
+
+The UI shows two badges so it is always clear which backends are running:
+**`AI: LLM`** vs **`AI: rule-based`**, and **`B Moni: sandbox`** vs
+**`B Moni: mock`**. The mode comes from `GET /api/v1/meta`.
+
+| Flag | `BMONI_API_KEY` set | `BMONI_API_KEY` empty |
+|------|---------------------|-----------------------|
+| B Moni client | `HTTPClient` + mock fallback | `MockClient` |
+| `AI_API_KEY` set | LLM drafts reminders; answers stay deterministic | — |
+| `AI_API_KEY` empty | — | deterministic rule-based answers |
+
+Some B Moni endpoints (smart-wallet provisioning, owner-proof signatures,
+proposal signing) require an on-device owner wallet this backend cannot hold, so
+those calls stay behind the interface and degrade to the mock. They are marked
+**UNVERIFIED** in code.
+
+---
 
 ## Deploying (Neon + Render + Vercel)
 
@@ -186,9 +254,9 @@ The app is built to run on free tiers: **Neon** (Postgres), **Render** (API),
    `render.yaml` builds `backend/Dockerfile` (context `backend/`) and exposes
    `/health`.
 3. Set the env vars marked `sync:false` in the dashboard:
-   - `DATABASE_URL` — the Neon string from step 1.
-   - `CORS_ORIGINS` — your Vercel URL, e.g. `https://campuspot.vercel.app`.
-   - `JWT_SECRET` is generated automatically.
+    - `DATABASE_URL` — the Neon string from step 1.
+    - `CORS_ORIGINS` — your Vercel URL, e.g. `https://campus-spot-six.vercel.app`.
+    - `JWT_SECRET` is generated automatically.
 4. Note the deployed API URL, e.g. `https://campuspot-api.onrender.com`.
 
 > If you create the service manually instead of via Blueprint, set **Runtime**

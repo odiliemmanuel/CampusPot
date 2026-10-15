@@ -31,11 +31,13 @@ type Client interface {
 	GetProposal(ctx context.Context, bmoniUserID, proposalID string) (Proposal, error)
 }
 
-// CreateUserRequest is POST /v1/users.
+// CreateUserRequest is POST /v1/users. B Moni expects the name split into
+// first and last, with an E.164 phone number (e.g. "+2348012345678").
 type CreateUserRequest struct {
-	Name  string `json:"name"`
-	Email string `json:"email"`
-	Phone string `json:"phone,omitempty"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+	Email     string `json:"email"`
+	Phone     string `json:"phoneNumber,omitempty"`
 }
 
 // User is the minimal B Moni user representation we persist.
@@ -43,12 +45,20 @@ type User struct {
 	ID string `json:"id"`
 }
 
-// CreateWalletRequest parameters. Currency must be the stablecoin code
-// (CNGN for Naira), not the fiat code.
+// CreateWalletRequest parameters for POST /v1/users/{userId}/smart-wallets/
+// create-managed. Currency must be the stablecoin code (CNGN for Naira), not
+// the fiat code.
+//
+// UNVERIFIED: B Moni requires the wallet owner to sign an EIP-191 owner-proof
+// challenge on-device (ownerProofChallengeId + ownerProofSignature) before a
+// managed wallet is deployed. This backend-only integration cannot produce
+// that signature, so CreateWallet falls back to the mock (see FallbackClient).
 type CreateWalletRequest struct {
-	BMoniUserID      string `json:"userId"`
-	Currency         string `json:"currency"`
-	UserOwnerAddress string `json:"userOwnerAddress"`
+	BMoniUserID           string `json:"-"`
+	Currency              string `json:"currency"`
+	UserOwnerAddress      string `json:"userOwnerAddress"`
+	OwnerProofChallengeID string `json:"ownerProofChallengeId,omitempty"`
+	OwnerProofSignature   string `json:"ownerProofSignature,omitempty"`
 }
 
 // Wallet is a provisioned smart wallet.
@@ -59,12 +69,14 @@ type Wallet struct {
 	Status   string `json:"status"`
 }
 
-// NigeriaOnboardingRequest activates the NGN rail and issues the NUBAN.
+// NigeriaOnboardingRequest activates the NGN rail and issues the NUBAN via
+// POST /v1/users/{userId}/onboarding/start-nigeria. The wallet fields are
+// currency-prefixed (ngnWalletAddress / ngnWalletIndex) per the API contract.
 type NigeriaOnboardingRequest struct {
-	BMoniUserID   string `json:"userId"`
+	BMoniUserID   string `json:"-"`
 	BVN           string `json:"bvn"`
-	WalletAddress string `json:"walletAddress"`
-	WalletIndex   int    `json:"walletIndex"`
+	WalletAddress string `json:"ngnWalletAddress"`
+	WalletIndex   int    `json:"ngnWalletIndex"`
 }
 
 // OnboardingResult reports the activated currency and the issued account.

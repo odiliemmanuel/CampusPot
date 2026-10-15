@@ -79,13 +79,15 @@ func (c *HTTPClient) CreateUser(ctx context.Context, req CreateUserRequest) (Use
 
 func (c *HTTPClient) CreateWallet(ctx context.Context, req CreateWalletRequest) (Wallet, error) {
 	var out Wallet
-	err := c.do(ctx, http.MethodPost, "/v1/smart-wallets/create-managed", req, &out)
+	path := fmt.Sprintf("/v1/users/%s/smart-wallets/create-managed", url.PathEscape(req.BMoniUserID))
+	err := c.do(ctx, http.MethodPost, path, req, &out)
 	return out, err
 }
 
 func (c *HTTPClient) StartNigeriaOnboarding(ctx context.Context, req NigeriaOnboardingRequest) (OnboardingResult, error) {
 	var out OnboardingResult
-	err := c.do(ctx, http.MethodPost, "/v1/onboarding/start-nigeria", req, &out)
+	path := fmt.Sprintf("/v1/users/%s/onboarding/start-nigeria", url.PathEscape(req.BMoniUserID))
+	err := c.do(ctx, http.MethodPost, path, req, &out)
 	return out, err
 }
 

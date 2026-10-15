@@ -328,3 +328,13 @@ export const draftReminder = (groupId: string, userId: string, tone = "friendly"
 export const listReminders = (groupId: string) => request<Reminder[] | null>(`/groups/${groupId}/reminders`).then((r) => r ?? []);
 export const sendReminder = (groupId: string, reminderId: string) =>
   request<Reminder>(`/groups/${groupId}/reminders/${reminderId}/send`, { method: "POST" });
+
+// ---------- Meta ----------
+
+export interface AppMeta {
+  appEnv: string;
+  aiMode: "llm" | "rule-based";
+  bmoniMode: "sandbox" | "mock";
+  webhookConfigured: boolean;
+}
+export const getMeta = () => request<AppMeta>(`/meta`);

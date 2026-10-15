@@ -109,7 +109,7 @@ func Load() *Config {
 		JWTAccessTokenTTL:  getEnvDuration("JWT_ACCESS_TTL", 24*time.Hour),
 		JWTRefreshTokenTTL: getEnvDuration("JWT_REFRESH_TTL", 7*24*time.Hour),
 
-		BMoniBaseURL:       getEnv("BMONI_BASE_URL", "https://sandbox.bmoni.com"),
+		BMoniBaseURL:       getEnv("BMONI_BASE_URL", "https://embedded-dev.bmoni.com"),
 		BMoniAPIKey:        getEnv("BMONI_API_KEY", ""),
 		BMoniPartnerID:     getEnv("BMONI_PARTNER_ID", ""),
 		BMoniWebhookSecret: getEnv("BMONI_WEBHOOK_SECRET", ""),

@@ -3,7 +3,9 @@ package pot
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/google/uuid"
@@ -243,6 +245,60 @@ func (s *Service) Execute(ctx context.Context, groupID, expenseID, actorID uuid.
 		return nil, err
 	}
 	return &expense, nil
+}
+
+// ApplyWithdrawalEvent reconciles a withdrawal after B Moni reports a new state
+// via webhook. It matches the expense by the stored proposal id and is
+// idempotent: completing an already-completed expense, or failing one that
+// already failed, is a no-op. status is one of "completed", "failed", or
+// "processing".
+//
+// UNVERIFIED: B Moni does not publish the withdrawal webhook payload shape, so
+// the caller tolerates missing proposal ids by acking the event.
+func (s *Service) ApplyWithdrawalEvent(_ context.Context, proposalID, status string) error {
+	var expense models.ExpenseRequest
+	if err := s.db.Where("proposal_id = ?", proposalID).First(&expense).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Printf("pot: withdrawal event for unknown proposal %s (status %s)", proposalID, status)
+			return nil
+		}
+		return err
+	}
+
+	switch status {
+	case "completed":
+		if expense.Status == models.ExpenseCompleted {
+			return nil
+		}
+		return s.db.Transaction(func(tx *gorm.DB) error {
+			entry := &models.LedgerEntry{
+				GroupID:     expense.GroupID,
+				Kind:        models.LedgerDebit,
+				AmountKobo:  expense.AmountKobo,
+				Description: "Withdrawal: " + firstNonEmpty(expense.Category, expense.Note, "approved spend"),
+				RefType:     "expense",
+				RefID:       expense.ID.String(),
+			}
+			if err := s.appendLedger(tx, entry); err != nil {
+				return err
+			}
+			now := s.now()
+			return tx.Model(&expense).Updates(map[string]interface{}{
+				"status":      models.ExpenseCompleted,
+				"executed_at": &now,
+			}).Error
+		})
+	case "failed":
+		if expense.Status == models.ExpenseFailed || expense.Status == models.ExpenseCompleted {
+			return nil
+		}
+		return s.db.Model(&expense).Update("status", models.ExpenseFailed).Error
+	default: // processing / in-flight
+		if expense.Status == models.ExpenseExecuting {
+			return nil
+		}
+		return s.db.Model(&expense).Update("status", models.ExpenseExecuting).Error
+	}
 }
 
 // ListExpenses returns all spend requests for a group.

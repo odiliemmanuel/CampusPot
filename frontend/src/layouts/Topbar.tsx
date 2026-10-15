@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Bell, CalendarDays, ChevronDown, LogOut, Menu, Search, Settings } from "lucide-react";
 import { clearSession, getStoredUser, listMembers, type AuthUser, type Role } from "../lib/api";
 import { useGroup } from "../providers/GroupProvider";
+import ModeBadges from "../components/ModeBadges";
 
 const roleLabel = (role: Role | null) =>
   role ? role.charAt(0).toUpperCase() + role.slice(1) : "Member";
@@ -95,6 +96,8 @@ export default function Topbar({ onMenu }: { onMenu: () => void }) {
       </div>
 
       <div className="ml-auto flex items-center gap-2 sm:gap-3">
+        <ModeBadges />
+
         {/* Date chip */}
         <button
           type="button"

@@ -31,13 +31,13 @@ func TestMockLifecycle(t *testing.T) {
 	c := NewMockClient()
 	ctx := context.Background()
 
-	u, err := c.CreateUser(ctx, CreateUserRequest{Name: "Ada", Email: "ada@example.com"})
+	u, err := c.CreateUser(ctx, CreateUserRequest{FirstName: "Ada", LastName: "Obi", Email: "ada@example.com"})
 	if err != nil || u.ID == "" {
 		t.Fatalf("CreateUser: id=%q err=%v", u.ID, err)
 	}
 
 	// Same email must return the same user (no duplicate users on relaunch).
-	again, _ := c.CreateUser(ctx, CreateUserRequest{Name: "Ada", Email: "ada@example.com"})
+	again, _ := c.CreateUser(ctx, CreateUserRequest{FirstName: "Ada", LastName: "Obi", Email: "ada@example.com"})
 	if again.ID != u.ID {
 		t.Fatalf("expected stable user id, got %q then %q", u.ID, again.ID)
 	}

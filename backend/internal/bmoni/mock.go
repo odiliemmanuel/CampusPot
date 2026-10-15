@@ -54,7 +54,7 @@ func (m *MockClient) StartNigeriaOnboarding(_ context.Context, req NigeriaOnboar
 		Currency:             "CNGN",
 		Status:               "active",
 		VirtualAccountNumber: nuban(req.BMoniUserID),
-		BankName:             "Wema Bank (sandbox)",
+		BankName:             "BMONI Sandbox Bank",
 		AccountName:          "CAMPUSPOT SANDBOX",
 	}, nil
 }
@@ -62,7 +62,7 @@ func (m *MockClient) StartNigeriaOnboarding(_ context.Context, req NigeriaOnboar
 func (m *MockClient) GetDepositAccount(_ context.Context, bmoniUserID string) (DepositAccount, error) {
 	return DepositAccount{
 		Number:      nuban(bmoniUserID),
-		BankName:    "Wema Bank (sandbox)",
+		BankName:    "BMONI Sandbox Bank",
 		AccountName: "CAMPUSPOT SANDBOX",
 		Currency:    "NGN",
 	}, nil
@@ -74,7 +74,7 @@ func (m *MockClient) ListNigerianBanks(_ context.Context, _ string) ([]Bank, err
 		{Name: "Zenith Bank", Code: "057"},
 		{Name: "Access Bank", Code: "044"},
 		{Name: "First Bank of Nigeria", Code: "011"},
-		{Name: "Wema Bank", Code: "035"},
+		{Name: "United Bank for Africa", Code: "033"},
 	}, nil
 }
 

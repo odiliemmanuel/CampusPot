@@ -57,6 +57,17 @@ type DepositPayload struct {
 	Narration     string `json:"narration"`
 }
 
+// WithdrawalPayload covers a withdrawal event. B Moni does not publish the
+// withdrawal payload shape (UNVERIFIED), so we accept a couple of id aliases
+// and match the expense by the proposal id returned at execution time.
+type WithdrawalPayload struct {
+	UserID     string `json:"userId"`
+	ProposalID string `json:"proposalId"`
+	ID         string `json:"id"`
+	Amount     string `json:"amount"`
+	Status     string `json:"status"`
+}
+
 func (h *Handler) receive(c *gin.Context) {
 	raw, err := io.ReadAll(io.LimitReader(c.Request.Body, 1<<20))
 	if err != nil {
@@ -117,8 +128,10 @@ func (h *Handler) receive(c *gin.Context) {
 
 func (h *Handler) handle(c *gin.Context, event Event) error {
 	switch event.EventType {
-	case "employee.deposit.completed", "wallet.deposit.completed":
+	case "employee.deposit.completed":
 		return h.handleDeposit(c, event)
+	case "employee.withdrawal.processing", "employee.withdrawal.completed", "employee.withdrawal.failed":
+		return h.handleWithdrawal(c, event)
 	default:
 		// Ignore events we do not act on, but still ack them.
 		log.Printf("webhook: ignoring event type %s", event.EventType)
@@ -162,6 +175,38 @@ func (h *Handler) handleDeposit(c *gin.Context, event Event) error {
 		ProviderEventID: event.ID,
 	})
 	return err
+}
+
+// handleWithdrawal reconciles an async payout. B Moni does not publish the
+// withdrawal payload shape, so an event without a proposal id is logged and
+// acked rather than retried forever.
+func (h *Handler) handleWithdrawal(c *gin.Context, event Event) error {
+	var p WithdrawalPayload
+	if err := json.Unmarshal(event.Payload, &p); err != nil {
+		return err
+	}
+	proposalID := p.ProposalID
+	if proposalID == "" {
+		proposalID = p.ID
+	}
+	if proposalID == "" {
+		log.Printf("webhook: withdrawal event %s (%s) has no proposal id; acking", event.ID, event.EventType)
+		return nil
+	}
+	return h.pots.ApplyWithdrawalEvent(c.Request.Context(), proposalID, withdrawalStatus(event.EventType))
+}
+
+// withdrawalStatus maps an employee.withdrawal.* event to the normalized state
+// the pot engine stores.
+func withdrawalStatus(eventType string) string {
+	switch eventType {
+	case "employee.withdrawal.completed":
+		return "completed"
+	case "employee.withdrawal.failed":
+		return "failed"
+	default:
+		return "processing"
+	}
 }
 
 func isUniqueViolation(err error) bool {

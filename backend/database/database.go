@@ -54,7 +54,9 @@ func Connect(cfg *config.Config) *gorm.DB {
 		log.Fatalf("database: ping failed: %v", err)
 	}
 
-	log.Printf("database: connected to %s:%s/%s", cfg.DBHost, cfg.DBPort, cfg.DBName)
+	if cfg.DBDriver != "sqlite" {
+		log.Printf("database: connected to %s:%s/%s", cfg.DBHost, cfg.DBPort, cfg.DBName)
+	}
 	return db
 }
 

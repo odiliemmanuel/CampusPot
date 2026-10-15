@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -63,8 +64,9 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*models.Us
 
 	// Provision the B Moni user now so every member has a wallet id from day
 	// one. Best-effort: a provisioning failure must not block sign-up.
+	first, last := splitName(req.Name)
 	if bu, err := s.bmoni.CreateUser(ctx, bmoni.CreateUserRequest{
-		Name: req.Name, Email: req.Email, Phone: req.Phone,
+		FirstName: first, LastName: last, Email: req.Email, Phone: req.Phone,
 	}); err == nil {
 		user.BMoniUserID = bu.ID
 	} else {
@@ -129,4 +131,18 @@ func (s *Service) Parse(tokenStr string) (uuid.UUID, error) {
 		return uuid.Nil, errors.New("auth: invalid token")
 	}
 	return uuid.Parse(claims.Subject)
+}
+
+// splitName divides a single display name into the first/last pair B Moni's
+// POST /v1/users expects, tolerating empty and single-word names.
+func splitName(name string) (first, last string) {
+	parts := strings.Fields(name)
+	switch len(parts) {
+	case 0:
+		return "CampusPot", "Member"
+	case 1:
+		return parts[0], "Member"
+	default:
+		return parts[0], strings.Join(parts[1:], " ")
+	}
 }

@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import ThemeProvider from "./providers/ThemeProvider";
 import { GroupProvider } from "./providers/GroupProvider";
 import ProtectedRoute from "./components/ProtectedRoute";
+import ServerWakeBanner from "./components/ServerWakeBanner";
 
 import LandingPage from "./pages/landing/LandingPage";
 import SignUp from "./pages/auth/SignUp";
@@ -19,6 +20,7 @@ import JoinPot from "./pages/join/JoinPot";
 export default function App() {
   return (
     <ThemeProvider>
+      <ServerWakeBanner />
       <BrowserRouter>
         <GroupProvider>
           <Routes>

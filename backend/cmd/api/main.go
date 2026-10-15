@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 
 	"github.com/odiliemmmanuel/campuspot/common/response"
 	"github.com/odiliemmmanuel/campuspot/config"
@@ -65,15 +66,30 @@ func main() {
 	router := gin.New()
 	router.Use(corsMiddleware(cfg.CORSOrigins), gin.Logger(), gin.Recovery())
 
-	router.GET("/health", func(c *gin.Context) {
-		if err := database.Ping(db); err != nil {
-			response.Error(c, http.StatusServiceUnavailable, "DB_UNREACHABLE", err.Error())
-			return
-		}
-		response.OK(c, gin.H{"status": "ok"})
-	})
+	router.GET("/health", healthHandler(db))
+	router.GET("/healthz", healthHandler(db))
 
 	api := router.Group("/api/v1")
+
+	// Public meta: lets the UI label which AI and B Moni modes are active.
+	// During a demo this makes it obvious whether the LLM and the live B Moni
+	// sandbox are in play, or the offline rule-based/mock fallbacks.
+	api.GET("/meta", func(c *gin.Context) {
+		aiMode := "rule-based"
+		if !cfg.UseRuleBasedAI() {
+			aiMode = "llm"
+		}
+		bmoniMode := "sandbox"
+		if cfg.UseMockBMoni() {
+			bmoniMode = "mock"
+		}
+		response.OK(c, gin.H{
+			"appEnv":            cfg.AppEnv,
+			"aiMode":            aiMode,
+			"bmoniMode":         bmoniMode,
+			"webhookConfigured": cfg.BMoniWebhookSecret != "",
+		})
+	})
 
 	// Public auth routes + protected /auth/me.
 	auth.NewController(authSvc).RegisterRoutes(api)
@@ -95,8 +111,23 @@ func buildBMoniClient(cfg *config.Config) bmoni.Client {
 		log.Printf("bmoni: using in-process MOCK client (sandbox=false or no key)")
 		return bmoni.NewMockClient()
 	}
-	log.Printf("bmoni: using HTTP client against %s", cfg.BMoniBaseURL)
-	return bmoni.NewHTTPClient(cfg.BMoniBaseURL, cfg.BMoniAPIKey)
+	log.Printf("bmoni: using HTTP client against %s (mock fallback on unverified calls)", cfg.BMoniBaseURL)
+	return bmoni.NewFallbackClient(
+		bmoni.NewHTTPClient(cfg.BMoniBaseURL, cfg.BMoniAPIKey),
+		bmoni.NewMockClient(),
+	)
+}
+
+// healthHandler reports process liveness and database reachability. It backs
+// both /health and /healthz (Render health checks use one of them).
+func healthHandler(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if err := database.Ping(db); err != nil {
+			response.Error(c, http.StatusServiceUnavailable, "DB_UNREACHABLE", err.Error())
+			return
+		}
+		response.OK(c, gin.H{"status": "ok"})
+	}
 }
 
 // corsMiddleware lets the browser call the API. Localhost origins (the Vite
