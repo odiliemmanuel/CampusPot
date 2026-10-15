@@ -25,6 +25,7 @@ import (
 	"github.com/odiliemmmanuel/campuspot/internal/bmoni"
 	"github.com/odiliemmmanuel/campuspot/internal/models"
 	"github.com/odiliemmmanuel/campuspot/internal/pot"
+	"github.com/odiliemmmanuel/campuspot/internal/seed"
 	"github.com/odiliemmmanuel/campuspot/internal/webhook"
 )
 
@@ -34,6 +35,21 @@ func main() {
 
 	if err := db.AutoMigrate(models.AllModels()...); err != nil {
 		log.Fatalf("migrate: %v", err)
+	}
+
+	// On a brand-new (empty) database, build the demo dataset automatically so
+	// a fresh deploy is instantly testable without running the seed CLI.
+	if cfg.AutoSeed {
+		if empty, err := seed.IsEmpty(db); err != nil {
+			log.Printf("seed: could not check whether the database is empty: %v", err)
+		} else if empty {
+			log.Printf("seed: empty database detected — creating demo data")
+			if _, err := seed.Run(context.Background(), db, cfg); err != nil {
+				log.Printf("seed: auto-seed failed: %v", err)
+			} else {
+				log.Printf("seed: demo data ready (login ada@campuspot.ng / password123)")
+			}
+		}
 	}
 
 	client := buildBMoniClient(cfg)

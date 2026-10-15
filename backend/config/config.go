@@ -48,6 +48,12 @@ type Config struct {
 	// DEMO_OPENING_BALANCE=false to turn it off.
 	DemoOpeningBalance bool
 
+	// AutoSeed populates a brand-new (empty) database with the demo dataset on
+	// startup, so a fresh deploy is instantly testable without running the seed
+	// CLI. It never touches a database that already holds data. Default on;
+	// set AUTO_SEED=false to disable.
+	AutoSeed bool
+
 	// Auth
 	JWTSecret          string
 	JWTAccessTokenTTL  time.Duration
@@ -96,6 +102,8 @@ func Load() *Config {
 		DatabaseURL: getEnv("DATABASE_URL", ""),
 
 		DemoOpeningBalance: getEnvBool("DEMO_OPENING_BALANCE", true),
+
+		AutoSeed: getEnvBool("AUTO_SEED", true),
 
 		JWTSecret:          getEnv("JWT_SECRET", "dev-only-change-me"),
 		JWTAccessTokenTTL:  getEnvDuration("JWT_ACCESS_TTL", 24*time.Hour),

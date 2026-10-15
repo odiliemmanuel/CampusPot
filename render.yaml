@@ -35,3 +35,8 @@ services:
       # Sandbox only: no B Moni key -> the in-process mock is used.
       - key: BMONI_SANDBOX
         value: "true"
+      # Give every new pot a random opening float, and auto-seed an empty DB.
+      - key: DEMO_OPENING_BALANCE
+        value: "true"
+      - key: AUTO_SEED
+        value: "true"
