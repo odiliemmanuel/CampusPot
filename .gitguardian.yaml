@@ -1,0 +1,23 @@
+version: 2
+
+# CampusPot ships synthetic/demo data for a hackathon. Every credential-like
+# value in this repo is a local dev placeholder or a demo login for throwaway
+# data — none of them grant access to anything. This file tells ggshield
+# (pre-commit / CI) to ignore those known false positives. Anything outside the
+# paths/values below is still scanned.
+secret:
+  # Example / throwaway config where placeholder credentials are expected.
+  ignored_paths:
+    - '**/.env.example'
+    - '**/docker-compose.yml'
+
+  # Exact values GitGuardian may flag as "Generic Password"/"Generic Secret".
+  ignored_matches:
+    - name: Local Postgres password (docker-compose dev default)
+      match: campuspot
+    - name: Demo seed login password (synthetic users)
+      match: password123
+    - name: Dev JWT secret default
+      match: dev-only-change-me
+
+  show_secrets: false

@@ -175,7 +175,7 @@ The app is built to run on free tiers: **Neon** (Postgres), **Render** (API),
 ### 1. Database — Neon
 
 1. Create a project at [neon.tech](https://neon.tech) and copy the connection
-   string (it looks like `postgresql://user:pass@ep-xxx.region.aws.neon.tech/db?sslmode=require`).
+   string (a `postgres://…` URL ending in `sslmode=require`).
 2. That single URL is all the backend needs — set it as `DATABASE_URL` (it
    overrides the discrete `DB_*` vars). Tables are auto-migrated on boot.
 
