@@ -1,8 +1,12 @@
-import { useState, type FormEvent, type ReactNode } from "react";
-import { HandCoins, Plus, LogIn } from "lucide-react";
+import { lazy, Suspense, useState, type FormEvent, type ReactNode } from "react";
+import { HandCoins, Plus, LogIn, QrCode } from "lucide-react";
 import { useGroup } from "../providers/GroupProvider";
 import { createGroup, joinGroup } from "../lib/api";
+import { extractJoinCode } from "../lib/join";
 import { nairaToKobo } from "../lib/format";
+
+// Loaded on demand so the QR decoder never lands in the main bundle.
+const QrScanner = lazy(() => import("./QrScanner"));
 
 // Every feature page needs an active pot. GroupGate shows the "no pot yet"
 // onboarding (create or join) until the signed-in user belongs to one.
@@ -14,6 +18,7 @@ export default function GroupGate({ children }: { children: ReactNode }) {
   const [joinCode, setJoinCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [scanning, setScanning] = useState(false);
 
   // Still resolving the user's groups.
   if (loading) {
@@ -41,18 +46,27 @@ export default function GroupGate({ children }: { children: ReactNode }) {
     }
   };
 
-  const handleJoin = async (e: FormEvent) => {
-    e.preventDefault();
+  const join = async (raw: string) => {
+    const value = extractJoinCode(raw);
+    if (!value) {
+      setError("Enter the join code your treasurer shared.");
+      return;
+    }
     setError("");
     setBusy(true);
     try {
-      await joinGroup(joinCode.trim());
+      await joinGroup(value);
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not join that pot.");
     } finally {
       setBusy(false);
     }
+  };
+
+  const handleJoin = (e: FormEvent) => {
+    e.preventDefault();
+    join(joinCode);
   };
 
   return (
@@ -137,12 +151,27 @@ export default function GroupGate({ children }: { children: ReactNode }) {
               />
             </div>
             {error && <p className="text-sm text-rose-600">{error}</p>}
-            <button type="submit" disabled={busy} className="cp-btn-primary w-full">
-              {busy ? "Joining..." : "Join pot"}
-            </button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button type="submit" disabled={busy} className="cp-btn-primary flex-1">
+                {busy ? "Joining..." : "Join pot"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setScanning(true)}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-primary-200 bg-primary-50 px-4 py-2.5 text-sm font-semibold text-primary-700 transition hover:bg-primary-100 dark:border-primary-800/50 dark:bg-primary-900/30 dark:text-primary-300"
+              >
+                <QrCode className="w-4 h-4" /> Scan QR
+              </button>
+            </div>
           </form>
         )}
       </div>
+
+      {scanning && (
+        <Suspense fallback={null}>
+          <QrScanner onResult={(text) => { setScanning(false); join(text); }} onClose={() => setScanning(false)} />
+        </Suspense>
+      )}
     </div>
   );
 }

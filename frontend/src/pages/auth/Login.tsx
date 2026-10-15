@@ -1,11 +1,14 @@
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import AuthLayout from "../../layouts/AuthLayout";
 import { login, setSession } from "../../lib/api";
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  // Where to go after login — set by ProtectedRoute (e.g. a scanned join link).
+  const from = (location.state as { from?: string } | null)?.from ?? "/dashboard";
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
@@ -18,7 +21,7 @@ export default function Login() {
     try {
       const res = await login(form.email, form.password);
       setSession(res.token, res.user);
-      navigate("/dashboard");
+      navigate(from, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally {
@@ -90,7 +93,7 @@ export default function Login() {
 
       <p className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
         Don't have an account?{" "}
-        <Link to="/signup" className="font-semibold text-primary-600 hover:text-primary-700">
+        <Link to="/signup" state={{ from }} className="font-semibold text-primary-600 hover:text-primary-700">
           Sign up
         </Link>
       </p>

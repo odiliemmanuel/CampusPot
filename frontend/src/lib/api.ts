@@ -251,6 +251,11 @@ export const joinGroup = (joinCode: string) =>
 export const listMembers = (groupId: string) => request<Membership[] | null>(`/groups/${groupId}/members`).then((m) => m ?? []);
 export const inviteMember = (groupId: string, email: string, role: Role) =>
   request<Membership>(`/groups/${groupId}/invite`, { method: "POST", body: JSON.stringify({ email, role }) });
+export const updateMemberRole = (groupId: string, userId: string, role: Role) =>
+  request<Membership>(`/groups/${groupId}/members/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ role }),
+  });
 
 // ---------- Levies ----------
 

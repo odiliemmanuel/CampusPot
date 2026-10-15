@@ -1,12 +1,14 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, HandCoins, Check } from "lucide-react";
+import { ChevronDown, HandCoins, Check, Plus } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useGroup } from "../providers/GroupProvider";
 
 // Switch between every pot the signed-in user belongs to. Shown in the sidebar
 // on both desktop and mobile so the active pot is always obvious.
 export default function GroupSwitcher({ onNavigate }: { onNavigate?: () => void }) {
   const { groups, activeGroup, setActiveGroup } = useGroup();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
 
   if (groups.length === 0) return null;
@@ -51,6 +53,19 @@ export default function GroupSwitcher({ onNavigate }: { onNavigate?: () => void 
                 {activeGroup?.id === g.id && <Check className="w-3.5 h-3.5 text-primary-400 shrink-0" />}
               </button>
             ))}
+
+            <div className="my-1 h-px bg-white/10" />
+            <button
+              onClick={() => {
+                setOpen(false);
+                onNavigate?.();
+                navigate("/join");
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-primary-300 hover:bg-white/5 hover:text-white transition text-left"
+            >
+              <Plus className="w-4 h-4 shrink-0" />
+              <span className="truncate flex-1">Join another pot</span>
+            </button>
           </motion.div>
         )}
       </AnimatePresence>

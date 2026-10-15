@@ -218,3 +218,56 @@ func TestRiskFlags(t *testing.T) {
 		t.Fatal("expected risk reasons to be recorded")
 	}
 }
+
+func TestDemoOpeningBalance(t *testing.T) {
+	ctx := context.Background()
+	svc, db := newTestService(t)
+	svc.cfg.DemoOpeningBalance = true
+
+	treasurer := newUser(t, db, "Ada", "ada-open@x.ng")
+	group, err := svc.CreateGroup(ctx, treasurer.ID, CreateGroupRequest{Name: "Open Pot"})
+	if err != nil {
+		t.Fatalf("CreateGroup: %v", err)
+	}
+
+	bal, err := svc.Balance(ctx, group.ID)
+	if err != nil {
+		t.Fatalf("Balance: %v", err)
+	}
+	want := []int64{
+		int64(money.FromNaira(80_000)),
+		int64(money.FromNaira(100_000)),
+		int64(money.FromNaira(200_000)),
+	}
+	valid := false
+	for _, w := range want {
+		if bal == w {
+			valid = true
+		}
+	}
+	if !valid {
+		t.Fatalf("opening balance = %d, want one of 80k/100k/200k", bal)
+	}
+
+	// The float must count toward the balance but never toward "collected".
+	sum, err := svc.Summary(ctx, group.ID, nil)
+	if err != nil {
+		t.Fatalf("Summary: %v", err)
+	}
+	if sum.CollectedKobo != 0 {
+		t.Fatalf("collected = %d, want 0 (opening float is not a contribution)", sum.CollectedKobo)
+	}
+	if sum.BalanceKobo != bal {
+		t.Fatalf("summary balance = %d, want %d", sum.BalanceKobo, bal)
+	}
+
+	// Disabled config produces an empty pot (the existing test behaviour).
+	svc.cfg.DemoOpeningBalance = false
+	empty, err := svc.CreateGroup(ctx, treasurer.ID, CreateGroupRequest{Name: "Empty Pot"})
+	if err != nil {
+		t.Fatalf("CreateGroup (disabled): %v", err)
+	}
+	if b, _ := svc.Balance(ctx, empty.ID); b != 0 {
+		t.Fatalf("balance with opening disabled = %d, want 0", b)
+	}
+}

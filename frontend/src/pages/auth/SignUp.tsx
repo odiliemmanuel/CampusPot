@@ -1,11 +1,13 @@
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff, User, Phone } from "lucide-react";
 import AuthLayout from "../../layouts/AuthLayout";
 import { register, setSession } from "../../lib/api";
 
 export default function SignUp() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = (location.state as { from?: string } | null)?.from ?? "/dashboard";
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "", password: "" });
   const [loading, setLoading] = useState(false);
@@ -18,7 +20,7 @@ export default function SignUp() {
     try {
       const res = await register(form.name, form.email, form.password, form.phone);
       setSession(res.token, res.user);
-      navigate("/dashboard");
+      navigate(from, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally {

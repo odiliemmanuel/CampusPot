@@ -54,7 +54,6 @@ func main() {
 		Name:              "200L Mass Comm Dues",
 		ApprovalThreshold: 2,
 		ApprovalTotal:     3,
-		LargeExpenseKobo:  int64(money.FromNaira(20_000)), // ₦20,000 soft limit
 	})
 	if err != nil {
 		log.Fatalf("create group: %v", err)
@@ -91,9 +90,24 @@ func main() {
 	deposit(ctx, potSvc, group.ID, money.FromNaira(2_000), refFor[members[3].ID], members[3].Name, "seed-dep-4")
 	deposit(ctx, potSvc, group.ID, money.FromNaira(1_000), "", "Unknown Payer", "seed-dep-5")
 
+	// Anchor the soft limit to the (randomly seeded) balance so the demo
+	// reliably shows every risk level: a spend over half the pot reads medium,
+	// one over the whole pot reads high.
+	balance, err := potSvc.Balance(ctx, group.ID)
+	if err != nil {
+		log.Fatalf("balance: %v", err)
+	}
+	group.LargeExpenseKobo = balance
+	if err := db.Model(&models.Group{}).Where("id = ?", group.ID).
+		Update("large_expense_kobo", balance).Error; err != nil {
+		log.Fatalf("set large-expense threshold: %v", err)
+	}
+	mediumAmount := balance/2 + int64(money.FromNaira(5_000))
+	overAmount := balance + int64(money.FromNaira(10_000))
+
 	// A medium-risk expense (over half the balance), awaiting approvals.
 	expense, err := potSvc.CreateExpense(ctx, group.ID, treasurer.ID, pot.CreateExpenseRequest{
-		AmountKobo:  int64(money.FromNaira(15_000)),
+		AmountKobo:  mediumAmount,
 		Destination: "0123456789", // sandbox payout account id
 		Category:    "Excursion bus",
 		Note:        "Deposit for 18-seater bus",
@@ -103,7 +117,7 @@ func main() {
 	}
 	// An over-budget expense to demonstrate the high-risk flag.
 	overBudget, err := potSvc.CreateExpense(ctx, group.ID, treasurer.ID, pot.CreateExpenseRequest{
-		AmountKobo:  int64(money.FromNaira(90_000)),
+		AmountKobo:  overAmount,
 		Destination: "0987654321",
 		Category:    "New speaker",
 		Note:        "Sound system upgrade",

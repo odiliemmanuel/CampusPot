@@ -28,6 +28,7 @@ func (ct *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 	g.GET("/:id", ct.getGroup)
 	g.POST("/:id/invite", ct.invite)
 	g.GET("/:id/members", ct.listMembers)
+	g.PATCH("/:id/members/:userId", ct.updateMemberRole)
 
 	g.POST("/:id/levies", ct.createLevy)
 	g.GET("/:id/levies", ct.listLevies)
@@ -129,6 +130,28 @@ func (ct *Controller) listMembers(c *gin.Context) {
 		return
 	}
 	response.OK(c, members)
+}
+
+func (ct *Controller) updateMemberRole(c *gin.Context) {
+	groupID, ok := pathID(c, "id")
+	if !ok {
+		return
+	}
+	targetID, ok := pathID(c, "userId")
+	if !ok {
+		return
+	}
+	var req UpdateRoleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "INVALID_BODY", err.Error())
+		return
+	}
+	m, err := ct.svc.UpdateMemberRole(c.Request.Context(), groupID, auth.MustUserID(c), targetID, req.Role)
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, m)
 }
 
 func (ct *Controller) createLevy(c *gin.Context) {

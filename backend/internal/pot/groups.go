@@ -82,6 +82,20 @@ func (s *Service) CreateGroup(ctx context.Context, treasurerID uuid.UUID, req Cr
 	if err := s.db.Create(m).Error; err != nil {
 		return nil, err
 	}
+
+	// Seed the pot with a demo opening float so a brand-new pot is not empty.
+	// It counts toward the balance but never toward "collected".
+	if s.cfg != nil && s.cfg.DemoOpeningBalance {
+		if err := s.appendLedger(s.db, &models.LedgerEntry{
+			GroupID:     group.ID,
+			Kind:        models.LedgerOpening,
+			AmountKobo:  randomOpeningBalance(),
+			Description: "Opening balance",
+			RefType:     "opening",
+		}); err != nil {
+			log.Printf("opening balance for group %s: %v", group.ID, err)
+		}
+	}
 	return group, nil
 }
 
@@ -207,6 +221,47 @@ func (s *Service) Invite(_ context.Context, groupID, actorID uuid.UUID, req Invi
 		return nil, err
 	}
 	return m, nil
+}
+
+// UpdateRoleRequest changes a member's role within a pot.
+type UpdateRoleRequest struct {
+	Role models.Role `json:"role"`
+}
+
+// UpdateMemberRole lets a treasurer promote or demote another member — e.g.
+// turning someone who joined with the code into a co-signer. Treasurer only,
+// and the pot always keeps at least one treasurer.
+func (s *Service) UpdateMemberRole(_ context.Context, groupID, actorID, targetUserID uuid.UUID, role models.Role) (*models.Membership, error) {
+	if _, err := s.requireRole(groupID, actorID, models.RoleTreasurer); err != nil {
+		return nil, err
+	}
+	if role != models.RoleMember && role != models.RoleCosigner && role != models.RoleTreasurer {
+		return nil, fmt.Errorf("%w: role must be member, cosigner or treasurer", ErrInvalid)
+	}
+
+	var m models.Membership
+	if err := s.db.Where("group_id = ? AND user_id = ?", groupID, targetUserID).First(&m).Error; err != nil {
+		return nil, ErrNotFound
+	}
+
+	// Never let the last treasurer step down — that would lock the pot.
+	if m.Role == models.RoleTreasurer && role != models.RoleTreasurer {
+		var treasurers int64
+		if err := s.db.Model(&models.Membership{}).
+			Where("group_id = ? AND role = ? AND status = ?", groupID, models.RoleTreasurer, models.MembershipActive).
+			Count(&treasurers).Error; err != nil {
+			return nil, err
+		}
+		if treasurers <= 1 {
+			return nil, fmt.Errorf("%w: the pot must keep at least one treasurer", ErrInvalid)
+		}
+	}
+
+	m.Role = role
+	if err := s.db.Save(&m).Error; err != nil {
+		return nil, err
+	}
+	return &m, nil
 }
 
 // Join turns a join code into an active membership.

@@ -137,8 +137,9 @@ type Payment struct {
 
 // Ledger kinds.
 const (
-	LedgerCredit = "credit"
-	LedgerDebit  = "debit"
+	LedgerCredit  = "credit"
+	LedgerDebit   = "debit"
+	LedgerOpening = "opening" // a demo opening float; counts toward the balance but not "collected"
 )
 
 // LedgerEntry is an immutable, append-only record of money in or out of a pot.

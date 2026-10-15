@@ -18,6 +18,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/odiliemmmanuel/campuspot/common/money"
 	"github.com/odiliemmmanuel/campuspot/config"
 	"github.com/odiliemmmanuel/campuspot/internal/bmoni"
 	"github.com/odiliemmmanuel/campuspot/internal/models"
@@ -56,7 +57,7 @@ func (s *Service) appendLedger(tx *gorm.DB, e *models.LedgerEntry) error {
 	if err != nil {
 		return err
 	}
-	if e.Kind == models.LedgerCredit {
+	if e.Kind == models.LedgerCredit || e.Kind == models.LedgerOpening {
 		current += e.AmountKobo
 	} else {
 		current -= e.AmountKobo
@@ -68,11 +69,12 @@ func (s *Service) appendLedger(tx *gorm.DB, e *models.LedgerEntry) error {
 	return tx.Create(e).Error
 }
 
-// balanceTx computes a group's balance from the ledger.
+// balanceTx computes a group's balance from the ledger. Credits and demo
+// opening floats increase the balance; debits decrease it.
 func balanceTx(db *gorm.DB, groupID uuid.UUID) (int64, error) {
 	var credit, debit int64
 	if err := db.Model(&models.LedgerEntry{}).
-		Where("group_id = ? AND kind = ?", groupID, models.LedgerCredit).
+		Where("group_id = ? AND kind IN ?", groupID, []string{models.LedgerCredit, models.LedgerOpening}).
 		Select("COALESCE(SUM(amount_kobo),0)").Scan(&credit).Error; err != nil {
 		return 0, err
 	}
@@ -121,6 +123,24 @@ func generateJoinCode() (string, error) {
 		b.WriteByte(joinCodeAlphabet[n.Int64()])
 	}
 	return b.String(), nil
+}
+
+// demoOpeningBalances are the random floats a freshly created pot may start
+// with in a demo, so a brand-new pot is never empty and payouts can be
+// approved and exercised straight away.
+var demoOpeningBalances = []int64{
+	int64(money.FromNaira(80_000)),
+	int64(money.FromNaira(100_000)),
+	int64(money.FromNaira(200_000)),
+}
+
+// randomOpeningBalance picks one of the demo opening floats at random.
+func randomOpeningBalance() int64 {
+	n, err := rand.Int(rand.Reader, big.NewInt(int64(len(demoOpeningBalances))))
+	if err != nil {
+		return demoOpeningBalances[0]
+	}
+	return demoOpeningBalances[n.Int64()]
 }
 
 // shortRef is a human-quotable suffix derived from a UUID.

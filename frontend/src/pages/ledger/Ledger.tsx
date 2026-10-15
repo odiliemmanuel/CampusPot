@@ -78,7 +78,7 @@ function LedgerInner() {
                     </p>
                   </div>
                 </div>
-                <span className="sm:col-span-3 text-xs text-slate-400 capitalize">{l.kind.replace("_", " ")}</span>
+                <span className="sm:col-span-3 text-xs text-slate-400 capitalize">{kindLabel[l.kind] ?? l.kind.replace("_", " ")}</span>
                 <span className={`sm:col-span-2 sm:text-right text-sm font-semibold ${l.amountKobo >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
                   {l.amountKobo >= 0 ? "+" : ""}{formatNaira(l.amountKobo)}
                 </span>

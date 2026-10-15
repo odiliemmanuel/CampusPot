@@ -14,6 +14,7 @@ import Members from "./pages/members/Members";
 import Ledger from "./pages/ledger/Ledger";
 import Assistant from "./pages/assistant/Assistant";
 import Settings from "./pages/settings/Settings";
+import JoinPot from "./pages/join/JoinPot";
 
 export default function App() {
   return (
@@ -35,6 +36,10 @@ export default function App() {
             <Route path="/ledger" element={<ProtectedRoute><Ledger /></ProtectedRoute>} />
             <Route path="/assistant" element={<ProtectedRoute><Assistant /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+
+            {/* Join by code or scanned QR link */}
+            <Route path="/join" element={<ProtectedRoute><JoinPot /></ProtectedRoute>} />
+            <Route path="/join/:code" element={<ProtectedRoute><JoinPot /></ProtectedRoute>} />
           </Routes>
         </GroupProvider>
       </BrowserRouter>
