@@ -1,245 +1,301 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
-  Wallet, TrendingUp, AlertCircle, CheckCircle2, Sparkles, ArrowRight,
-  Clock, Loader2, Users,
+  Check, ChevronDown, Clock, Download, Filter, List, MoreVertical,
+  Receipt, TrendingUp, Users, Wallet, type LucideIcon,
 } from "lucide-react";
 
 import AppShell from "../../layouts/AppShell";
 import GroupGate from "../../components/GroupGate";
+import PageHeader from "../../components/PageHeader";
+import StatCard from "../../components/StatCard";
+import StatusBadge, { type StatusTone } from "../../components/StatusBadge";
+import DataTable, { type Column } from "../../components/DataTable";
+import Pagination from "../../components/Pagination";
 import { useGroup } from "../../providers/GroupProvider";
+import { formatNaira } from "../../lib/format";
 import {
-  getSummary, getOutstanding, listLedger, listExpenses,
-  type GroupSummary, type OutstandingMember, type LedgerEntry, type ExpenseRequest,
-} from "../../lib/api";
-import { formatNaira, formatNairaCompact } from "../../lib/format";
+  dashboardStats, recentContributions, periodOptions,
+  type ContributionRow, type ContributionStatus, type StatIcon,
+} from "./dashboardMock";
+
+// ---------- static maps ----------
+
+const iconMap: Record<StatIcon, LucideIcon> = {
+  wallet: Wallet,
+  users: Users,
+  clock: Clock,
+  trending: TrendingUp,
+};
+
+const statusMeta: Record<ContributionStatus, { label: string; tone: StatusTone }> = {
+  paid: { label: "Paid", tone: "success" },
+  processing: { label: "Processing", tone: "info" },
+  pending: { label: "Pending", tone: "warning" },
+  overdue: { label: "Overdue", tone: "danger" },
+};
+
+const filterOptions = [
+  { value: "all", label: "All statuses" },
+  { value: "paid", label: "Paid" },
+  { value: "processing", label: "Processing" },
+  { value: "pending", label: "Pending" },
+  { value: "overdue", label: "Overdue" },
+];
+
+const fmtDate = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" });
+const fmtTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString("en-NG", { hour: "numeric", minute: "2-digit" });
+
+const columns: Column<ContributionRow>[] = [
+  {
+    key: "reference",
+    header: "Reference",
+    render: (r) => (
+      <Link to="/ledger" className="font-semibold text-brand-600 hover:underline">
+        {r.reference}
+      </Link>
+    ),
+  },
+  {
+    key: "member",
+    header: "Member",
+    render: (r) => <span className="font-medium text-slate-700">{r.member}</span>,
+  },
+  {
+    key: "levy",
+    header: "Levy",
+    render: (r) => (
+      <span className="inline-flex items-center gap-1.5 text-slate-600">
+        <Receipt className="h-4 w-4 text-slate-400" />
+        {r.levy}
+      </span>
+    ),
+  },
+  {
+    key: "channel",
+    header: "Channel",
+    render: (r) => <span className="text-slate-600">{r.channel}</span>,
+  },
+  {
+    key: "status",
+    header: "Status",
+    render: (r) => <StatusBadge label={statusMeta[r.status].label} tone={statusMeta[r.status].tone} />,
+  },
+  {
+    key: "date",
+    header: "Date",
+    render: (r) => (
+      <span>
+        <span className="block text-slate-700">{fmtDate(r.date)}</span>
+        <span className="block text-xs text-slate-400">{fmtTime(r.date)}</span>
+      </span>
+    ),
+  },
+  {
+    key: "actions",
+    header: <span className="sr-only">Actions</span>,
+    headerClassName: "w-12",
+    className: "text-right",
+    render: () => (
+      <button
+        type="button"
+        aria-label="Row actions"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+      >
+        <MoreVertical className="h-4 w-4" />
+      </button>
+    ),
+  },
+];
+
+// ---------- small dropdown used for the period + filter controls ----------
+
+function Dropdown({
+  icon: Icon,
+  options,
+  value,
+  onChange,
+}: {
+  icon?: LucideIcon;
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [open]);
+
+  const current = options.find((o) => o.value === value)?.label ?? "";
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+      >
+        {Icon && <Icon className="h-4 w-4 text-slate-400" />}
+        {current}
+        <ChevronDown className="h-4 w-4 text-slate-400" />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.ul
+            role="menu"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            className="absolute right-0 z-10 mt-2 min-w-[10rem] rounded-xl border border-slate-100 bg-white p-1.5 shadow-lg"
+          >
+            {options.map((o) => (
+              <li key={o.value}>
+                <button
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={o.value === value}
+                  onClick={() => {
+                    onChange(o.value);
+                    setOpen(false);
+                  }}
+                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm transition ${
+                    o.value === value
+                      ? "bg-brand-50 font-semibold text-brand-700"
+                      : "text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  {o.label}
+                  {o.value === value && <Check className="h-3.5 w-3.5" />}
+                </button>
+              </li>
+            ))}
+          </motion.ul>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ---------- page ----------
 
 function DashboardInner() {
   const { activeGroup } = useGroup();
-  const groupId = activeGroup?.id;
 
-  const [summary, setSummary] = useState<GroupSummary | null>(null);
-  const [outstanding, setOutstanding] = useState<OutstandingMember[]>([]);
-  const [ledger, setLedger] = useState<LedgerEntry[]>([]);
-  const [expenses, setExpenses] = useState<ExpenseRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [period, setPeriod] = useState("This Week");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
-  useEffect(() => {
-    if (!groupId) return;
-    setLoading(true);
-    setError("");
-    Promise.all([
-      getSummary(groupId),
-      getOutstanding(groupId),
-      listLedger(groupId),
-      listExpenses(groupId),
-    ])
-      .then(([summaryRes, outstandingRes, ledgerList, expenseList]) => {
-        setSummary(summaryRes);
-        setOutstanding(outstandingRes.members);
-        setLedger(ledgerList);
-        setExpenses(expenseList);
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : "Couldn't load the dashboard."))
-      .finally(() => setLoading(false));
-  }, [activeGroup?.id]);
+  const filtered = useMemo(
+    () =>
+      statusFilter === "all"
+        ? recentContributions
+        : recentContributions.filter((r) => r.status === statusFilter),
+    [statusFilter]
+  );
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="w-6 h-6 text-primary-600 animate-spin" />
-      </div>
-    );
-  }
+  // Reset to the first page whenever the filter or page size changes.
+  useEffect(() => setPage(1), [statusFilter, pageSize]);
 
-  if (error || !summary) {
-    return (
-      <div className="cp-card rounded-3xl p-8 text-center">
-        <p className="text-slate-600 dark:text-slate-300">{error || "No data yet."}</p>
-      </div>
-    );
-  }
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const current = Math.min(page, totalPages);
+  const paged = filtered.slice((current - 1) * pageSize, current * pageSize);
 
-  const owe = outstanding.filter((m) => m.state !== "paid");
-  const pending = expenses.filter((e) => e.status === "pending_approval");
-
-  const stats = [
-    { label: "Pot balance", value: summary.balanceKobo, icon: Wallet, tint: "text-primary-600 bg-primary-100 dark:bg-primary-500/15" },
-    { label: "Collected", value: summary.collectedKobo, icon: TrendingUp, tint: "text-emerald-600 bg-emerald-100 dark:bg-emerald-500/15" },
-    { label: "Outstanding", value: summary.outstandingKobo, icon: AlertCircle, tint: "text-amber-600 bg-amber-100 dark:bg-amber-500/15" },
-  ];
+  const exportCsv = () => {
+    const header = ["Reference", "Member", "Levy", "Channel", "Status", "Date"];
+    const rows = filtered.map((r) => [
+      r.reference, r.member, r.levy, r.channel, statusMeta[r.status].label, r.date,
+    ]);
+    const csv = [header, ...rows]
+      .map((cols) => cols.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "campuspot-contributions.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <>
-      {/* Hero */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="rounded-3xl bg-gradient-to-br from-primary-600 to-primary-800 p-6 sm:p-8 mb-6 relative overflow-hidden"
-      >
-        <div className="absolute -top-10 -right-10 w-56 h-56 rounded-full bg-white/10 blur-2xl" />
-        <div className="relative flex flex-wrap items-center justify-between gap-6">
-          <div>
-            <p className="text-primary-100 text-sm">{summary.groupName}</p>
-            <h1 className="font-sora text-3xl sm:text-4xl font-bold text-white mt-1">
-              {formatNaira(summary.balanceKobo)}
-            </h1>
-            <p className="text-primary-100 mt-1.5 text-sm">
-              {summary.paidCount} of {summary.members} members have paid · {summary.currency}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="bg-white/15 backdrop-blur rounded-2xl px-5 py-3">
-              <p className="text-white font-bold leading-none">{summary.paidCount}/{summary.members}</p>
-              <p className="text-primary-100 text-xs mt-1">paid</p>
-            </div>
-            <div className="bg-white/15 backdrop-blur rounded-2xl px-5 py-3">
-              <p className="text-white font-bold leading-none">{summary.outstandingCount}</p>
-              <p className="text-primary-100 text-xs mt-1">owing</p>
-            </div>
-          </div>
-        </div>
-      </motion.div>
+      <PageHeader
+        title="Dashboard"
+        subtitle={`Here's how ${activeGroup?.name ?? "your pot"} is doing ${period.toLowerCase()}.`}
+        action={
+          <Dropdown
+            options={periodOptions.map((p) => ({ value: p, label: p }))}
+            value={period}
+            onChange={setPeriod}
+          />
+        }
+      />
 
       {/* Stat cards */}
-      <div className="grid sm:grid-cols-3 gap-4 mb-6">
-        {stats.map((s) => (
-          <div key={s.label} className="cp-stat">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${s.tint}`}>
-              <s.icon className="w-5 h-5" />
-            </div>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{s.label}</p>
-            <p className="font-sora text-xl font-bold text-slate-900 dark:text-white mt-0.5">
-              {formatNaira(s.value)}
-            </p>
-          </div>
-        ))}
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+        {dashboardStats.map((stat) => {
+          const Icon = iconMap[stat.icon];
+          return (
+            <StatCard
+              key={stat.id}
+              icon={<Icon className="h-5 w-5" />}
+              label={stat.label}
+              value={stat.valueKobo != null ? formatNaira(stat.valueKobo) : stat.valueText ?? ""}
+              trend={stat.trend}
+              color={stat.color}
+              spark={stat.spark}
+            />
+          );
+        })}
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Who owes + AI insight */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="cp-card rounded-3xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Who hasn't paid
-              </p>
-              <Link to="/contributions" className="text-xs font-semibold text-primary-600 hover:text-primary-700 inline-flex items-center gap-1">
-                Contributions <ArrowRight className="w-3 h-3" />
-              </Link>
-            </div>
-            {owe.length === 0 ? (
-              <div className="flex items-center gap-3 text-sm text-emerald-600 dark:text-emerald-400">
-                <CheckCircle2 className="w-5 h-5" /> Everyone has paid — nice.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {owe.map((m) => (
-                  <div key={m.userId} className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                        {m.name.charAt(0)}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{m.name}</p>
-                        <p className="text-xs text-slate-400">
-                          {m.state === "partial" ? `Paid ${formatNaira(m.paidKobo)} of ${formatNaira(m.amountKobo)}` : "No payment yet"}
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-sm font-bold text-amber-600 shrink-0">{formatNaira(m.outstandingKobo)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+      {/* Recent contributions */}
+      <section className="mt-6 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-5">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+              <List className="h-4 w-4" />
+            </span>
+            <h2 className="text-base font-semibold text-slate-900">Recent Contributions</h2>
           </div>
 
-          {/* AI insight */}
-          <div className="rounded-3xl bg-gradient-to-br from-primary-50 to-primary-100/60 dark:from-primary-900/40 dark:to-primary-950/30 border border-primary-200 dark:border-primary-800/50 p-6">
-            <div className="flex items-center gap-2 mb-3">
-              <Sparkles className="w-4 h-4 text-primary-600" />
-              <p className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-300">AI Treasurer</p>
-            </div>
-            <p className="text-slate-700 dark:text-slate-200 leading-relaxed">
-              {owe.length === 0
-                ? `All ${summary.members} members are square. The pot holds ${formatNaira(summary.balanceKobo)}.`
-                : `${owe.length} member${owe.length > 1 ? "s" : ""} still owing — ${formatNaira(summary.outstandingKobo)} outstanding in total.`}
-            </p>
-            <Link to="/assistant" className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-700 dark:text-primary-300 mt-3 hover:gap-2.5 transition-all">
-              Ask the AI Treasurer <ArrowRight className="w-4 h-4" />
-            </Link>
+          <div className="flex items-center gap-2">
+            <Dropdown icon={Filter} options={filterOptions} value={statusFilter} onChange={setStatusFilter} />
+            <button
+              type="button"
+              onClick={exportCsv}
+              className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+            >
+              <Download className="h-4 w-4" /> Export
+            </button>
           </div>
         </div>
 
-        {/* Approvals + activity */}
-        <div className="space-y-6">
-          <div className="cp-card rounded-3xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Pending payouts
-              </p>
-              <Clock className="w-4 h-4 text-slate-400" />
-            </div>
-            {pending.length === 0 ? (
-              <p className="text-sm text-slate-400">No payouts awaiting approval.</p>
-            ) : (
-              <div className="space-y-3">
-                {pending.map((e) => (
-                  <Link key={e.id} to="/expenses" className="block p-3 rounded-xl bg-white dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700 hover:border-primary-300 transition">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{e.destination}</span>
-                      <span className="text-sm font-bold text-slate-900 dark:text-white">{formatNairaCompact(e.amountKobo)}</span>
-                    </div>
-                    <span className={`inline-flex items-center gap-1 text-[11px] font-semibold mt-1 ${
-                      e.riskLevel === "high" ? "text-rose-600" : e.riskLevel === "medium" ? "text-amber-600" : "text-slate-400"
-                    }`}>
-                      <Clock className="w-3 h-3" /> awaiting 2-of-3 approval
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
+        <DataTable columns={columns} rows={paged} getRowKey={(r) => r.id} empty="No contributions match this filter." />
 
-          <div className="cp-card rounded-3xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Recent activity</p>
-              <Link to="/ledger" className="text-xs font-semibold text-primary-600 hover:text-primary-700">View all</Link>
-            </div>
-            {ledger.length === 0 ? (
-              <p className="text-sm text-slate-400">Nothing yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {ledger.slice(0, 5).map((l) => (
-                  <div key={l.id} className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                      l.amountKobo >= 0 ? "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600" : "bg-rose-100 dark:bg-rose-500/15 text-rose-600"
-                    }`}>
-                      {l.amountKobo >= 0 ? <TrendingUp className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm text-slate-700 dark:text-slate-200 truncate">{l.description}</p>
-                      <p className="text-xs text-slate-400">{new Date(l.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}</p>
-                    </div>
-                    <span className={`text-sm font-semibold shrink-0 ${l.amountKobo >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-                      {l.amountKobo >= 0 ? "+" : ""}{formatNairaCompact(l.amountKobo)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {pending.length > 0 && (
-            <Link to="/expenses" className="flex items-center justify-center gap-2 rounded-3xl bg-primary-600 text-white py-4 font-semibold hover:shadow-lg hover:shadow-primary-600/30 transition">
-              <Users className="w-4 h-4" /> Review {pending.length} approval{pending.length > 1 ? "s" : ""}
-            </Link>
-          )}
+        <div className="border-t border-slate-100 p-4">
+          <Pagination
+            page={current}
+            pageSize={pageSize}
+            total={filtered.length}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
-      </div>
+      </section>
     </>
   );
 }

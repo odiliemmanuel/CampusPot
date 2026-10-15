@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { useTheme } from "next-themes";
-import { Loader2, Sun, Moon, LogOut } from "lucide-react";
+import { Loader2, LogOut } from "lucide-react";
 
 import AppShell from "../../layouts/AppShell";
 import PageHeader from "../../components/PageHeader";
@@ -10,8 +9,6 @@ import { formatNaira } from "../../lib/format";
 
 export default function Settings() {
   const { activeGroup } = useGroup();
-  const { theme, setTheme } = useTheme();
-  const isDark = theme === "dark";
 
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -71,24 +68,6 @@ export default function Settings() {
             </div>
           </div>
         )}
-
-        {/* Appearance */}
-        <div className="cp-card rounded-3xl p-6">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-4">Appearance</p>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-800 dark:text-slate-200">Dark mode</p>
-              <p className="text-xs text-slate-400">Switch the content area theme.</p>
-            </div>
-            <button
-              onClick={() => setTheme(isDark ? "light" : "dark")}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-amber-300 text-sm font-medium hover:bg-primary-100 dark:hover:bg-slate-700 transition"
-            >
-              {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-              {isDark ? "Light" : "Dark"}
-            </button>
-          </div>
-        </div>
 
         {/* Session */}
         <div className="cp-card rounded-3xl p-6">

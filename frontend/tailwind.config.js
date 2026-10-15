@@ -5,7 +5,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
+        sans: ["Poppins", "Inter", "system-ui", "sans-serif"],
         sora: ["Sora", "system-ui", "sans-serif"],
       },
       colors: {
@@ -23,13 +23,27 @@ export default {
           900: "#181F79",
           950: "#0F1450",
         },
+        // Dashboard (admin) palette — royal-blue sidebar + vivid accents.
+        brand: {
+          50: "#EEF3FF",
+          100: "#DCE6FF",
+          200: "#BACCFE",
+          300: "#8FAAF9",
+          400: "#6086F5",
+          500: "#4F7DF3", // sidebar active pill
+          600: "#2F5BEA", // primary action blue
+          700: "#2547B8", // sidebar gradient end
+          800: "#1E3A8A", // sidebar gradient start
+          900: "#182E6E",
+          950: "#101F4D",
+        },
         // Sidebar is near-black in both themes — only the content area switches.
         ink: {
           DEFAULT: "#0B0B14",
           light: "#171826",
         },
         // Light mode surfaces
-        canvas: "#F4F5FA",
+        canvas: "#F4F6FB",
         panel: "#FFFFFF",
         // Dark mode surfaces — deep space navy.
         "panel-dark": "#111226",
