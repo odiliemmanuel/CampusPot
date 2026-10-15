@@ -1,0 +1,21 @@
+# IDE / editor
+.idea/
+.vscode/
+
+# Local env
+.env
+.env.local
+
+# SQLite databases
+*.db
+*.db-shm
+*.db-wal
+
+# Go build output
+backend/bin/
+backend/tmp/
+
+# Node (frontend also has its own .gitignore)
+node_modules/
+dist/
+*.tsbuildinfo

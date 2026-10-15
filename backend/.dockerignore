@@ -1,0 +1,13 @@
+.git
+.gitignore
+Dockerfile
+.dockerignore
+*.db
+*.db-shm
+*.db-wal
+bin/
+tmp/
+.env
+.env.*
+!.env.example
+README.md

@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+/* Shared card surface used across every page. Light mode: sky-blue tint with
+   a real border so cards separate from the white content panel. Dark mode:
+   deep navy panel with a soft blue glow, matching the app's cosmic-glow look. */
+@layer components {
+  .cp-card {
+    @apply bg-sky-50 border border-sky-200 transition-colors duration-300;
+  }
+  .dark .cp-card {
+    @apply bg-panel-dark border-primary-500/25;
+    box-shadow:
+      inset 0 1px 0 0 rgba(107, 120, 245, 0.12),
+      0 4px 28px -8px rgba(47, 62, 228, 0.35);
+  }
+
+  /* Number-first money cards (balance, collected, outstanding). */
+  .cp-stat {
+    @apply rounded-3xl cp-card p-5;
+  }
+
+  .cp-input {
+    @apply w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 transition;
+  }
+
+  .cp-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 bg-gradient-to-br from-primary-600 to-primary-800 text-white px-5 py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-primary-600/30 transition disabled:opacity-60 disabled:cursor-not-allowed;
+  }
+
+  .cp-btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition;
+  }
+}
