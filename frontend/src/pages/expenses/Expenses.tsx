@@ -33,7 +33,7 @@ const statusLabel: Record<string, string> = {
   failed: "Failed",
 };
 
-function ExpensesInner() {
+export function ExpensesInner() {
   const { activeGroup } = useGroup();
   const gid = activeGroup!.id;
 

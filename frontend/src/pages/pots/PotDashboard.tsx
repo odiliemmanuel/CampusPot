@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link, Navigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import {
-  ArrowDownLeft, ArrowRight, ArrowUpRight, HandCoins, Loader2, PiggyBank,
-  Receipt, ScrollText, TrendingUp, Users, Wallet,
+  ArrowDownLeft, ArrowUpRight, HandCoins, Loader2, Receipt, ScrollText,
+  TrendingUp, Users, Wallet,
 } from "lucide-react";
 
-import AppShell from "../../layouts/AppShell";
-import GroupGate from "../../components/GroupGate";
 import PageHeader from "../../components/PageHeader";
 import DataTable, { type Column } from "../../components/DataTable";
 import Pagination from "../../components/Pagination";
@@ -20,8 +18,8 @@ const kindLabel: Record<string, string> = {
   opening: "Opening balance",
 };
 
-// A real, trend-free money tile (unlike the marketing StatCard, which invents a
-// "vs last week" delta).
+// A real, trend-free money tile (unlike the marketing StatCard, which invented
+// a "vs last week" delta).
 function StatTile({
   icon,
   label,
@@ -40,14 +38,14 @@ function StatTile({
     rose: "bg-rose-50 text-rose-600",
   } as const;
   return (
-    <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-      <div className="flex items-center gap-3">
-        <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${tones[tone]}`}>
+    <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-5">
+      <div className="flex items-center gap-2.5">
+        <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${tones[tone]}`}>
           {icon}
         </span>
         <p className="text-sm font-medium text-slate-500">{label}</p>
       </div>
-      <p className="mt-3 font-sora text-2xl font-bold text-slate-900">{value}</p>
+      <p className="mt-3 font-sora text-xl font-bold text-slate-900 sm:text-2xl">{value}</p>
     </div>
   );
 }
@@ -60,9 +58,7 @@ const columns: Column<LedgerEntry>[] = [
       <div className="flex items-center gap-3">
         <span
           className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-            e.amountKobo >= 0
-              ? "bg-emerald-100 text-emerald-600"
-              : "bg-rose-100 text-rose-600"
+            e.amountKobo >= 0 ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"
           }`}
         >
           {e.amountKobo >= 0 ? (
@@ -90,7 +86,11 @@ const columns: Column<LedgerEntry>[] = [
     className: "text-right",
     headerClassName: "text-right",
     render: (e) => (
-      <span className={e.amountKobo >= 0 ? "font-semibold text-emerald-600" : "font-semibold text-rose-600"}>
+      <span
+        className={
+          e.amountKobo >= 0 ? "font-semibold text-emerald-600" : "font-semibold text-rose-600"
+        }
+      >
         {e.amountKobo >= 0 ? "+" : "−"}
         {formatNaira(Math.abs(e.amountKobo))}
       </span>
@@ -111,16 +111,9 @@ const columns: Column<LedgerEntry>[] = [
   },
 ];
 
-function PotDashboardInner() {
+export default function PotDashboard() {
   const { id } = useParams<{ id: string }>();
-  const { groups, activeGroup, setActiveGroupById } = useGroup();
-
-  const group = groups.find((g) => g.id === id) ?? null;
-
-  // Keep the rest of the app scoped to whichever pot is open.
-  useEffect(() => {
-    if (id && activeGroup?.id !== id) setActiveGroupById(id);
-  }, [id, activeGroup?.id, setActiveGroupById]);
+  const { activeGroup } = useGroup();
 
   const [summary, setSummary] = useState<GroupSummary | null>(null);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
@@ -162,67 +155,39 @@ function PotDashboardInner() {
     [ordered, page, pageSize]
   );
 
-  if (!id) return <Navigate to="/pots" replace />;
-
-  if (!group) {
-    return (
-      <div className="rounded-3xl border border-slate-100 bg-white p-10 text-center">
-        <PiggyBank className="mx-auto mb-3 h-8 w-8 text-slate-300" />
-        <p className="text-slate-500">This pot isn't one you belong to.</p>
-        <Link
-          to="/pots"
-          className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-600 hover:underline"
-        >
-          Back to your pots <ArrowRight className="h-4 w-4" />
-        </Link>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="flex justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-brand-600" />
-      </div>
-    );
-  }
+  const base = `/pots/${id}`;
 
   return (
     <>
       <PageHeader
-        title={group.name}
+        title={activeGroup?.name ?? "Pot"}
         subtitle="This pot's dashboard — every figure and transaction below belongs to this pot alone."
-        action={
-          <Link to="/pots" className="cp-btn-ghost text-sm">
-            All pots
-          </Link>
-        }
       />
 
       {error && <p className="mb-4 text-sm text-rose-600">{error}</p>}
 
       {/* Money overview */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatTile
-          icon={<Wallet className="h-5 w-5" />}
+          icon={<Wallet className="h-4 w-4" />}
           label="Balance"
           value={formatNaira(summary?.balanceKobo ?? 0)}
           tone="brand"
         />
         <StatTile
-          icon={<TrendingUp className="h-5 w-5" />}
+          icon={<TrendingUp className="h-4 w-4" />}
           label="Collected"
           value={formatNaira(summary?.collectedKobo ?? 0)}
           tone="green"
         />
         <StatTile
-          icon={<ArrowUpRight className="h-5 w-5" />}
+          icon={<ArrowUpRight className="h-4 w-4" />}
           label="Spent"
           value={formatNaira(summary?.spentKobo ?? 0)}
           tone="rose"
         />
         <StatTile
-          icon={<Users className="h-5 w-5" />}
+          icon={<Users className="h-4 w-4" />}
           label="Outstanding"
           value={formatNaira(summary?.outstandingKobo ?? 0)}
           tone="amber"
@@ -231,37 +196,37 @@ function PotDashboardInner() {
 
       {/* Shortcuts into this pot's other pages */}
       <div className="mt-6 flex flex-wrap gap-2">
-        <Link to="/contributions" className="cp-btn-ghost text-sm">
+        <Link to={`${base}/contributions`} className="cp-btn-ghost text-sm">
           <HandCoins className="h-4 w-4" /> Contributions
         </Link>
-        <Link to="/levies" className="cp-btn-ghost text-sm">
+        <Link to={`${base}/levies`} className="cp-btn-ghost text-sm">
           <Receipt className="h-4 w-4" /> Levies
         </Link>
-        <Link to="/expenses" className="cp-btn-ghost text-sm">
-          <ArrowUpRight className="h-4 w-4" /> Payouts
-        </Link>
-        <Link to="/members" className="cp-btn-ghost text-sm">
+        <Link to={`${base}/members`} className="cp-btn-ghost text-sm">
           <Users className="h-4 w-4" /> Members
         </Link>
-        <Link to="/ledger" className="cp-btn-ghost text-sm">
+        <Link to={`${base}/ledger`} className="cp-btn-ghost text-sm">
           <ScrollText className="h-4 w-4" /> Full ledger
         </Link>
       </div>
 
       {/* This pot's transactions only */}
       <section className="mt-6 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
-        <div className="flex items-center gap-2.5 border-b border-slate-100 p-5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
-            <ScrollText className="h-4 w-4" />
-          </span>
-          <h2 className="text-base font-semibold text-slate-900">Transactions in this pot</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4 sm:p-5">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+              <ScrollText className="h-4 w-4" />
+            </span>
+            <h2 className="text-base font-semibold text-slate-900">Transactions in this pot</h2>
+          </div>
+          {loading && <Loader2 className="h-4 w-4 animate-spin text-slate-400" />}
         </div>
 
         <DataTable
           columns={columns}
           rows={paged}
           getRowKey={(e) => e.id}
-          empty="No transactions in this pot yet."
+          empty={loading ? "Loading…" : "No transactions yet."}
         />
 
         <div className="border-t border-slate-100 p-4">
@@ -271,20 +236,9 @@ function PotDashboardInner() {
             total={ledger.length}
             onPageChange={setPage}
             onPageSizeChange={setPageSize}
-            pageSizeOptions={[10, 20, 50]}
           />
         </div>
       </section>
     </>
-  );
-}
-
-export default function PotDashboard() {
-  return (
-    <AppShell>
-      <GroupGate>
-        <PotDashboardInner />
-      </GroupGate>
-    </AppShell>
   );
 }

@@ -1,24 +1,14 @@
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  ArrowRight, HandCoins, PiggyBank, Receipt, ScrollText, Send,
-  Settings, Sparkles, Users, X,
+  ArrowRight, HandCoins, LayoutDashboard, PiggyBank, Receipt, ScrollText,
+  Send, Settings, Sparkles, Users, X,
 } from "lucide-react";
+import { useGroup } from "../providers/GroupProvider";
 
-// Sidebar navigation. "Pots" lists every pot as a card; opening one shows that
-// pot's own dashboard and scopes the rest of the app to it. Icons from
-// lucide-react.
-const navItems = [
-  { to: "/pots", icon: PiggyBank, label: "Pots" },
-  { to: "/contributions", icon: HandCoins, label: "Contributions" },
-  { to: "/levies", icon: Receipt, label: "Levies" },
-  { to: "/expenses", icon: Send, label: "Payouts" },
-  { to: "/members", icon: Users, label: "Members" },
-  { to: "/ledger", icon: ScrollText, label: "Ledger" },
-  { to: "/assistant", icon: Sparkles, label: "AI Treasurer" },
-  { to: "/settings", icon: Settings, label: "Settings" },
-];
-
+// Top-level navigation is just the list of pots. Everything that belongs to a
+// single pot (its dashboard, contributions, levies, payouts, members, ledger
+// and AI treasurer) only appears once a pot is open, nested under its name.
 const navClass = ({ isActive }: { isActive: boolean }) =>
   [
     "group flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors",
@@ -28,7 +18,7 @@ const navClass = ({ isActive }: { isActive: boolean }) =>
       : "text-brand-100/90 hover:bg-white/10 hover:text-white",
   ].join(" ");
 
-function PromoCard({ onNavigate }: { onNavigate?: () => void }) {
+function PromoCard({ to, onNavigate }: { to: string; onNavigate?: () => void }) {
   return (
     <div className="rounded-2xl bg-white/10 p-4 text-white backdrop-blur-sm">
       <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
@@ -39,7 +29,7 @@ function PromoCard({ onNavigate }: { onNavigate?: () => void }) {
         Let the AI Treasurer draft a friendly reminder in seconds.
       </p>
       <Link
-        to="/assistant"
+        to={to}
         onClick={onNavigate}
         className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-white px-3 py-2 text-xs font-bold text-brand-700 transition hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
       >
@@ -50,6 +40,27 @@ function PromoCard({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+  const { activeGroup } = useGroup();
+  const { pathname } = useLocation();
+
+  // A pot is "open" when the URL is /pots/<id> (not the list or the new-pot page).
+  const potOpen =
+    activeGroup !== null &&
+    /^\/pots\/[^/]+/.test(pathname) &&
+    !pathname.startsWith("/pots/new");
+
+  const potNav = activeGroup
+    ? [
+        { to: `/pots/${activeGroup.id}`, icon: LayoutDashboard, label: "Dashboard", end: true },
+        { to: `/pots/${activeGroup.id}/contributions`, icon: HandCoins, label: "Contributions" },
+        { to: `/pots/${activeGroup.id}/levies`, icon: Receipt, label: "Levies" },
+        { to: `/pots/${activeGroup.id}/payouts`, icon: Send, label: "Payouts" },
+        { to: `/pots/${activeGroup.id}/members`, icon: Users, label: "Members" },
+        { to: `/pots/${activeGroup.id}/ledger`, icon: ScrollText, label: "Ledger" },
+        { to: `/pots/${activeGroup.id}/assistant`, icon: Sparkles, label: "AI Treasurer" },
+      ]
+    : [];
+
   return (
     <div className="flex h-full flex-col">
       {/* Logo + tagline */}
@@ -63,17 +74,45 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </div>
       </div>
 
+      {/* Top level: the pots list */}
       <nav className="mt-6 flex flex-col gap-1" aria-label="Primary">
-        {navItems.map((item) => (
-          <NavLink key={item.to} to={item.to} onClick={onNavigate} className={navClass}>
-            <item.icon className="h-4 w-4 shrink-0" />
-            {item.label}
-          </NavLink>
-        ))}
+        <NavLink to="/pots" end onClick={onNavigate} className={navClass}>
+          <PiggyBank className="h-4 w-4 shrink-0" />
+          Pots
+        </NavLink>
       </nav>
 
-      <div className="mt-auto pt-6">
-        <PromoCard onNavigate={onNavigate} />
+      {/* Everything under the pot that's currently open */}
+      {potOpen && activeGroup && (
+        <div className="mt-5">
+          <p className="truncate px-3.5 text-[11px] font-semibold uppercase tracking-wide text-brand-200/80">
+            {activeGroup.name}
+          </p>
+          <nav className="mt-2 flex flex-col gap-1" aria-label="Pot">
+            {potNav.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                onClick={onNavigate}
+                className={navClass}
+              >
+                <item.icon className="h-4 w-4 shrink-0" />
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
+        </div>
+      )}
+
+      <div className="mt-auto flex flex-col gap-5 pt-6">
+        {potOpen && activeGroup && (
+          <PromoCard to={`/pots/${activeGroup.id}/assistant`} onNavigate={onNavigate} />
+        )}
+        <NavLink to="/settings" onClick={onNavigate} className={navClass}>
+          <Settings className="h-4 w-4 shrink-0" />
+          Settings
+        </NavLink>
       </div>
     </div>
   );
@@ -83,7 +122,7 @@ export default function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; 
   return (
     <>
       {/* Desktop: fixed, full-height royal-blue rail */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col bg-gradient-to-b from-brand-800 to-brand-700 p-5 lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col overflow-y-auto bg-gradient-to-b from-brand-800 to-brand-700 p-5 lg:flex">
         <SidebarContent />
       </aside>
 

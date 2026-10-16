@@ -15,7 +15,7 @@ import {
 } from "../../lib/api";
 import { formatNaira, nairaToKobo } from "../../lib/format";
 
-function ContributionsInner() {
+export function ContributionsInner() {
   const { activeGroup } = useGroup();
   const gid = activeGroup!.id;
 

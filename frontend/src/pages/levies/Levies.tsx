@@ -9,7 +9,7 @@ import { useGroup } from "../../providers/GroupProvider";
 import { listLevies, createLevy, closeLevy, type Levy } from "../../lib/api";
 import { formatNaira, nairaToKobo } from "../../lib/format";
 
-function LeviesInner() {
+export function LeviesInner() {
   const { activeGroup } = useGroup();
   const gid = activeGroup!.id;
 

@@ -7,13 +7,14 @@ import LandingPage from "./pages/landing/LandingPage";
 import SignUp from "./pages/auth/SignUp";
 import Login from "./pages/auth/Login";
 import Pots from "./pages/pots/Pots";
+import PotLayout from "./layouts/PotLayout";
 import PotDashboard from "./pages/pots/PotDashboard";
-import Contributions from "./pages/contributions/Contributions";
-import Levies from "./pages/levies/Levies";
-import Expenses from "./pages/expenses/Expenses";
-import Members from "./pages/members/Members";
-import Ledger from "./pages/ledger/Ledger";
-import Assistant from "./pages/assistant/Assistant";
+import { ContributionsInner } from "./pages/contributions/Contributions";
+import { LeviesInner } from "./pages/levies/Levies";
+import { ExpensesInner } from "./pages/expenses/Expenses";
+import { MembersInner } from "./pages/members/Members";
+import { LedgerInner } from "./pages/ledger/Ledger";
+import { AssistantInner } from "./pages/assistant/Assistant";
 import Settings from "./pages/settings/Settings";
 import JoinPot from "./pages/join/JoinPot";
 import NewPot from "./pages/pots/NewPot";
@@ -29,20 +30,31 @@ export default function App() {
             <Route path="/signup" element={<SignUp />} />
             <Route path="/login" element={<Login />} />
 
-            {/* Authenticated — redirects to /login if there's no session */}
+            {/* Authenticated — the pots list and creating a pot */}
             <Route path="/pots" element={<ProtectedRoute><Pots /></ProtectedRoute>} />
             <Route path="/pots/new" element={<ProtectedRoute><NewPot /></ProtectedRoute>} />
-            <Route path="/pots/:id" element={<ProtectedRoute><PotDashboard /></ProtectedRoute>} />
-            <Route path="/contributions" element={<ProtectedRoute><Contributions /></ProtectedRoute>} />
-            <Route path="/levies" element={<ProtectedRoute><Levies /></ProtectedRoute>} />
-            <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
-            <Route path="/members" element={<ProtectedRoute><Members /></ProtectedRoute>} />
-            <Route path="/ledger" element={<ProtectedRoute><Ledger /></ProtectedRoute>} />
-            <Route path="/assistant" element={<ProtectedRoute><Assistant /></ProtectedRoute>} />
+
+            {/* Everything that belongs to one pot lives under /pots/:id */}
+            <Route path="/pots/:id" element={<ProtectedRoute><PotLayout /></ProtectedRoute>}>
+              <Route index element={<PotDashboard />} />
+              <Route path="contributions" element={<ContributionsInner />} />
+              <Route path="levies" element={<LeviesInner />} />
+              <Route path="payouts" element={<ExpensesInner />} />
+              <Route path="members" element={<MembersInner />} />
+              <Route path="ledger" element={<LedgerInner />} />
+              <Route path="assistant" element={<AssistantInner />} />
+            </Route>
+
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
-            {/* The old dashboard now lives per pot. */}
+            {/* The old flat routes now open from within a pot */}
             <Route path="/dashboard" element={<Navigate to="/pots" replace />} />
+            <Route path="/contributions" element={<Navigate to="/pots" replace />} />
+            <Route path="/levies" element={<Navigate to="/pots" replace />} />
+            <Route path="/expenses" element={<Navigate to="/pots" replace />} />
+            <Route path="/members" element={<Navigate to="/pots" replace />} />
+            <Route path="/ledger" element={<Navigate to="/pots" replace />} />
+            <Route path="/assistant" element={<Navigate to="/pots" replace />} />
 
             {/* Join by code or scanned QR link */}
             <Route path="/join" element={<ProtectedRoute><JoinPot /></ProtectedRoute>} />

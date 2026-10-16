@@ -21,7 +21,7 @@ const roleMeta: Record<Role, { label: string; icon: typeof Shield; tint: string 
 
 const roleOptions: Role[] = ["member", "cosigner", "treasurer"];
 
-function MembersInner() {
+export function MembersInner() {
   const { activeGroup } = useGroup();
   const gid = activeGroup!.id;
   const myId = getStoredUser()?.id;

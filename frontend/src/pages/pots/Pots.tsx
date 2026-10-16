@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, Loader2, PiggyBank, Plus, Users } from "lucide-react";
+import { ChevronRight, Loader2, PiggyBank, Plus } from "lucide-react";
 
 import AppShell from "../../layouts/AppShell";
 import GroupGate from "../../components/GroupGate";
@@ -9,7 +9,7 @@ import { useGroup } from "../../providers/GroupProvider";
 import { getSummary, type Group, type GroupSummary } from "../../lib/api";
 import { formatNaira } from "../../lib/format";
 
-// One card per pot. Clicking a card opens that pot's own dashboard.
+// One compact row per pot. Clicking it opens that pot's own dashboard.
 function PotCard({
   group,
   summary,
@@ -19,48 +19,37 @@ function PotCard({
   summary?: GroupSummary;
   onOpen: () => void;
 }) {
+  const outstanding = summary?.outstandingKobo ?? 0;
   return (
     <button
       type="button"
       onClick={onOpen}
-      className="group flex flex-col rounded-3xl border border-slate-100 bg-white p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+      className="group flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
     >
-      <div className="flex items-start gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-white">
-          <PiggyBank className="h-5 w-5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-sora text-base font-bold text-slate-900">{group.name}</p>
-          <p className="mt-0.5 text-xs text-slate-400">
-            Join code ·{" "}
-            <span className="font-semibold tracking-widest text-slate-500">{group.joinCode}</span>
-          </p>
-        </div>
-      </div>
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white">
+        <PiggyBank className="h-5 w-5" />
+      </span>
 
-      <div className="mt-5">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Balance</p>
-        <p className="font-sora text-2xl font-bold text-slate-900">
-          {summary ? formatNaira(summary.balanceKobo) : "—"}
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-slate-900">{group.name}</p>
+        <p className="mt-0.5 truncate text-xs text-slate-400">
+          {summary ? `${summary.paidCount}/${summary.members} paid` : "…"}
+          {outstanding > 0 && (
+            <span className="text-amber-600"> · {formatNaira(outstanding)} due</span>
+          )}
+          <span className="text-slate-300"> · </span>
+          <span className="tracking-widest">{group.joinCode}</span>
         </p>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
-        <span className="inline-flex items-center gap-1.5">
-          <Users className="h-3.5 w-3.5 text-slate-400" />
-          {summary ? `${summary.paidCount}/${summary.members} paid` : "—"}
-        </span>
-        {summary && summary.outstandingKobo > 0 && (
-          <span className="font-medium text-amber-600">
-            {formatNaira(summary.outstandingKobo)} outstanding
-          </span>
-        )}
+      <div className="shrink-0 text-right">
+        <p className="font-sora text-sm font-bold text-slate-900">
+          {summary ? formatNaira(summary.balanceKobo) : "—"}
+        </p>
+        <p className="text-[10px] uppercase tracking-wide text-slate-400">Balance</p>
       </div>
 
-      <span className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-600">
-        Open dashboard
-        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-      </span>
+      <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />
     </button>
   );
 }
@@ -106,7 +95,7 @@ function PotsGrid() {
     <>
       <PageHeader
         title="Pots"
-        subtitle="Every pot keeps its own money, members and history."
+        subtitle="Open a pot to see everything it owns — its money, members and history."
         action={
           <Link to="/pots/new" className="cp-btn-primary text-sm">
             <Plus className="h-4 w-4" /> Create a pot
@@ -114,7 +103,7 @@ function PotsGrid() {
         }
       />
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {groups.map((group) => (
           <PotCard
             key={group.id}
@@ -126,10 +115,9 @@ function PotsGrid() {
 
         <Link
           to="/pots/new"
-          className="flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-3xl border-2 border-dashed border-slate-200 text-slate-400 transition hover:border-brand-300 hover:text-brand-600"
+          className="flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 p-4 text-sm font-semibold text-slate-400 transition hover:border-brand-300 hover:text-brand-600"
         >
-          <Plus className="h-6 w-6" />
-          <span className="text-sm font-semibold">Create a pot</span>
+          <Plus className="h-4 w-4" /> Create a pot
         </Link>
       </div>
     </>

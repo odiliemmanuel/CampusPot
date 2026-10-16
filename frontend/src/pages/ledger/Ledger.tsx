@@ -14,7 +14,7 @@ const kindLabel: Record<string, string> = {
   opening: "Opening balance",
 };
 
-function LedgerInner() {
+export function LedgerInner() {
   const { activeGroup } = useGroup();
   const gid = activeGroup!.id;
 

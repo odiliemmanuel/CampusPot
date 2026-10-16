@@ -20,7 +20,7 @@ const suggestions = [
   "Which members are partially paid?",
 ];
 
-function AssistantInner() {
+export function AssistantInner() {
   const { activeGroup } = useGroup();
   const gid = activeGroup!.id;
 
