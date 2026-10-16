@@ -346,6 +346,30 @@ func (s *Service) UpdateMemberRole(_ context.Context, groupID, actorID, targetUs
 	return &m, nil
 }
 
+// Leave removes the caller from a pot. Chat access follows the membership, so
+// leaving also drops the person out of the pot chat. The pot must keep at least
+// one treasurer, so the last treasurer cannot simply walk away.
+func (s *Service) Leave(_ context.Context, groupID, userID uuid.UUID) error {
+	m, err := s.requireMember(groupID, userID)
+	if err != nil {
+		return err
+	}
+	if m.Role == models.RoleTreasurer {
+		var treasurers int64
+		if err := s.db.Model(&models.Membership{}).
+			Where("group_id = ? AND role = ? AND status = ?", groupID, models.RoleTreasurer, models.MembershipActive).
+			Count(&treasurers).Error; err != nil {
+			return err
+		}
+		if treasurers <= 1 {
+			return fmt.Errorf("%w: the pot must keep at least one treasurer — promote someone before leaving", ErrInvalid)
+		}
+	}
+	return s.db.Model(&models.Membership{}).
+		Where("group_id = ? AND user_id = ?", groupID, userID).
+		Update("status", models.MembershipRemoved).Error
+}
+
 // Join turns a join code into an active membership.
 func (s *Service) Join(_ context.Context, userID uuid.UUID, joinCode string) (*models.Group, error) {
 	var group models.Group

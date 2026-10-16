@@ -31,6 +31,22 @@ func (ct *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 	g.POST("/:id/invite", ct.invite)
 	g.GET("/:id/members", ct.listMembers)
 	g.PATCH("/:id/members/:userId", ct.updateMemberRole)
+	g.POST("/:id/leave", ct.leaveGroup)
+
+	// Pot chat — every active member can read, post and reply; read receipts
+	// are tracked per message.
+	g.GET("/:id/chat", ct.listChat)
+	g.POST("/:id/chat", ct.postChat)
+	g.POST("/:id/chat/read", ct.markChatRead)
+	g.GET("/:id/chat/participants", ct.chatParticipants)
+	g.DELETE("/:id/chat/members/:userId", ct.removeChatMember)
+
+	// Member disputes — two or more open disputes freeze the treasurer's spending.
+	g.GET("/:id/disputes", ct.listDisputes)
+	g.POST("/:id/disputes", ct.raiseDispute)
+	g.POST("/:id/disputes/:disputeId/resolve", ct.resolveDispute)
+
+	g.GET("/:id/contributions", ct.contributions)
 
 	g.POST("/:id/levies", ct.createLevy)
 	g.GET("/:id/levies", ct.listLevies)
@@ -518,6 +534,158 @@ func (ct *Controller) outstanding(c *gin.Context) {
 		return
 	}
 	response.WithMeta(c, outstanding, gin.H{"levy": levy})
+}
+
+func (ct *Controller) leaveGroup(c *gin.Context) {
+	groupID, ok := pathID(c, "id")
+	if !ok {
+		return
+	}
+	if err := ct.svc.Leave(c.Request.Context(), groupID, auth.MustUserID(c)); err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, gin.H{"status": "left"})
+}
+
+func (ct *Controller) contributions(c *gin.Context) {
+	groupID, ok := pathID(c, "id")
+	if !ok {
+		return
+	}
+	res, err := ct.svc.Contributions(c.Request.Context(), groupID, auth.MustUserID(c))
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, res)
+}
+
+func (ct *Controller) listChat(c *gin.Context) {
+	groupID, ok := pathID(c, "id")
+	if !ok {
+		return
+	}
+	msgs, err := ct.svc.ListChat(c.Request.Context(), groupID, auth.MustUserID(c))
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, msgs)
+}
+
+func (ct *Controller) postChat(c *gin.Context) {
+	groupID, ok := pathID(c, "id")
+	if !ok {
+		return
+	}
+	var req PostChatRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "INVALID_BODY", err.Error())
+		return
+	}
+	msg, err := ct.svc.PostChat(c.Request.Context(), groupID, auth.MustUserID(c), req)
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.Created(c, msg)
+}
+
+func (ct *Controller) markChatRead(c *gin.Context) {
+	groupID, ok := pathID(c, "id")
+	if !ok {
+		return
+	}
+	var req struct {
+		MessageID uuid.UUID `json:"messageId" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "INVALID_BODY", err.Error())
+		return
+	}
+	if err := ct.svc.MarkChatRead(c.Request.Context(), groupID, auth.MustUserID(c), req.MessageID); err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, gin.H{"status": "read"})
+}
+
+func (ct *Controller) chatParticipants(c *gin.Context) {
+	groupID, ok := pathID(c, "id")
+	if !ok {
+		return
+	}
+	members, err := ct.svc.ChatParticipants(c.Request.Context(), groupID, auth.MustUserID(c))
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, members)
+}
+
+func (ct *Controller) removeChatMember(c *gin.Context) {
+	groupID, ok := pathID(c, "id")
+	if !ok {
+		return
+	}
+	targetID, ok := pathID(c, "userId")
+	if !ok {
+		return
+	}
+	if err := ct.svc.RemoveChatMember(c.Request.Context(), groupID, auth.MustUserID(c), targetID); err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, gin.H{"status": "removed"})
+}
+
+func (ct *Controller) listDisputes(c *gin.Context) {
+	groupID, ok := pathID(c, "id")
+	if !ok {
+		return
+	}
+	disputes, err := ct.svc.ListDisputes(c.Request.Context(), groupID, auth.MustUserID(c))
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, disputes)
+}
+
+func (ct *Controller) raiseDispute(c *gin.Context) {
+	groupID, ok := pathID(c, "id")
+	if !ok {
+		return
+	}
+	var req RaiseDisputeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "INVALID_BODY", err.Error())
+		return
+	}
+	d, err := ct.svc.RaiseDispute(c.Request.Context(), groupID, auth.MustUserID(c), req)
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.Created(c, d)
+}
+
+func (ct *Controller) resolveDispute(c *gin.Context) {
+	groupID, ok := pathID(c, "id")
+	if !ok {
+		return
+	}
+	disputeID, ok := pathID(c, "disputeId")
+	if !ok {
+		return
+	}
+	d, err := ct.svc.ResolveDispute(c.Request.Context(), groupID, disputeID, auth.MustUserID(c))
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, d)
 }
 
 func pathID(c *gin.Context, name string) (uuid.UUID, bool) {

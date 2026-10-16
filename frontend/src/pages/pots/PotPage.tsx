@@ -2,14 +2,14 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  ArrowUpRight, HandCoins, LayoutDashboard, QrCode, Receipt, Send,
+  ArrowUpRight, HandCoins, LayoutDashboard, MessageSquare, QrCode, Send,
   Settings as SettingsIcon, Sparkles, TrendingUp, Users, Wallet,
 } from "lucide-react";
 
 import PotDashboard from "./PotDashboard";
 import PotSettings from "./PotSettings";
 import { ContributionsInner } from "../contributions/Contributions";
-import { LeviesInner } from "../levies/Levies";
+import { ChatInner } from "../chat/Chat";
 import { ExpensesInner } from "../expenses/Expenses";
 import { MembersInner, InviteInner } from "../members/Members";
 import { AssistantInner } from "../assistant/Assistant";
@@ -22,9 +22,9 @@ import { formatNaira } from "../../lib/format";
 const TABS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "contributions", label: "Contributions", icon: HandCoins },
-  { key: "levies", label: "Levies", icon: Receipt },
   { key: "payouts", label: "Payouts", icon: Send },
   { key: "members", label: "Members", icon: Users },
+  { key: "chat", label: "Chat", icon: MessageSquare },
   { key: "invite", label: "Invite", icon: QrCode },
   { key: "assistant", label: "AI Treasurer", icon: Sparkles },
   { key: "settings", label: "Settings", icon: SettingsIcon },
@@ -144,9 +144,9 @@ export default function PotPage() {
       >
         {tab === "dashboard" && <PotDashboard />}
         {tab === "contributions" && <ContributionsInner />}
-        {tab === "levies" && <LeviesInner />}
         {tab === "payouts" && <ExpensesInner />}
         {tab === "members" && <MembersInner />}
+        {tab === "chat" && <ChatInner />}
         {tab === "invite" && <InviteInner />}
         {tab === "assistant" && <AssistantInner />}
         {tab === "settings" && <PotSettings />}

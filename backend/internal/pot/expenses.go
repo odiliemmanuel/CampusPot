@@ -68,6 +68,11 @@ func (s *Service) CreateExpense(ctx context.Context, groupID, actorID uuid.UUID,
 	if _, err := s.requireRole(groupID, actorID, models.RoleTreasurer); err != nil {
 		return nil, err
 	}
+	if frozen, n, err := s.spendingFrozen(groupID); err != nil {
+		return nil, err
+	} else if frozen {
+		return nil, fmt.Errorf("%w: spending is frozen by %d member disputes", ErrConflict, n)
+	}
 	if req.AmountKobo <= 0 {
 		return nil, fmt.Errorf("%w: amount must be positive", ErrInvalid)
 	}
@@ -176,6 +181,11 @@ func (s *Service) Approve(_ context.Context, groupID, expenseID, actorID uuid.UU
 func (s *Service) Execute(ctx context.Context, groupID, expenseID, actorID uuid.UUID) (*models.ExpenseRequest, error) {
 	if _, err := s.requireRole(groupID, actorID, models.RoleTreasurer); err != nil {
 		return nil, err
+	}
+	if frozen, n, err := s.spendingFrozen(groupID); err != nil {
+		return nil, err
+	} else if frozen {
+		return nil, fmt.Errorf("%w: spending is frozen by %d member disputes", ErrConflict, n)
 	}
 	var expense models.ExpenseRequest
 	if err := s.db.First(&expense, "id = ? AND group_id = ?", expenseID, groupID).Error; err != nil {

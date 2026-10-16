@@ -28,7 +28,7 @@ const stateMeta: Record<PotMembership["state"], { label: string; tint: string }>
 const money = (kobo: number) =>
   kobo.toLocaleString("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 });
 
-const BANKS = ["GTBank", "Opay", "Access Bank", "Zenith Bank", "UBA", "Kuda", "Moniepoint"];
+const BANKS = ["B Moni", "GTBank", "Opay", "Access Bank", "Zenith Bank", "UBA", "Kuda", "Moniepoint"];
 
 function QuickAction({
   icon, label, onClick, to, tint = WALLET_SOFT,
@@ -42,11 +42,11 @@ function QuickAction({
   const inner = (
     <>
       <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${tint}`}>{icon}</span>
-      <span className="text-[11px] font-semibold leading-tight text-slate-700 dark:text-slate-200">{label}</span>
+      <span className="px-1 text-center text-[11px] font-semibold leading-tight text-slate-700 dark:text-slate-200">{label}</span>
     </>
   );
   const cls =
-    "flex h-[76px] flex-col items-center justify-center gap-1.5 rounded-2xl border border-slate-100 bg-white transition active:scale-95 dark:border-white/10 dark:bg-panel-dark";
+    "flex min-h-[76px] flex-col items-center justify-center gap-1.5 rounded-2xl border border-slate-100 bg-white px-1 py-2.5 transition active:scale-95 dark:border-white/10 dark:bg-panel-dark";
   if (to) return <Link to={to} className={cls}>{inner}</Link>;
   return <button type="button" onClick={onClick} className={cls}>{inner}</button>;
 }
@@ -488,7 +488,7 @@ function WalletHome() {
       </div>
 
       {/* Secondary actions — consistent tiles */}
-      <div className="mt-3 grid grid-cols-4 gap-2 sm:gap-3">
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
         <QuickAction icon={<Banknote className="h-5 w-5" />} label="Add money" onClick={() => setSheet("add")} />
         <QuickAction icon={<Send className="h-4 w-4" />} label="Send" onClick={() => setSheet("send")} />
         <QuickAction icon={<QrCode className="h-4 w-4" />} label="Join pot" to="/join" />

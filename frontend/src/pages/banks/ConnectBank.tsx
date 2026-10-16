@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CheckCircle2, Landmark, Plus } from "lucide-react";
 
 import AppShell from "../../layouts/AppShell";
@@ -6,7 +6,9 @@ import PageHeader from "../../components/PageHeader";
 
 // A bank a member can link to fund their wallet. In this demo the connection is
 // stored locally; wiring a real aggregator would replace load/save below.
-const BANKS = ["GTBank", "Opay", "Access Bank", "Zenith Bank", "UBA", "Kuda", "Moniepoint"];
+const BANKS = ["B Moni", "GTBank", "Opay", "Access Bank", "Zenith Bank", "UBA", "Kuda", "Moniepoint"];
+// B Moni is PotKeeper's own rail, so it is connected out of the box.
+const DEFAULT_CONNECTED = ["B Moni"];
 
 const STORAGE_KEY = "potkeeper.banks";
 
@@ -21,6 +23,15 @@ function loadConnected(): string[] {
 
 export default function ConnectBank() {
   const [connected, setConnected] = useState<string[]>(loadConnected);
+
+  // Persist the default the first time so "Add money" can fund from B Moni
+  // without the user having to connect anything.
+  useEffect(() => {
+    if (localStorage.getItem(STORAGE_KEY) === null) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_CONNECTED));
+      setConnected(DEFAULT_CONNECTED);
+    }
+  }, []);
 
   const toggle = (bank: string) => {
     setConnected((prev) => {

@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { motion } from "framer-motion";
 import {
-  Loader2, Send, Bell, CheckCircle2, Landmark, ArrowDownLeft, RefreshCw, Plus,
+  Loader2, Bell, CheckCircle2, Landmark, ArrowDownLeft, RefreshCw, Plus, Lock,
 } from "lucide-react";
 
 import AppShell from "../../layouts/AppShell";
@@ -9,11 +9,24 @@ import GroupGate from "../../components/GroupGate";
 import PageHeader from "../../components/PageHeader";
 import { useGroup } from "../../providers/GroupProvider";
 import {
-  listPayments, getOutstanding, simulateDeposit, recordManualPayment, listMembers,
-  draftReminder, sendReminder, walletPayPot, getStoredUser, getSummary,
-  type Payment, type OutstandingMember, type Membership, type Levy, type GroupSummary,
+  listPayments, listMembers, simulateDeposit, recordManualPayment,
+  draftReminder, sendReminder, walletPayPot, getStoredUser, getContributions,
+  type Payment, type Membership, type ContributionsResponse, type ContributionRow,
 } from "../../lib/api";
 import { formatNaira, nairaToKobo } from "../../lib/format";
+
+function statusBadge(row: ContributionRow) {
+  switch (row.state) {
+    case "paid":
+      return { label: "Paid in full", tint: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10" };
+    case "partial":
+      return { label: "Partial", tint: "bg-amber-50 text-amber-600 dark:bg-amber-500/10" };
+    case "unpaid":
+      return { label: "Not paid", tint: "bg-rose-50 text-rose-600 dark:bg-rose-500/10" };
+    default:
+      return { label: "—", tint: "bg-slate-100 text-slate-500 dark:bg-white/5" };
+  }
+}
 
 export function ContributionsInner() {
   const { activeGroup } = useGroup();
@@ -21,9 +34,7 @@ export function ContributionsInner() {
   const myId = getStoredUser()?.id;
 
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [outstanding, setOutstanding] = useState<OutstandingMember[]>([]);
-  const [levy, setLevy] = useState<Levy | undefined>(undefined);
-  const [summary, setSummary] = useState<GroupSummary | null>(null);
+  const [contrib, setContrib] = useState<ContributionsResponse | null>(null);
   const [members, setMembers] = useState<Membership[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -40,37 +51,15 @@ export function ContributionsInner() {
   const [payAmount, setPayAmount] = useState("");
   const [payBusy, setPayBusy] = useState(false);
 
-  // Who has paid and how much, summed from matched/partial payments. Only the
-  // treasurer sees this breakdown.
-  const paidBreakdown = useMemo(() => {
-    const totals = new Map<string, number>();
-    for (const p of payments) {
-      if (!p.userId || (p.status !== "matched" && p.status !== "partial")) continue;
-      totals.set(p.userId, (totals.get(p.userId) ?? 0) + p.amountKobo);
-    }
-    return members
-      .map((m) => ({
-        userId: m.userId,
-        name: m.user?.name ?? m.userId,
-        paidKobo: totals.get(m.userId) ?? 0,
-      }))
-      .filter((r) => r.paidKobo > 0)
-      .sort((a, b) => b.paidKobo - a.paidKobo);
-  }, [payments, members]);
-
   const load = async () => {
-    const [p, o, m, s] = await Promise.all([
-      listPayments(gid),
-      // A pot with no open levy isn't an error — it just has nothing to track.
-      getOutstanding(gid).catch(() => ({ members: [] as OutstandingMember[], levy: null as Levy | null })),
+    const [p, c, m] = await Promise.all([
+      listPayments(gid).catch(() => [] as Payment[]),
+      getContributions(gid).catch(() => null),
       listMembers(gid),
-      getSummary(gid).catch(() => null),
     ]);
     setPayments(p);
-    setOutstanding(o.members);
-    setLevy(o.levy ?? undefined);
+    setContrib(c);
     setMembers(m);
-    setSummary(s);
   };
 
   useEffect(() => {
@@ -78,6 +67,7 @@ export function ContributionsInner() {
     load()
       .catch((err) => setError(err instanceof Error ? err.message : "Couldn't load contributions."))
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeGroup?.id]);
 
   const handleSimulate = async (e: FormEvent) => {
@@ -85,7 +75,7 @@ export function ContributionsInner() {
     setError(""); setNotice(""); setBusy(true);
     try {
       await simulateDeposit(gid, nairaToKobo(depAmount), depRef, depPayer);
-      setNotice("Deposit reconciled — see it in the ledger.");
+      setNotice("Deposit reconciled.");
       setDepAmount(""); setDepRef(""); setDepPayer(""); setShowDeposit(false);
       await load();
     } catch (err) {
@@ -117,9 +107,23 @@ export function ContributionsInner() {
     }
   };
 
+  if (loading) {
+    return <div className="flex justify-center py-24"><Loader2 className="w-6 h-6 text-primary-600 animate-spin" /></div>;
+  }
+
+  const myRole = members.find((m) => m.userId === myId)?.role ?? null;
+  const canManage = myRole === "treasurer";
+
+  const rows = contrib?.rows ?? [];
+  const mine = rows.find((r) => r.isMe);
+  const myOwed = mine && mine.state !== "paid" && mine.state !== "none"
+    ? Math.max(0, mine.amountKobo - mine.paidKobo)
+    : 0;
+  const unpaid = rows.filter((r) => r.state !== "paid");
+
   const handlePayFromWallet = async (full: boolean) => {
     setError(""); setNotice("");
-    const target = full && mine ? mine.outstandingKobo : nairaToKobo(payAmount);
+    const target = full ? myOwed : nairaToKobo(payAmount);
     if (target <= 0) { setError("Enter an amount to pay."); return; }
     setPayBusy(true);
     try {
@@ -134,28 +138,13 @@ export function ContributionsInner() {
     }
   };
 
-  if (loading) {
-    return <div className="flex justify-center py-24"><Loader2 className="w-6 h-6 text-primary-600 animate-spin" /></div>;
-  }
-
-  const owe = outstanding.filter((m) => m.state !== "paid");
-
-  const myRole = members.find((m) => m.userId === myId)?.role ?? null;
-  const canManage = myRole === "treasurer";
-  const mine = outstanding.find((m) => m.userId === myId);
-  const myStatus = levy
-    ? mine
-      ? { amount: mine.amountKobo, paid: mine.paidKobo, owed: mine.outstandingKobo }
-      : { amount: levy.amountKobo, paid: levy.amountKobo, owed: 0 }
-    : null;
-
   return (
     <>
       <PageHeader
         title="Contributions"
         subtitle={canManage
           ? "Every deposit reconciles to a member automatically."
-          : "Your dues and every deposit in this pot."}
+          : "See who has paid — figures stay with the treasurer."}
         action={canManage ? (
           <button onClick={() => setShowDeposit((v) => !v)} className="cp-btn-primary">
             <Landmark className="w-4 h-4" /> Simulate deposit
@@ -196,116 +185,115 @@ export function ContributionsInner() {
       )}
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Outstanding — treasurers see the full breakdown; members see their own */}
         <div className="lg:col-span-2 cp-card rounded-3xl p-6">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-4">
-            {canManage
-              ? `Outstanding · ${formatNaira(owe.reduce((s, m) => s + m.outstandingKobo, 0))}`
-              : "Your status"}
-          </p>
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              {canManage ? "Who has paid" : "Contribution status"}
+            </p>
+            {!canManage && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400">
+                <Lock className="w-3 h-3" /> amounts visible to treasurer
+              </span>
+            )}
+          </div>
 
-          {canManage ? (
-            <>
-              {levy && members.length > 0 && (
-                <div className="mb-4 -mt-1 grid grid-cols-2 gap-3">
-                  <div className="rounded-xl bg-emerald-50 px-3 py-2 dark:bg-emerald-500/10">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700/80 dark:text-emerald-400/80">Collected</p>
-                    <p className="font-sora text-base font-bold text-emerald-700 dark:text-emerald-400">
-                      {formatNaira(summary?.collectedKobo ?? 0)}
-                    </p>
-                  </div>
-                  <div className="rounded-xl bg-brand-50 px-3 py-2 dark:bg-brand-500/10">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-brand-600/80">Target</p>
-                    <p className="font-sora text-base font-bold text-brand-700 dark:text-brand-300">
-                      {formatNaira(summary?.expectedKobo ?? levy.amountKobo * members.length)}
-                    </p>
-                    <p className="text-[10px] text-slate-400">
-                      {formatNaira(levy.amountKobo)} × {members.length} members
-                    </p>
-                  </div>
-                </div>
-              )}
-              {owe.length === 0 ? (
-                <div className="flex items-center gap-3 text-sm text-emerald-600 dark:text-emerald-400">
-                  <CheckCircle2 className="w-5 h-5" /> Everyone is fully paid up.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {owe.map((m) => (
-                    <div key={m.userId} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-white dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{m.name}</p>
-                        <p className="text-xs text-slate-400">
-                          {m.state === "partial" ? `Paid ${formatNaira(m.paidKobo)} of ${formatNaira(m.amountKobo)}` : `Owes ${formatNaira(m.amountKobo)}`}
-                        </p>
+          {canManage && contrib && (
+            <div className="mb-5 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-emerald-50 p-4 dark:bg-emerald-500/10">
+                <p className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">Collected</p>
+                <p className="mt-0.5 font-sora text-lg font-bold text-emerald-700 dark:text-emerald-300">
+                  {formatNaira(contrib.collectedKobo)}
+                </p>
+              </div>
+              <div className="rounded-2xl bg-brand-50 p-4 dark:bg-brand-500/10">
+                <p className="text-[11px] font-medium text-brand-700 dark:text-brand-300">Target</p>
+                <p className="mt-0.5 font-sora text-lg font-bold text-brand-700 dark:text-brand-300">
+                  {formatNaira(contrib.expectedKobo)}
+                </p>
+                {contrib.levyAmountKobo > 0 && (
+                  <p className="text-[10px] text-slate-400">
+                    {formatNaira(contrib.levyAmountKobo)} × {rows.length} members
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {rows.length === 0 ? (
+            <p className="text-sm text-slate-400">No members yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {rows.map((r) => {
+                const badge = statusBadge(r);
+                return (
+                  <div key={r.userId} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-white dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold shrink-0">
+                        {(r.name || "?").charAt(0).toUpperCase()}
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-sm font-bold text-amber-600">{formatNaira(m.outstandingKobo)}</span>
-                        <button
-                          onClick={() => handleRemind(m.userId)}
-                          disabled={reminded[m.userId]}
-                          className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg bg-primary-50 dark:bg-primary-500/15 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-500/25 transition disabled:opacity-60"
-                        >
-                          {reminded[m.userId] ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Bell className="w-3.5 h-3.5" />}
-                          {reminded[m.userId] ? "Sent" : "Remind"}
-                        </button>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">
+                          {r.name || r.userId}
+                          {r.isMe && <span className="ml-1.5 text-xs font-normal text-slate-400">(you)</span>}
+                        </p>
+                        {r.showAmount && r.state !== "none" ? (
+                          <p className="text-xs text-slate-400">
+                            {formatNaira(r.paidKobo)} of {formatNaira(r.amountKobo)}
+                          </p>
+                        ) : (
+                          <span className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${badge.tint}`}>
+                            {badge.label}
+                          </span>
+                        )}
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Who has paid, and how much — treasurer only */}
-              {paidBreakdown.length > 0 && (
-                <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-3">
-                    Paid ({paidBreakdown.length})
-                  </p>
-                  <div className="space-y-2">
-                    {paidBreakdown.map((r) => (
-                      <div key={r.userId} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-white dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700">
-                        <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{r.name}</p>
-                        <span className="text-sm font-bold text-emerald-600 shrink-0">+{formatNaira(r.paidKobo)}</span>
-                      </div>
-                    ))}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {r.showAmount && r.state !== "none" && (
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${badge.tint}`}>
+                          {badge.label}
+                        </span>
+                      )}
+                      {canManage && r.state !== "paid" && (
+                        <button
+                          onClick={() => handleRemind(r.userId)}
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-primary-50 text-primary-700 dark:bg-primary-500/15 dark:text-primary-300"
+                        >
+                          {reminded[r.userId] ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Bell className="w-3.5 h-3.5" />}
+                          {reminded[r.userId] ? "Sent" : "Remind"}
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })}
+            </div>
+          )}
 
-              {/* Manual record for treasurers */}
-              {members.length > 0 && (
-                <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-3">
-                    Record a cash payment
-                  </p>
-                  <ManualPayRow members={members} onSubmit={handleManual} />
-                </div>
-              )}
-            </>
-          ) : myStatus ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3 rounded-xl bg-white dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700 p-4">
-                <div>
-                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
-                    {levy?.title ?? "Current levy"}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    Paid {formatNaira(myStatus.paid)} of {formatNaira(myStatus.amount)}
-                  </p>
-                </div>
-                <span className={`text-sm font-bold ${myStatus.owed > 0 ? "text-amber-600" : "text-emerald-600"}`}>
-                  {myStatus.owed > 0 ? `${formatNaira(myStatus.owed)} left` : "Paid up"}
-                </span>
-              </div>
-              <p className="text-xs text-slate-400">
-                Quote reference <span className="font-mono font-semibold text-slate-600 dark:text-slate-300">{activeGroup!.joinCode}</span> on a bank transfer, or pay straight from your wallet.
+          {canManage && members.length > 0 && (
+            <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-3">
+                Record a cash payment
               </p>
+              <ManualPayRow members={members} onSubmit={handleManual} />
+            </div>
+          )}
+        </div>
 
-              {myStatus.owed > 0 && (
-                <div className="rounded-xl border border-primary-100 dark:border-primary-500/20 p-3 space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    Pay from wallet
-                  </p>
+        {/* Right column */}
+        <div className="space-y-6">
+          {mine && mine.state !== "none" && (
+            <div className="cp-card rounded-3xl p-6">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-3">
+                Your dues
+              </p>
+              <div className="flex items-baseline justify-between">
+                <span className="font-sora text-2xl font-bold text-slate-900 dark:text-white">
+                  {formatNaira(Math.max(0, mine.amountKobo - mine.paidKobo))}
+                </span>
+                <span className="text-xs text-slate-400">left to pay</span>
+              </div>
+              {myOwed > 0 && (
+                <div className="mt-4 space-y-2">
                   <div className="flex items-center gap-2">
                     <input
                       value={payAmount}
@@ -314,50 +302,60 @@ export function ContributionsInner() {
                       inputMode="numeric"
                       className="cp-input flex-1"
                     />
-                    <button
-                      onClick={() => handlePayFromWallet(false)}
-                      disabled={payBusy}
-                      className="cp-btn-primary shrink-0 px-4"
-                    >
+                    <button onClick={() => handlePayFromWallet(false)} disabled={payBusy} className="cp-btn-primary shrink-0 px-4">
                       {payBusy ? <RefreshCw className="w-4 h-4 animate-spin" /> : "Pay"}
                     </button>
                   </div>
-                  <button
-                    onClick={() => handlePayFromWallet(true)}
-                    disabled={payBusy}
-                    className="cp-btn-ghost w-full text-xs"
-                  >
-                    Pay full balance · {formatNaira(myStatus.owed)}
+                  <button onClick={() => handlePayFromWallet(true)} disabled={payBusy} className="cp-btn-ghost w-full text-xs">
+                    Pay full balance · {formatNaira(myOwed)}
                   </button>
                 </div>
               )}
             </div>
-          ) : (
-            <p className="text-sm text-slate-400">No open levy right now.</p>
           )}
-        </div>
 
-        {/* Recent payments */}
-        <div className="cp-card rounded-3xl p-6">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-4">
-            Recent payments
-          </p>
-          {payments.length === 0 ? (
-            <p className="text-sm text-slate-400">No payments yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {payments.slice(0, 8).map((p) => (
-                <div key={p.id} className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/15 flex items-center justify-center shrink-0">
-                    <ArrowDownLeft className="w-4 h-4 text-emerald-600" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm text-slate-700 dark:text-slate-200 truncate">{p.payerName || p.quotedReference || "Deposit"}</p>
-                    <p className="text-xs text-slate-400">{new Date(p.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}</p>
-                  </div>
-                  <span className="text-sm font-semibold text-emerald-600 shrink-0">{formatNaira(p.amountKobo)}</span>
+          {canManage ? (
+            <div className="cp-card rounded-3xl p-6">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-4">
+                Recent payments
+              </p>
+              {payments.length === 0 ? (
+                <p className="text-sm text-slate-400">No payments yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {payments.slice(0, 8).map((p) => (
+                    <div key={p.id} className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/15 flex items-center justify-center shrink-0">
+                        <ArrowDownLeft className="w-4 h-4 text-emerald-600" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-slate-700 dark:text-slate-200 truncate">{p.payerName || p.quotedReference || "Deposit"}</p>
+                        <p className="text-xs text-slate-400">{new Date(p.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}</p>
+                      </div>
+                      <span className="text-sm font-semibold text-emerald-600 shrink-0">{formatNaira(p.amountKobo)}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
+            </div>
+          ) : (
+            <div className="cp-card rounded-3xl p-6">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-3">
+                Still to pay ({unpaid.length})
+              </p>
+              {unpaid.length === 0 ? (
+                <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="w-4 h-4" /> Everyone is paid up.
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {unpaid.map((r) => (
+                    <span key={r.userId} className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${statusBadge(r).tint}`}>
+                      {r.name || r.userId}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -220,6 +220,51 @@ export interface GroupSummary {
   outstandingCount: number;
   outstandingKobo: number;
   pendingExpenses: number;
+  openDisputes: number;
+  spendingFrozen: boolean;
+}
+
+export interface ChatMessage {
+  id: string;
+  userId: string;
+  author: string;
+  body: string;
+  replyToId?: string;
+  createdAt: string;
+  readBy: string[];
+}
+
+export type DisputeStatus = "open" | "resolved";
+
+export interface Dispute {
+  id: string;
+  groupId: string;
+  userId: string;
+  name: string;
+  reason?: string;
+  status: DisputeStatus;
+  resolvedBy?: string;
+  resolvedAt?: string;
+  createdAt: string;
+}
+
+export interface ContributionRow {
+  userId: string;
+  name: string;
+  reference?: string;
+  state: "paid" | "partial" | "unpaid" | "none";
+  paidKobo: number;
+  amountKobo: number;
+  showAmount: boolean;
+  isMe: boolean;
+}
+
+export interface ContributionsResponse {
+  collectedKobo: number;
+  expectedKobo: number;
+  levyAmountKobo: number;
+  showAmounts: boolean;
+  rows: ContributionRow[];
 }
 
 export interface Reminder {
@@ -351,6 +396,44 @@ export const updateMemberRole = (groupId: string, userId: string, role: Role) =>
     method: "PATCH",
     body: JSON.stringify({ role }),
   });
+export const leaveGroup = (groupId: string) =>
+  request<{ status: string }>(`/groups/${groupId}/leave`, { method: "POST" });
+
+// ---------- Pot chat ----------
+
+export const listChat = (groupId: string) =>
+  request<ChatMessage[] | null>(`/groups/${groupId}/chat`).then((m) => m ?? []);
+export const postChat = (groupId: string, body: string, replyToId?: string) =>
+  request<ChatMessage>(`/groups/${groupId}/chat`, {
+    method: "POST",
+    body: JSON.stringify({ body, replyToId }),
+  });
+export const markChatRead = (groupId: string, messageId: string) =>
+  request<{ status: string }>(`/groups/${groupId}/chat/read`, {
+    method: "POST",
+    body: JSON.stringify({ messageId }),
+  });
+export const listChatParticipants = (groupId: string) =>
+  request<Membership[] | null>(`/groups/${groupId}/chat/participants`).then((m) => m ?? []);
+export const removeChatMember = (groupId: string, userId: string) =>
+  request<{ status: string }>(`/groups/${groupId}/chat/members/${userId}`, { method: "DELETE" });
+
+// ---------- Disputes ----------
+
+export const listDisputes = (groupId: string) =>
+  request<Dispute[] | null>(`/groups/${groupId}/disputes`).then((d) => d ?? []);
+export const raiseDispute = (groupId: string, reason = "") =>
+  request<Dispute>(`/groups/${groupId}/disputes`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+export const resolveDispute = (groupId: string, disputeId: string) =>
+  request<Dispute>(`/groups/${groupId}/disputes/${disputeId}/resolve`, { method: "POST" });
+
+// ---------- Contributions ----------
+
+export const getContributions = (groupId: string) =>
+  request<ContributionsResponse>(`/groups/${groupId}/contributions`);
 
 // ---------- Levies ----------
 

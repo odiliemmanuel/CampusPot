@@ -1,16 +1,18 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { CheckCircle2, Loader2, Lock, RefreshCw, Save, ShieldAlert } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { CheckCircle2, Loader2, Lock, LogOut, RefreshCw, Save, ShieldAlert } from "lucide-react";
 
 import PageHeader from "../../components/PageHeader";
 import JoinCard from "../../components/JoinCard";
 import { useGroup } from "../../providers/GroupProvider";
 import {
-  getStoredUser, listMembers, regenerateJoinCode, updateGroup, type Membership,
+  getStoredUser, leaveGroup, listMembers, regenerateJoinCode, updateGroup, type Membership,
 } from "../../lib/api";
 import { formatNaira, nairaToKobo } from "../../lib/format";
 
 export default function PotSettings() {
   const { activeGroup, refresh } = useGroup();
+  const navigate = useNavigate();
   const gid = activeGroup!.id;
   const myId = getStoredUser()?.id;
 
@@ -53,6 +55,20 @@ export default function PotSettings() {
       setNotice("Pot settings saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't save settings.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const leave = async () => {
+    if (!window.confirm("Leave this pot? You'll lose access to its chat and contributions.")) return;
+    setError(""); setNotice(""); setBusy(true);
+    try {
+      await leaveGroup(gid);
+      await refresh();
+      navigate("/pots", { replace: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't leave the pot.");
     } finally {
       setBusy(false);
     }
@@ -177,6 +193,24 @@ export default function PotSettings() {
               </button>
             </div>
           )}
+
+          <div className="rounded-3xl border border-rose-100 bg-white p-6 shadow-sm dark:border-rose-500/20">
+            <div className="mb-2 flex items-center gap-2">
+              <LogOut className="h-4 w-4 text-rose-500" />
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Leave pot</p>
+            </div>
+            <p className="text-sm text-slate-500">
+              Leaving removes you from the pot and its chat. A pot always keeps at least one treasurer.
+            </p>
+            <button
+              type="button"
+              onClick={leave}
+              disabled={busy}
+              className="cp-btn-ghost mt-3 text-rose-600"
+            >
+              <LogOut className="h-4 w-4" /> Leave this pot
+            </button>
+          </div>
         </div>
       </div>
     </>

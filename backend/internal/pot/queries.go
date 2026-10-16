@@ -88,6 +88,10 @@ type GroupSummary struct {
 	OutstandingCount int   `json:"outstandingCount"`
 	OutstandingKobo  int64 `json:"outstandingKobo"`
 	PendingExpenses  int   `json:"pendingExpenses"`
+	// OpenDisputes is how many members have an unresolved dispute. When it
+	// reaches DisputeThreshold the pot's spending is frozen.
+	OpenDisputes   int  `json:"openDisputes"`
+	SpendingFrozen bool `json:"spendingFrozen"`
 }
 
 // Summary builds the group's weekly-summary numbers.
@@ -142,6 +146,11 @@ func (s *Service) Summary(ctx context.Context, groupID uuid.UUID, levyID *uuid.U
 		Where("group_id = ? AND status = ?", groupID, models.ExpensePendingApproval).
 		Count(&pending).Error
 	sum.PendingExpenses = int(pending)
+
+	if frozen, n, err := s.spendingFrozen(groupID); err == nil {
+		sum.SpendingFrozen = frozen
+		sum.OpenDisputes = int(n)
+	}
 
 	return sum, nil
 }

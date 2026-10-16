@@ -42,6 +42,10 @@ type MembershipStatus string
 const (
 	MembershipInvited MembershipStatus = "invited"
 	MembershipActive  MembershipStatus = "active"
+	// MembershipRemoved is set when a member leaves or is removed. Their chat
+	// access ends with the membership, since chat participants are derived from
+	// active memberships.
+	MembershipRemoved MembershipStatus = "removed"
 )
 
 // User is a PotKeeper account. It maps 1:1 to a B Moni user/wallet.
@@ -255,6 +259,46 @@ type Reminder struct {
 	SentAt  *time.Time `json:"sentAt,omitempty"`
 }
 
+// ChatMessage is one message in a pot's group chat. Membership is implied by
+// the author's active Membership — nobody outside the pot can read or post.
+type ChatMessage struct {
+	Base
+	GroupID uuid.UUID `gorm:"type:uuid;index;not null" json:"groupId"`
+	UserID  uuid.UUID `gorm:"type:uuid;index;not null" json:"userId"`
+	Body    string    `gorm:"not null" json:"body"`
+	// ReplyToID links a message to the one it answers, for threaded replies.
+	ReplyToID *uuid.UUID `gorm:"type:uuid" json:"replyToId,omitempty"`
+}
+
+// ChatReadReceipt records that a member has seen a message. The unique index
+// on (message_id, user_id) keeps the "read by" list free of duplicates.
+type ChatReadReceipt struct {
+	Base
+	GroupID   uuid.UUID `gorm:"type:uuid;index;not null" json:"groupId"`
+	MessageID uuid.UUID `gorm:"type:uuid;uniqueIndex:idx_chat_read;not null" json:"messageId"`
+	UserID    uuid.UUID `gorm:"type:uuid;uniqueIndex:idx_chat_read;not null" json:"userId"`
+}
+
+// Dispute statuses.
+const (
+	DisputeOpen     = "open"
+	DisputeResolved = "resolved"
+)
+
+// Dispute is one member's formal objection to how the pot is being run. When
+// more than one member has an open dispute, the pot's spending is frozen so the
+// treasurer cannot move money until the dispute is resolved. The unique index
+// on (group_id, user_id) means each member counts once.
+type Dispute struct {
+	Base
+	GroupID    uuid.UUID  `gorm:"type:uuid;uniqueIndex:idx_dispute_member;not null" json:"groupId"`
+	UserID     uuid.UUID  `gorm:"type:uuid;uniqueIndex:idx_dispute_member;not null" json:"userId"`
+	Reason     string     `json:"reason,omitempty"`
+	Status     string     `gorm:"not null;default:open" json:"status"`
+	ResolvedBy *uuid.UUID `gorm:"type:uuid" json:"resolvedBy,omitempty"`
+	ResolvedAt *time.Time `json:"resolvedAt,omitempty"`
+}
+
 // AllModels is the AutoMigrate list. Order does not strictly matter for
 // GORM but is kept readable.
 func AllModels() []interface{} {
@@ -270,5 +314,8 @@ func AllModels() []interface{} {
 		&WebhookEvent{},
 		&Reminder{},
 		&WalletTransaction{},
+		&ChatMessage{},
+		&ChatReadReceipt{},
+		&Dispute{},
 	}
 }
