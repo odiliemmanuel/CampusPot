@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  ArrowUpRight, HandCoins, LayoutDashboard, QrCode, Receipt, ScrollText, Send,
+  ArrowUpRight, HandCoins, LayoutDashboard, QrCode, Receipt, Send,
   Settings as SettingsIcon, Sparkles, TrendingUp, Users, Wallet,
 } from "lucide-react";
 
@@ -12,7 +12,6 @@ import { ContributionsInner } from "../contributions/Contributions";
 import { LeviesInner } from "../levies/Levies";
 import { ExpensesInner } from "../expenses/Expenses";
 import { MembersInner, InviteInner } from "../members/Members";
-import { LedgerInner } from "../ledger/Ledger";
 import { AssistantInner } from "../assistant/Assistant";
 import { useGroup } from "../../providers/GroupProvider";
 import { getSummary, type GroupSummary } from "../../lib/api";
@@ -27,7 +26,6 @@ const TABS = [
   { key: "payouts", label: "Payouts", icon: Send },
   { key: "members", label: "Members", icon: Users },
   { key: "invite", label: "Invite", icon: QrCode },
-  { key: "ledger", label: "Ledger", icon: ScrollText },
   { key: "assistant", label: "AI Treasurer", icon: Sparkles },
   { key: "settings", label: "Settings", icon: SettingsIcon },
 ] as const;
@@ -150,7 +148,6 @@ export default function PotPage() {
         {tab === "payouts" && <ExpensesInner />}
         {tab === "members" && <MembersInner />}
         {tab === "invite" && <InviteInner />}
-        {tab === "ledger" && <LedgerInner />}
         {tab === "assistant" && <AssistantInner />}
         {tab === "settings" && <PotSettings />}
       </motion.div>

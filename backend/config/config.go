@@ -42,12 +42,6 @@ type Config struct {
 	// postgres:// connection string, so we accept one directly.
 	DatabaseURL string
 
-	// DemoOpeningBalance seeds every newly created pot with a random opening
-	// float (₦80k/100k/200k) so a fresh demo is not empty. It is off on a
-	// zero-value Config (used by unit tests) and on via Load(); set
-	// DEMO_OPENING_BALANCE=false to turn it off.
-	DemoOpeningBalance bool
-
 	// AutoSeed populates a brand-new (empty) database with the demo dataset on
 	// startup, so a fresh deploy is instantly testable without running the seed
 	// CLI. It never touches a database that already holds data. Default on;
@@ -100,8 +94,6 @@ func Load() *Config {
 		GormLog:    getEnv("GORM_LOG", "warn"),
 
 		DatabaseURL: getEnv("DATABASE_URL", ""),
-
-		DemoOpeningBalance: getEnvBool("DEMO_OPENING_BALANCE", true),
 
 		AutoSeed: getEnvBool("AUTO_SEED", true),
 

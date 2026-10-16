@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { motion } from "framer-motion";
 import {
   Loader2, Send, Bell, CheckCircle2, Landmark, ArrowDownLeft, RefreshCw, Plus,
@@ -10,8 +10,8 @@ import PageHeader from "../../components/PageHeader";
 import { useGroup } from "../../providers/GroupProvider";
 import {
   listPayments, getOutstanding, simulateDeposit, recordManualPayment, listMembers,
-  draftReminder, sendReminder, walletPayPot, getStoredUser,
-  type Payment, type OutstandingMember, type Membership, type Levy,
+  draftReminder, sendReminder, walletPayPot, getStoredUser, getSummary,
+  type Payment, type OutstandingMember, type Membership, type Levy, type GroupSummary,
 } from "../../lib/api";
 import { formatNaira, nairaToKobo } from "../../lib/format";
 
@@ -23,6 +23,7 @@ export function ContributionsInner() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [outstanding, setOutstanding] = useState<OutstandingMember[]>([]);
   const [levy, setLevy] = useState<Levy | undefined>(undefined);
+  const [summary, setSummary] = useState<GroupSummary | null>(null);
   const [members, setMembers] = useState<Membership[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -39,17 +40,37 @@ export function ContributionsInner() {
   const [payAmount, setPayAmount] = useState("");
   const [payBusy, setPayBusy] = useState(false);
 
+  // Who has paid and how much, summed from matched/partial payments. Only the
+  // treasurer sees this breakdown.
+  const paidBreakdown = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const p of payments) {
+      if (!p.userId || (p.status !== "matched" && p.status !== "partial")) continue;
+      totals.set(p.userId, (totals.get(p.userId) ?? 0) + p.amountKobo);
+    }
+    return members
+      .map((m) => ({
+        userId: m.userId,
+        name: m.user?.name ?? m.userId,
+        paidKobo: totals.get(m.userId) ?? 0,
+      }))
+      .filter((r) => r.paidKobo > 0)
+      .sort((a, b) => b.paidKobo - a.paidKobo);
+  }, [payments, members]);
+
   const load = async () => {
-    const [p, o, m] = await Promise.all([
+    const [p, o, m, s] = await Promise.all([
       listPayments(gid),
       // A pot with no open levy isn't an error — it just has nothing to track.
       getOutstanding(gid).catch(() => ({ members: [] as OutstandingMember[], levy: null as Levy | null })),
       listMembers(gid),
+      getSummary(gid).catch(() => null),
     ]);
     setPayments(p);
     setOutstanding(o.members);
     setLevy(o.levy ?? undefined);
     setMembers(m);
+    setSummary(s);
   };
 
   useEffect(() => {
@@ -186,13 +207,23 @@ export function ContributionsInner() {
           {canManage ? (
             <>
               {levy && members.length > 0 && (
-                <p className="mb-4 -mt-1 text-xs text-slate-400">
-                  Target for <span className="font-medium text-slate-500 dark:text-slate-300">{levy.title}</span> ·{" "}
-                  <span className="font-semibold text-slate-600 dark:text-slate-200">
-                    {formatNaira(levy.amountKobo * members.length)}
-                  </span>{" "}
-                  ({formatNaira(levy.amountKobo)} × {members.length} members)
-                </p>
+                <div className="mb-4 -mt-1 grid grid-cols-2 gap-3">
+                  <div className="rounded-xl bg-emerald-50 px-3 py-2 dark:bg-emerald-500/10">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700/80 dark:text-emerald-400/80">Collected</p>
+                    <p className="font-sora text-base font-bold text-emerald-700 dark:text-emerald-400">
+                      {formatNaira(summary?.collectedKobo ?? 0)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-brand-50 px-3 py-2 dark:bg-brand-500/10">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-brand-600/80">Target</p>
+                    <p className="font-sora text-base font-bold text-brand-700 dark:text-brand-300">
+                      {formatNaira(summary?.expectedKobo ?? levy.amountKobo * members.length)}
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      {formatNaira(levy.amountKobo)} × {members.length} members
+                    </p>
+                  </div>
+                </div>
               )}
               {owe.length === 0 ? (
                 <div className="flex items-center gap-3 text-sm text-emerald-600 dark:text-emerald-400">
@@ -221,6 +252,23 @@ export function ContributionsInner() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* Who has paid, and how much — treasurer only */}
+              {paidBreakdown.length > 0 && (
+                <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-3">
+                    Paid ({paidBreakdown.length})
+                  </p>
+                  <div className="space-y-2">
+                    {paidBreakdown.map((r) => (
+                      <div key={r.userId} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-white dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700">
+                        <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{r.name}</p>
+                        <span className="text-sm font-bold text-emerald-600 shrink-0">+{formatNaira(r.paidKobo)}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 

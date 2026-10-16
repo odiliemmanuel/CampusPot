@@ -20,6 +20,9 @@ type CreateGroupRequest struct {
 	ApprovalThreshold int    `json:"approvalThreshold"` // defaults to 2
 	ApprovalTotal     int    `json:"approvalTotal"`     // defaults to 3
 	LargeExpenseKobo  int64  `json:"largeExpenseKobo"`  // 0 = no soft limit
+	// PerMemberKobo is the amount every member pays in. When > 0 the pot opens
+	// with a matching levy, so the collection target is per-member × members.
+	PerMemberKobo int64 `json:"perMemberKobo"`
 }
 
 // CreateGroup creates a pot, makes the caller its treasurer, and provisions
@@ -83,19 +86,22 @@ func (s *Service) CreateGroup(ctx context.Context, treasurerID uuid.UUID, req Cr
 		return nil, err
 	}
 
-	// Seed the pot with a demo opening float so a brand-new pot is not empty.
-	// It counts toward the balance but never toward "collected".
-	if s.cfg != nil && s.cfg.DemoOpeningBalance {
-		if err := s.appendLedger(s.db, &models.LedgerEntry{
-			GroupID:     group.ID,
-			Kind:        models.LedgerOpening,
-			AmountKobo:  randomOpeningBalance(),
-			Description: "Opening balance",
-			RefType:     "opening",
-		}); err != nil {
-			log.Printf("opening balance for group %s: %v", group.ID, err)
+	// A pot starts empty. If the creator set an amount each member pays, open a
+	// matching levy so the collection target (amount × joined members) is ready
+	// the moment people start joining.
+	if req.PerMemberKobo > 0 {
+		levy := &models.Levy{
+			GroupID:    group.ID,
+			Title:      "Member dues",
+			AmountKobo: req.PerMemberKobo,
+			Status:     "open",
+			CreatedBy:  treasurerID,
+		}
+		if err := s.db.Create(levy).Error; err != nil {
+			return nil, err
 		}
 	}
+
 	return group, nil
 }
 

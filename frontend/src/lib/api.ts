@@ -214,6 +214,7 @@ export interface GroupSummary {
   spentKobo: number;
   levy?: Levy;
   members: number;
+  expectedKobo: number;
   paidCount: number;
   partialCount: number;
   outstandingCount: number;
@@ -322,10 +323,16 @@ export const updateProfile = (patch: { name?: string; phone?: string }) =>
 // ---------- Groups ----------
 
 export const listGroups = () => request<Group[] | null>("/groups").then((g) => g ?? []);
-export const createGroup = (name: string, approvalThreshold = 2, approvalTotal = 3, largeExpenseKobo = 0) =>
+export const createGroup = (
+  name: string,
+  approvalThreshold = 2,
+  approvalTotal = 3,
+  largeExpenseKobo = 0,
+  perMemberKobo = 0,
+) =>
   request<Group>("/groups", {
     method: "POST",
-    body: JSON.stringify({ name, approvalThreshold, approvalTotal, largeExpenseKobo }),
+    body: JSON.stringify({ name, approvalThreshold, approvalTotal, largeExpenseKobo, perMemberKobo }),
   });
 export const getGroup = (id: string) => request<Group>(`/groups/${id}`);
 export const updateGroup = (
@@ -441,10 +448,10 @@ export const walletDeposit = (amountKobo: number, reference = "", note = "") =>
     body: JSON.stringify({ amountKobo, reference, note }),
   });
 
-export const walletTransfer = (amountKobo: number, recipient: string, note = "") =>
+export const walletTransfer = (amountKobo: number, recipient: string, note = "", bankName = "") =>
   request<WalletOverview>("/wallet/transfer", {
     method: "POST",
-    body: JSON.stringify({ amountKobo, recipient, note }),
+    body: JSON.stringify({ amountKobo, recipient, note, bankName }),
   });
 
 export const walletPayPot = (groupId: string, amountKobo: number, levyId?: string) =>

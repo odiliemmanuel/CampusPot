@@ -13,6 +13,7 @@ import Account from "./pages/account/Account";
 import Settings from "./pages/settings/Settings";
 import JoinPot from "./pages/join/JoinPot";
 import NewPot from "./pages/pots/NewPot";
+import ConnectBank from "./pages/banks/ConnectBank";
 
 // Old pot sub-paths (/pots/:id/members, etc.) now open the matching inline tab.
 function LegacyPotTab() {
@@ -46,6 +47,7 @@ export default function App() {
             </Route>
 
             <Route path="/account" element={<ProtectedRoute><Account /></ProtectedRoute>} />
+            <Route path="/banks" element={<ProtectedRoute><ConnectBank /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
             {/* The old flat routes now open from within a pot */}
@@ -54,7 +56,6 @@ export default function App() {
             <Route path="/levies" element={<Navigate to="/pots" replace />} />
             <Route path="/expenses" element={<Navigate to="/pots" replace />} />
             <Route path="/members" element={<Navigate to="/pots" replace />} />
-            <Route path="/ledger" element={<Navigate to="/pots" replace />} />
             <Route path="/assistant" element={<Navigate to="/pots" replace />} />
 
             {/* Join by code or scanned QR link */}

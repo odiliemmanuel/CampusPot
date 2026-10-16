@@ -20,6 +20,10 @@ import (
 	"github.com/odiliemmmanuel/campuspot/internal/models"
 )
 
+// demoWelcomeKobo is the starting wallet balance every new account gets so the
+// demo has money to send and pay with (₦10,000 in kobo). It is play money.
+const demoWelcomeKobo int64 = 1_000_000
+
 // ErrEmailTaken is returned when registering an email that already exists.
 var ErrEmailTaken = errors.New("email already registered")
 
@@ -56,10 +60,11 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*models.Us
 	}
 
 	user := &models.User{
-		Name:         req.Name,
-		Email:        req.Email,
-		Phone:        req.Phone,
-		PasswordHash: string(hash),
+		Name:              req.Name,
+		Email:             req.Email,
+		Phone:             req.Phone,
+		PasswordHash:      string(hash),
+		WalletBalanceKobo: demoWelcomeKobo,
 	}
 
 	// Provision the B Moni user now so every member has a wallet id from day
@@ -76,6 +81,15 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*models.Us
 	if err := s.db.Create(user).Error; err != nil {
 		return nil, "", err
 	}
+
+	// Record the demo welcome balance in the wallet's history too.
+	_ = s.db.Create(&models.WalletTransaction{
+		UserID:       user.ID,
+		Kind:         models.WalletDeposit,
+		AmountKobo:   demoWelcomeKobo,
+		Counterparty: "Welcome balance",
+		Note:         "Demo starting balance",
+	}).Error
 
 	token, err := s.IssueToken(user)
 	if err != nil {

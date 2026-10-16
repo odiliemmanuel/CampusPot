@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   ArrowDownLeft, ArrowUpRight, Banknote, ChevronDown, Check, Copy, Landmark,
-  Loader2, PiggyBank, Plus, QrCode, Send, Settings, Wallet, X,
+  Loader2, PiggyBank, Plus, QrCode, Send, Wallet, X,
 } from "lucide-react";
 
 import AppShell from "../../layouts/AppShell";
@@ -173,8 +173,10 @@ function AddMoneySheet({ onClose, onDone }: { onClose: () => void; onDone: () =>
 }
 
 function SendSheet({ balanceKobo, onClose, onDone }: { balanceKobo: number; onClose: () => void; onDone: () => void }) {
+  const [mode, setMode] = useState<"member" | "bank">("member");
   const [amount, setAmount] = useState("");
   const [recipient, setRecipient] = useState("");
+  const [bank, setBank] = useState(BANKS[0]);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -183,10 +185,17 @@ function SendSheet({ balanceKobo, onClose, onDone }: { balanceKobo: number; onCl
     e.preventDefault();
     const kobo = nairaToKobo(amount);
     if (kobo <= 0) { setError("Enter an amount to send."); return; }
-    if (!recipient.trim()) { setError("Enter the recipient's email or phone."); return; }
+    if (!recipient.trim()) {
+      setError(mode === "member" ? "Enter the recipient's email or phone." : "Enter the account number.");
+      return;
+    }
     setError(""); setBusy(true);
     try {
-      await walletTransfer(kobo, recipient.trim(), `Sent to ${recipient.trim()}`);
+      if (mode === "member") {
+        await walletTransfer(kobo, recipient.trim(), note || `Sent to ${recipient.trim()}`);
+      } else {
+        await walletTransfer(kobo, recipient.trim(), note || `Sent to ${bank}`, bank);
+      }
       onDone();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't send money.");
@@ -196,17 +205,60 @@ function SendSheet({ balanceKobo, onClose, onDone }: { balanceKobo: number; onCl
   return (
     <Sheet title="Send money" onClose={onClose}>
       <form onSubmit={submit} className="space-y-4">
-        <label className="block">
-          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">To (email or phone)</span>
-          <input
-            value={recipient}
-            onChange={(e) => setRecipient(e.target.value)}
-            placeholder="chidi@potkeeper.ng"
-            className="cp-input mt-1"
-          />
-        </label>
+        <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1 dark:bg-white/5">
+          {([["member", "PotKeeper user"], ["bank", "Bank account"]] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => { setMode(key); setRecipient(""); }}
+              className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                mode === key ? "bg-white text-brand-700 shadow-sm dark:bg-white/15 dark:text-white" : "text-slate-500 dark:text-slate-400"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {mode === "member" ? (
+          <label className="block">
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">To (email or phone)</span>
+            <input
+              value={recipient}
+              onChange={(e) => setRecipient(e.target.value)}
+              placeholder="chidi@potkeeper.ng"
+              className="cp-input mt-1"
+            />
+          </label>
+        ) : (
+          <div className="space-y-3">
+            <label className="block">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Bank</span>
+              <select value={bank} onChange={(e) => setBank(e.target.value)} className="cp-input mt-1">
+                {BANKS.map((b) => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Account number</span>
+              <input
+                value={recipient}
+                onChange={(e) => setRecipient(e.target.value)}
+                placeholder="0123456789"
+                inputMode="numeric"
+                className="cp-input mt-1"
+              />
+            </label>
+          </div>
+        )}
+
         <AmountInput amount={amount} setAmount={setAmount} />
-        <p className="text-[11px] text-slate-400">Wallet balance: {money(balanceKobo)}. Sending to a registered PotKeeper user credits their wallet instantly.</p>
+        <label className="block">
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Note (optional)</span>
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="What's it for?" className="cp-input mt-1" />
+        </label>
+        <p className="text-[11px] text-slate-400">
+          Wallet balance: {money(balanceKobo)}. Sending to a registered PotKeeper user credits their wallet instantly; a bank send is an external payout.
+        </p>
         {error && <p className="text-sm text-rose-600">{error}</p>}
         <SubmitButton busy={busy} label="Send money" />
       </form>
@@ -440,7 +492,7 @@ function WalletHome() {
         <QuickAction icon={<Banknote className="h-5 w-5" />} label="Add money" onClick={() => setSheet("add")} />
         <QuickAction icon={<Send className="h-4 w-4" />} label="Send" onClick={() => setSheet("send")} />
         <QuickAction icon={<QrCode className="h-4 w-4" />} label="Join pot" to="/join" />
-        <QuickAction icon={<Settings className="h-4 w-4" />} label="Settings" to="/settings" />
+        <QuickAction icon={<Landmark className="h-4 w-4" />} label="Connect bank" to="/banks" />
       </div>
 
       {/* Pots — compact, expand for detail */}

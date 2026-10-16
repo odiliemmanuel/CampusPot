@@ -72,8 +72,11 @@ func (s *Service) WalletDeposit(_ context.Context, userID uuid.UUID, req WalletD
 // WalletTransferRequest sends money out of the caller's wallet.
 type WalletTransferRequest struct {
 	AmountKobo int64  `json:"amountKobo" binding:"required,gt=0"`
-	Recipient  string `json:"recipient" binding:"required"` // email or phone of a PotKeeper user
-	Note       string `json:"note"`
+	Recipient  string `json:"recipient" binding:"required"` // email/phone of a user, or a bank account number
+	// BankName, when set, marks this as an external payout to a bank account
+	// rather than a transfer to another PotKeeper user.
+	BankName string `json:"bankName"`
+	Note     string `json:"note"`
 }
 
 // WalletTransfer moves money to another PotKeeper user when the recipient
@@ -89,19 +92,22 @@ func (s *Service) WalletTransfer(_ context.Context, userID uuid.UUID, req Wallet
 	}
 
 	var to *models.User
-	var match models.User
-	err := s.db.Where("LOWER(email) = ?", strings.ToLower(recipient)).
-		Or("phone = ?", recipient).First(&match).Error
-	if err == nil {
-		to = &match
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
+	// A named bank means an external payout — never match it to a user.
+	if strings.TrimSpace(req.BankName) == "" {
+		var match models.User
+		err := s.db.Where("LOWER(email) = ?", strings.ToLower(recipient)).
+			Or("phone = ?", recipient).First(&match).Error
+		if err == nil {
+			to = &match
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
 	}
 	if to != nil && to.ID == userID {
 		return nil, fmt.Errorf("%w: you cannot send money to yourself", ErrInvalid)
 	}
 
-	err = s.db.Transaction(func(tx *gorm.DB) error {
+	err := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := debitWallet(tx, userID, req.AmountKobo); err != nil {
 			return err
 		}
@@ -129,7 +135,12 @@ func (s *Service) WalletTransfer(_ context.Context, userID uuid.UUID, req Wallet
 				return err
 			}
 		} else {
-			out.Counterparty = recipient
+			bank := strings.TrimSpace(req.BankName)
+			if bank != "" {
+				out.Counterparty = fmt.Sprintf("%s · %s", bank, recipient)
+			} else {
+				out.Counterparty = recipient
+			}
 		}
 		return tx.Create(out).Error
 	})

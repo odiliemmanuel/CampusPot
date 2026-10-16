@@ -1,52 +1,36 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import {
-  ArrowDownLeft, ArrowUpRight, CheckCircle2, Loader2, ScrollText, Wallet,
-} from "lucide-react";
+import { ArrowDownLeft, CheckCircle2, Loader2, Wallet } from "lucide-react";
 
 import DataTable, { type Column } from "../../components/DataTable";
 import Pagination from "../../components/Pagination";
 import { useGroup } from "../../providers/GroupProvider";
 import {
-  getOutstanding, getStoredUser, getSummary, listLedger, listMembers,
-  type GroupSummary, type LedgerEntry, type Membership, type OutstandingMember,
+  getOutstanding, getStoredUser, getSummary, listMembers, listPayments,
+  type GroupSummary, type Membership, type OutstandingMember, type Payment,
 } from "../../lib/api";
 import { formatNaira } from "../../lib/format";
 
-const kindLabel: Record<string, string> = {
-  credit: "Deposit",
-  debit: "Payout",
-  opening: "Opening balance",
-};
-
-const columns: Column<LedgerEntry>[] = [
+const columns: Column<Payment>[] = [
   {
-    key: "description",
-    header: "Transaction",
-    render: (e) => (
+    key: "payer",
+    header: "Contributor",
+    render: (p) => (
       <div className="flex items-center gap-3">
-        <span
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-            e.amountKobo >= 0 ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"
-          }`}
-        >
-          {e.amountKobo >= 0 ? (
-            <ArrowDownLeft className="h-4 w-4" />
-          ) : (
-            <ArrowUpRight className="h-4 w-4" />
-          )}
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+          <ArrowDownLeft className="h-4 w-4" />
         </span>
-        <span className="font-medium text-slate-700 dark:text-slate-200">{e.description}</span>
+        <span className="font-medium text-slate-700 dark:text-slate-200">
+          {p.payerName || p.quotedReference || "Deposit"}
+        </span>
       </div>
     ),
   },
   {
-    key: "kind",
-    header: "Type",
-    render: (e) => (
-      <span className="text-slate-600 capitalize dark:text-slate-300">
-        {kindLabel[e.kind] ?? e.kind.replace("_", " ")}
-      </span>
+    key: "status",
+    header: "Status",
+    render: (p) => (
+      <span className="capitalize text-slate-600 dark:text-slate-300">{p.status}</span>
     ),
   },
   {
@@ -54,23 +38,16 @@ const columns: Column<LedgerEntry>[] = [
     header: "Amount",
     className: "text-right",
     headerClassName: "text-right",
-    render: (e) => (
-      <span
-        className={
-          e.amountKobo >= 0 ? "font-semibold text-emerald-600" : "font-semibold text-rose-600"
-        }
-      >
-        {e.amountKobo >= 0 ? "+" : "−"}
-        {formatNaira(Math.abs(e.amountKobo))}
-      </span>
+    render: (p) => (
+      <span className="font-semibold text-emerald-600">+{formatNaira(p.amountKobo)}</span>
     ),
   },
   {
     key: "date",
     header: "Date",
-    render: (e) => (
+    render: (p) => (
       <span className="whitespace-nowrap text-slate-500">
-        {new Date(e.createdAt).toLocaleDateString("en-NG", {
+        {new Date(p.createdAt).toLocaleDateString("en-NG", {
           day: "numeric",
           month: "short",
           year: "numeric",
@@ -80,7 +57,7 @@ const columns: Column<LedgerEntry>[] = [
   },
 ];
 
-// The dashboard tab: your position in the pot plus every transaction in it.
+// The dashboard tab: your position in the pot plus the contributions coming in.
 // The money cards above live on the pot page so they stay put while you switch
 // between sections.
 export default function PotDashboard() {
@@ -88,7 +65,7 @@ export default function PotDashboard() {
   const { activeGroup } = useGroup();
 
   const [summary, setSummary] = useState<GroupSummary | null>(null);
-  const [ledger, setLedger] = useState<LedgerEntry[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [outstanding, setOutstanding] = useState<OutstandingMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -102,14 +79,14 @@ export default function PotDashboard() {
     setError("");
     Promise.all([
       getSummary(id),
-      listLedger(id),
+      listPayments(id),
       listMembers(id).catch(() => [] as Membership[]),
       getOutstanding(id).then((o) => o.members).catch(() => [] as OutstandingMember[]),
     ])
-      .then(([s, l, , o]) => {
+      .then(([s, p, , o]) => {
         if (!alive) return;
         setSummary(s);
-        setLedger(l);
+        setPayments(p);
         setOutstanding(o);
       })
       .catch((err) => {
@@ -127,8 +104,8 @@ export default function PotDashboard() {
     setPage(1);
   }, [id]);
 
-  // The API returns the ledger oldest-first; show the newest on top.
-  const ordered = useMemo(() => [...ledger].reverse(), [ledger]);
+  // The API returns payments oldest-first; show the newest on top.
+  const ordered = useMemo(() => [...payments].reverse(), [payments]);
   const paged = useMemo(
     () => ordered.slice((page - 1) * pageSize, page * pageSize),
     [ordered, page, pageSize]
@@ -184,15 +161,15 @@ export default function PotDashboard() {
         </div>
       )}
 
-      {/* This pot's transactions only */}
+      {/* This pot's contributions only */}
       <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm dark:border-white/10 dark:bg-panel-dark">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4 sm:p-5 dark:border-white/10">
           <div className="flex items-center gap-2.5">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-500/15">
-              <ScrollText className="h-4 w-4" />
+              <ArrowDownLeft className="h-4 w-4" />
             </span>
             <h2 className="text-base font-semibold text-slate-900 dark:text-white">
-              Transactions in {activeGroup?.name ?? "this pot"}
+              Contributions to {activeGroup?.name ?? "this pot"}
             </h2>
           </div>
           {loading && <Loader2 className="h-4 w-4 animate-spin text-slate-400" />}
@@ -201,15 +178,15 @@ export default function PotDashboard() {
         <DataTable
           columns={columns}
           rows={paged}
-          getRowKey={(e) => e.id}
-          empty={loading ? "Loading…" : "No transactions yet."}
+          getRowKey={(p) => p.id}
+          empty={loading ? "Loading…" : "No contributions yet."}
         />
 
         <div className="border-t border-slate-100 p-4 dark:border-white/10">
           <Pagination
             page={page}
             pageSize={pageSize}
-            total={ledger.length}
+            total={payments.length}
             onPageChange={setPage}
             onPageSizeChange={setPageSize}
           />

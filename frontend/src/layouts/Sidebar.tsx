@@ -7,8 +7,8 @@ import { useGroup } from "../providers/GroupProvider";
 
 // Top-level navigation is the pots list, the personal Balance & History screen,
 // and app settings. A pot's sections (dashboard, contributions, levies, payouts,
-// members, ledger, AI treasurer, settings) are inline tabs on the pot page, so
-// there is nothing extra to list here.
+// members, AI treasurer, settings) are inline tabs on the pot page, so there is
+// nothing extra to list here.
 const navClass = ({ isActive }: { isActive: boolean }) =>
   [
     "group flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors",

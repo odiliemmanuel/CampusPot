@@ -27,7 +27,7 @@ export default function NewPot() {
     setError("");
     setBusy(true);
     try {
-      const group = await createGroup(name, 2, 3, nairaToKobo(nairaInput));
+      const group = await createGroup(name, 2, 3, 0, nairaToKobo(nairaInput));
       await refresh();
       setActiveGroupById(group.id);
       navigate(`/pots/${group.id}`, { replace: true });
@@ -72,15 +72,19 @@ export default function NewPot() {
             </div>
             <div>
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                Large-spend alert (₦, optional)
+                Amount each member pays (₦)
               </label>
               <input
+                required
                 value={nairaInput}
                 onChange={(e) => setNairaInput(e.target.value)}
-                placeholder="e.g. 20000"
+                placeholder="e.g. 5000"
+                inputMode="numeric"
                 className="cp-input mt-1.5"
               />
-              <p className="text-xs text-slate-400 mt-1">Payouts above this are flagged high-risk.</p>
+              <p className="text-xs text-slate-400 mt-1">
+                The pot's target is this amount × the number of members who join.
+              </p>
             </div>
             {error && <p className="text-sm text-rose-600">{error}</p>}
             <button type="submit" disabled={busy} className="cp-btn-primary w-full">
