@@ -15,8 +15,8 @@ import {
 import { formatNaira, nairaToKobo } from "../../lib/format";
 
 // B Moni's brand gradient (magenta → violet) used across the wallet surfaces.
-const BMONI = "bg-[linear-gradient(135deg,#FF24B8_0%,#AF01AF_100%)]";
-const BMONI_SOFT = "bg-[#FF24B8]/10 text-[#AF01AF] dark:text-[#FF67CD]";
+const WALLET_GRADIENT = "bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900";
+const WALLET_SOFT = "bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-300";
 
 const stateMeta: Record<PotMembership["state"], { label: string; tint: string }> = {
   paid: { label: "Paid up", tint: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15" },
@@ -31,7 +31,7 @@ const money = (kobo: number) =>
 const BANKS = ["GTBank", "Opay", "Access Bank", "Zenith Bank", "UBA", "Kuda", "Moniepoint"];
 
 function QuickAction({
-  icon, label, onClick, to, tint = BMONI_SOFT,
+  icon, label, onClick, to, tint = WALLET_SOFT,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -110,7 +110,7 @@ function AmountInput({ amount, setAmount }: { amount: string; setAmount: (v: str
             key={n}
             type="button"
             onClick={() => setAmount(String(n))}
-            className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-[#FF24B8] hover:text-[#AF01AF] dark:border-white/10 dark:text-slate-300"
+            className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-brand-400 hover:text-brand-600 dark:border-white/10 dark:text-slate-300"
           >
             ₦{n.toLocaleString()}
           </button>
@@ -125,7 +125,7 @@ function SubmitButton({ busy, label }: { busy: boolean; label: string }) {
     <button
       type="submit"
       disabled={busy}
-      className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 font-semibold text-white transition disabled:opacity-60 ${BMONI}`}
+      className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 font-semibold text-white transition disabled:opacity-60 ${WALLET_GRADIENT}`}
     >
       {busy ? <><Loader2 className="h-4 w-4 animate-spin" /> Working…</> : label}
     </button>
@@ -162,7 +162,7 @@ function AddMoneySheet({ onClose, onDone }: { onClose: () => void; onDone: () =>
         </label>
         <AmountInput amount={amount} setAmount={setAmount} />
         <p className="text-[11px] text-slate-400">
-          Money lands in <span className="font-semibold text-[#AF01AF] dark:text-[#FF67CD]">your wallet</span>, not a pot.
+          Money lands in <span className="font-semibold text-brand-600 dark:text-brand-300">your wallet</span>, not a pot.
           You can then send it to anyone or pay your contribution.
         </p>
         {error && <p className="text-sm text-rose-600">{error}</p>}
@@ -262,7 +262,7 @@ function PayPotSheet({ pots, balanceKobo, onClose, onDone }: { pots: PotMembersh
             <button
               type="button"
               onClick={() => setAmount(String(Math.round(selected.outstandingKobo / 100)))}
-              className="rounded-full border border-[#FF24B8]/40 bg-[#FF24B8]/10 px-3 py-1 text-xs font-semibold text-[#AF01AF] dark:text-[#FF67CD]"
+              className="rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-600 dark:text-brand-300"
             >
               Pay full {money(selected.outstandingKobo)}
             </button>
@@ -289,7 +289,7 @@ function PotRow({ pot, onPay }: { pot: PotMembership; onPay: (pot: PotMembership
         aria-expanded={open}
         className="flex w-full items-center gap-3 p-3.5 text-left"
       >
-        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white ${BMONI}`}>
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white ${WALLET_GRADIENT}`}>
           <PiggyBank className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1">
@@ -338,7 +338,7 @@ function PotRow({ pot, onPay }: { pot: PotMembership; onPay: (pot: PotMembership
             <button
               type="button"
               onClick={() => onPay(pot)}
-              className={`mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-semibold text-white ${BMONI}`}
+              className={`mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-semibold text-white ${WALLET_GRADIENT}`}
             >
               <Wallet className="h-4 w-4" /> Pay {money(pot.outstandingKobo)} from wallet
             </button>
@@ -387,7 +387,7 @@ function txMeta(kind: WalletTransaction["kind"], amount: number) {
     case "transfer_out":
       return { icon: <ArrowUpRight className="h-4 w-4" />, tint: "bg-rose-100 text-rose-600 dark:bg-rose-500/15", sign: "-", color: "text-rose-600" };
     default:
-      return { icon: <PiggyBank className="h-4 w-4" />, tint: BMONI_SOFT, sign: "-", color: "text-slate-600 dark:text-slate-300" };
+      return { icon: <PiggyBank className="h-4 w-4" />, tint: WALLET_SOFT, sign: "-", color: "text-slate-600 dark:text-slate-300" };
   }
 }
 
@@ -415,7 +415,7 @@ function WalletHome() {
   const walletReady = wallet?.ready !== false;
 
   if (loading) {
-    return <div className="flex justify-center py-24"><Loader2 className="h-6 w-6 animate-spin text-[#AF01AF]" /></div>;
+    return <div className="flex justify-center py-24"><Loader2 className="h-6 w-6 animate-spin text-brand-600" /></div>;
   }
   if (error) return <p className="text-sm text-rose-600">{error}</p>;
 
@@ -432,7 +432,7 @@ function WalletHome() {
       )}
 
       {/* Compact wallet card — B Moni palette */}
-      <div className={`relative overflow-hidden rounded-3xl p-5 text-white shadow-lg shadow-[#AF01AF]/25 ${BMONI}`}>
+      <div className={`relative overflow-hidden rounded-3xl p-5 text-white shadow-lg shadow-brand-900/20 ${WALLET_GRADIENT}`}>
         <div className="pointer-events-none absolute -right-8 -top-8 h-36 w-36 rounded-full bg-white/15 blur-2xl" />
         <div className="relative">
           <div className="flex items-center justify-between">
@@ -468,13 +468,13 @@ function WalletHome() {
       {/* Pots — compact, expand for detail */}
       <div className="mt-6 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Your pots</h2>
-        <Link to="/pots" className="text-xs font-semibold text-[#AF01AF] dark:text-[#FF67CD]">See all</Link>
+        <Link to="/pots" className="text-xs font-semibold text-brand-600 dark:text-brand-300">See all</Link>
       </div>
       {pots.length === 0 ? (
         <div className="mt-3 rounded-3xl border border-slate-100 bg-white p-8 text-center dark:border-white/10 dark:bg-panel-dark">
           <PiggyBank className="mx-auto mb-3 h-8 w-8 text-slate-300" />
           <p className="text-sm text-slate-500">You haven't joined a pot yet.</p>
-          <Link to="/pots/new" className={`mt-4 inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold text-white ${BMONI}`}>
+          <Link to="/pots/new" className={`mt-4 inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold text-white ${WALLET_GRADIENT}`}>
             <Plus className="h-4 w-4" /> Create a pot
           </Link>
         </div>
@@ -523,7 +523,7 @@ function WalletHome() {
           <button
             type="button"
             onClick={() => setSheet("add")}
-            className="flex w-full items-center justify-center gap-2 border-t border-slate-100 py-3 text-sm font-semibold text-[#AF01AF] dark:border-white/10 dark:text-[#FF67CD]"
+            className="flex w-full items-center justify-center gap-2 border-t border-slate-100 py-3 text-sm font-semibold text-brand-600 dark:border-white/10 dark:text-brand-300"
           >
             <Plus className="h-4 w-4" /> Add money to your wallet
           </button>
