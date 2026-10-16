@@ -241,6 +241,7 @@ export interface Dispute {
   groupId: string;
   userId: string;
   name: string;
+  expenseRequestId?: string;
   reason?: string;
   status: DisputeStatus;
   resolvedBy?: string;
@@ -401,8 +402,17 @@ export const leaveGroup = (groupId: string) =>
 
 // ---------- Pot chat ----------
 
+// A 404 on the chat endpoints means this deployment predates them; treat the
+// chat as empty rather than surfacing a "request failed" error.
+const is404 = (err: unknown) => err instanceof ApiError && err.status === 404;
+
 export const listChat = (groupId: string) =>
-  request<ChatMessage[] | null>(`/groups/${groupId}/chat`).then((m) => m ?? []);
+  request<ChatMessage[] | null>(`/groups/${groupId}/chat`)
+    .then((m) => m ?? [])
+    .catch((err) => {
+      if (is404(err)) return [] as ChatMessage[];
+      throw err;
+    });
 export const postChat = (groupId: string, body: string, replyToId?: string) =>
   request<ChatMessage>(`/groups/${groupId}/chat`, {
     method: "POST",
@@ -414,7 +424,12 @@ export const markChatRead = (groupId: string, messageId: string) =>
     body: JSON.stringify({ messageId }),
   });
 export const listChatParticipants = (groupId: string) =>
-  request<Membership[] | null>(`/groups/${groupId}/chat/participants`).then((m) => m ?? []);
+  request<Membership[] | null>(`/groups/${groupId}/chat/participants`)
+    .then((m) => m ?? [])
+    .catch((err) => {
+      if (is404(err)) return [] as Membership[];
+      throw err;
+    });
 export const removeChatMember = (groupId: string, userId: string) =>
   request<{ status: string }>(`/groups/${groupId}/chat/members/${userId}`, { method: "DELETE" });
 
@@ -422,10 +437,10 @@ export const removeChatMember = (groupId: string, userId: string) =>
 
 export const listDisputes = (groupId: string) =>
   request<Dispute[] | null>(`/groups/${groupId}/disputes`).then((d) => d ?? []);
-export const raiseDispute = (groupId: string, reason = "") =>
+export const raiseDispute = (groupId: string, reason = "", expenseRequestId?: string) =>
   request<Dispute>(`/groups/${groupId}/disputes`, {
     method: "POST",
-    body: JSON.stringify({ reason }),
+    body: JSON.stringify({ reason, expenseRequestId }),
   });
 export const resolveDispute = (groupId: string, disputeId: string) =>
   request<Dispute>(`/groups/${groupId}/disputes/${disputeId}/resolve`, { method: "POST" });

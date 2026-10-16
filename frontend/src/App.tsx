@@ -13,6 +13,7 @@ import Account from "./pages/account/Account";
 import Settings from "./pages/settings/Settings";
 import JoinPot from "./pages/join/JoinPot";
 import NewPot from "./pages/pots/NewPot";
+import Chat from "./pages/chat/Chat";
 import ConnectBank from "./pages/banks/ConnectBank";
 
 // Old pot sub-paths (/pots/:id/members, etc.) now open the matching inline tab.
@@ -43,6 +44,7 @@ export default function App() {
                 inline tabs. Legacy section URLs redirect to the right tab. */}
             <Route path="/pots/:id" element={<ProtectedRoute><PotLayout /></ProtectedRoute>}>
               <Route index element={<PotPage />} />
+              <Route path="chat" element={<Chat />} />
               <Route path="*" element={<LegacyPotTab />} />
             </Route>
 

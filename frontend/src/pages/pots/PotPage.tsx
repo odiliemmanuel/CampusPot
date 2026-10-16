@@ -1,15 +1,14 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  ArrowUpRight, HandCoins, LayoutDashboard, MessageSquare, QrCode, Send,
+  ArrowRight, ArrowUpRight, HandCoins, LayoutDashboard, MessageSquare, QrCode, Send,
   Settings as SettingsIcon, Sparkles, TrendingUp, Users, Wallet,
 } from "lucide-react";
 
 import PotDashboard from "./PotDashboard";
 import PotSettings from "./PotSettings";
 import { ContributionsInner } from "../contributions/Contributions";
-import { ChatInner } from "../chat/Chat";
 import { ExpensesInner } from "../expenses/Expenses";
 import { MembersInner, InviteInner } from "../members/Members";
 import { AssistantInner } from "../assistant/Assistant";
@@ -24,7 +23,6 @@ const TABS = [
   { key: "contributions", label: "Contributions", icon: HandCoins },
   { key: "payouts", label: "Payouts", icon: Send },
   { key: "members", label: "Members", icon: Users },
-  { key: "chat", label: "Chat", icon: MessageSquare },
   { key: "invite", label: "Invite", icon: QrCode },
   { key: "assistant", label: "AI Treasurer", icon: Sparkles },
   { key: "settings", label: "Settings", icon: SettingsIcon },
@@ -70,6 +68,7 @@ export default function PotPage() {
   const { activeGroup } = useGroup();
   const [params, setParams] = useSearchParams();
   const [summary, setSummary] = useState<GroupSummary | null>(null);
+  const chatActive = activeGroup?.id === id;
 
   const requested = params.get("tab");
   const tab: TabKey = (TABS.find((t) => t.key === requested)?.key ?? "dashboard") as TabKey;
@@ -105,7 +104,23 @@ export default function PotPage() {
         <StatTile icon={<Users className="h-4 w-4" />} label="Outstanding" value={formatNaira(summary?.outstandingKobo ?? 0)} tone="amber" />
       </div>
 
-      {/* Inline tab bar — only the section below changes */}
+      <div className="mb-4 mt-4 flex items-center justify-between gap-3">
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Manage contributions, payouts and members for this pot.
+        </p>
+        {chatActive && (
+          <Link
+            to={`/pots/${id}/chat`}
+            className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
+          >
+            <MessageSquare className="h-4 w-4" />
+            Chat
+          </Link>
+        )}
+      </div>
+
+      {/* Inline tab bar — only the section below changes. Chat opens as its
+          own full-screen page from the header button. */}
       <div className="mb-5 mt-4 -mx-1 flex gap-1 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {TABS.map((t) => {
           const active = t.key === tab;
@@ -146,7 +161,6 @@ export default function PotPage() {
         {tab === "contributions" && <ContributionsInner />}
         {tab === "payouts" && <ExpensesInner />}
         {tab === "members" && <MembersInner />}
-        {tab === "chat" && <ChatInner />}
         {tab === "invite" && <InviteInner />}
         {tab === "assistant" && <AssistantInner />}
         {tab === "settings" && <PotSettings />}

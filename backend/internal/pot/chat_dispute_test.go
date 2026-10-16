@@ -105,6 +105,63 @@ func TestDisputesFreezeSpending(t *testing.T) {
 	}
 }
 
+func TestDisputeOnExpenseBlocksItsPayout(t *testing.T) {
+	ctx := context.Background()
+	svc, db := newTestService(t)
+
+	treasurer := newUser(t, db, "Ada", "ada@x.ng")
+	m1 := newUser(t, db, "Chidi", "chidi@x.ng")
+	m2 := newUser(t, db, "Fatima", "fatima@x.ng")
+
+	group, err := svc.CreateGroup(ctx, treasurer.ID, CreateGroupRequest{Name: "200L Dues"})
+	if err != nil {
+		t.Fatalf("CreateGroup: %v", err)
+	}
+	addTestMember(t, svc, group, treasurer.ID, m1, models.RoleMember)
+	addTestMember(t, svc, group, treasurer.ID, m2, models.RoleMember)
+
+	expense, err := svc.CreateExpense(ctx, group.ID, treasurer.ID, CreateExpenseRequest{AmountKobo: 1000, Destination: "x"})
+	if err != nil {
+		t.Fatalf("CreateExpense: %v", err)
+	}
+	// Pretend it cleared approvals.
+	if err := db.Model(expense).Update("status", models.ExpenseApproved).Error; err != nil {
+		t.Fatalf("approve: %v", err)
+	}
+
+	// A single dispute aimed at this payout blocks it, without freezing the pot.
+	if _, err := svc.RaiseDispute(ctx, group.ID, m1.ID, RaiseDisputeRequest{Reason: "fake receipt", ExpenseRequestID: &expense.ID}); err != nil {
+		t.Fatalf("RaiseDispute: %v", err)
+	}
+	if frozen, n, _ := svc.spendingFrozen(group.ID); frozen || n != 1 {
+		t.Fatalf("expected one dispute and no pot-wide freeze, got frozen=%v n=%d", frozen, n)
+	}
+	if _, err := svc.Execute(ctx, group.ID, expense.ID, treasurer.ID); err == nil {
+		t.Fatal("expected Execute to be blocked while the payout is disputed")
+	}
+
+	// A dispute may only target a payout in the same pot.
+	other, err := svc.CreateGroup(ctx, treasurer.ID, CreateGroupRequest{Name: "Other"})
+	if err != nil {
+		t.Fatalf("CreateGroup other: %v", err)
+	}
+	if _, err := svc.RaiseDispute(ctx, other.ID, treasurer.ID, RaiseDisputeRequest{ExpenseRequestID: &expense.ID}); err == nil {
+		t.Fatal("expected a cross-pot dispute target to be rejected")
+	}
+
+	// Once resolved, the payout is no longer disputed.
+	var d models.Dispute
+	if err := db.Where("group_id = ? AND user_id = ?", group.ID, m1.ID).First(&d).Error; err != nil {
+		t.Fatalf("load dispute: %v", err)
+	}
+	if _, err := svc.ResolveDispute(ctx, group.ID, d.ID, m1.ID); err != nil {
+		t.Fatalf("ResolveDispute: %v", err)
+	}
+	if disputed, err := svc.expenseDisputed(expense.ID); err != nil || disputed {
+		t.Fatalf("expected payout to be clear after resolving, got disputed=%v err=%v", disputed, err)
+	}
+}
+
 func TestLeavePotRemovesFromChat(t *testing.T) {
 	ctx := context.Background()
 	svc, db := newTestService(t)

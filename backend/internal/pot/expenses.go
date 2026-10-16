@@ -191,6 +191,11 @@ func (s *Service) Execute(ctx context.Context, groupID, expenseID, actorID uuid.
 	if err := s.db.First(&expense, "id = ? AND group_id = ?", expenseID, groupID).Error; err != nil {
 		return nil, ErrNotFound
 	}
+	if disputed, err := s.expenseDisputed(expenseID); err != nil {
+		return nil, err
+	} else if disputed {
+		return nil, fmt.Errorf("%w: this payout is disputed by a member", ErrConflict)
+	}
 	if expense.Status != models.ExpenseApproved {
 		return nil, fmt.Errorf("%w: expense must be approved before execution (is %s)", ErrConflict, expense.Status)
 	}

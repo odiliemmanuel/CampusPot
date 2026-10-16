@@ -291,12 +291,15 @@ const (
 // on (group_id, user_id) means each member counts once.
 type Dispute struct {
 	Base
-	GroupID    uuid.UUID  `gorm:"type:uuid;uniqueIndex:idx_dispute_member;not null" json:"groupId"`
-	UserID     uuid.UUID  `gorm:"type:uuid;uniqueIndex:idx_dispute_member;not null" json:"userId"`
-	Reason     string     `json:"reason,omitempty"`
-	Status     string     `gorm:"not null;default:open" json:"status"`
-	ResolvedBy *uuid.UUID `gorm:"type:uuid" json:"resolvedBy,omitempty"`
-	ResolvedAt *time.Time `json:"resolvedAt,omitempty"`
+	GroupID uuid.UUID `gorm:"type:uuid;uniqueIndex:idx_dispute_member;not null" json:"groupId"`
+	UserID  uuid.UUID `gorm:"type:uuid;uniqueIndex:idx_dispute_member;not null" json:"userId"`
+	// ExpenseRequestID, when set, is the specific payout this dispute is over.
+	// Nil means the dispute is about how the pot is being run in general.
+	ExpenseRequestID *uuid.UUID `gorm:"type:uuid;index" json:"expenseRequestId,omitempty"`
+	Reason           string     `json:"reason,omitempty"`
+	Status           string     `gorm:"not null;default:open" json:"status"`
+	ResolvedBy       *uuid.UUID `gorm:"type:uuid" json:"resolvedBy,omitempty"`
+	ResolvedAt       *time.Time `json:"resolvedAt,omitempty"`
 }
 
 // AllModels is the AutoMigrate list. Order does not strictly matter for

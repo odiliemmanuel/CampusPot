@@ -39,23 +39,42 @@ func (s *Service) spendingFrozen(groupID uuid.UUID) (bool, int64, error) {
 	return n >= DisputeThreshold, n, nil
 }
 
-// RaiseDisputeRequest is the body for opening a dispute.
+// RaiseDisputeRequest is the body for opening a dispute. ExpenseRequestID is
+// optional: set it to dispute a specific payout rather than the pot in general.
 type RaiseDisputeRequest struct {
-	Reason string `json:"reason"`
+	Reason           string     `json:"reason"`
+	ExpenseRequestID *uuid.UUID `json:"expenseRequestId"`
 }
 
-// RaiseDispute opens a dispute against how the pot is being run. Any active
-// member may raise one; each member counts once. Two or more open disputes
-// freeze the pot so the treasurer cannot create or execute spends.
+// expenseDisputed reports whether a payout has any open dispute against it.
+func (s *Service) expenseDisputed(expenseID uuid.UUID) (bool, error) {
+	var n int64
+	err := s.db.Model(&models.Dispute{}).
+		Where("expense_request_id = ? AND status = ?", expenseID, models.DisputeOpen).
+		Count(&n).Error
+	return n > 0, err
+}
+
+// RaiseDispute opens a dispute against how the pot is being run, or against a
+// specific payout. Any active member may raise one; each member counts once.
+// A single open dispute freezes the payout it names; two or more open disputes
+// freeze all spending so the treasurer cannot move money.
 func (s *Service) RaiseDispute(_ context.Context, groupID, userID uuid.UUID, req RaiseDisputeRequest) (*models.Dispute, error) {
 	if _, err := s.requireMember(groupID, userID); err != nil {
 		return nil, err
 	}
+	if req.ExpenseRequestID != nil {
+		var expense models.ExpenseRequest
+		if err := s.db.First(&expense, "id = ? AND group_id = ?", *req.ExpenseRequestID, groupID).Error; err != nil {
+			return nil, fmt.Errorf("%w: no such payout in this pot", ErrNotFound)
+		}
+	}
 	d := &models.Dispute{
-		GroupID: groupID,
-		UserID:  userID,
-		Reason:  strings.TrimSpace(req.Reason),
-		Status:  models.DisputeOpen,
+		GroupID:          groupID,
+		UserID:           userID,
+		ExpenseRequestID: req.ExpenseRequestID,
+		Reason:           strings.TrimSpace(req.Reason),
+		Status:           models.DisputeOpen,
 	}
 	if err := s.db.Create(d).Error; err != nil {
 		if isUniqueViolation(err) {
