@@ -266,7 +266,7 @@ The app is built to run on free tiers: **Neon** (Postgres), **Render** (API),
     - Optional `AUTO_SEED` (default `true`) — on a blank database the API
       self-seeds the demo accounts on boot. Set `AUTO_SEED=false` for a truly
       empty start with only the accounts you create yourself.
-4. Note the deployed API URL, e.g. `https://campuspot-api.onrender.com`.
+4. Note the deployed API URL, e.g. `https://campusspot-kvjm.onrender.com`.
 
 > If you create the service manually instead of via Blueprint, set **Runtime**
 > to `Docker`, **Root Directory** to `backend`, and leave **Dockerfile Path**
@@ -297,7 +297,7 @@ browser's `localStorage`. Clear site data (or use a fresh session) to drop it.
 
 1. Import the repo in Vercel and set **Root Directory** to `frontend`.
 2. Add an environment variable `VITE_API_URL` =
-   `https://campuspot-api.onrender.com/api/v1` (your Render URL + `/api/v1`).
+   `https://campusspot-kvjm.onrender.com/api/v1` (your Render URL + `/api/v1`).
 3. Deploy. `frontend/vercel.json` rewrites all routes to `index.html` so
    client-side routes survive a refresh.
 4. Copy the final Vercel URL back into the backend's `CORS_ORIGINS` and

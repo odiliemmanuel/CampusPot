@@ -2,7 +2,7 @@
 // time; otherwise local dev talks to the local API and everywhere else falls
 // back to the deployed API. This makes a deploy work even when the Vercel env
 // var is missing, which previously showed "cannot connect to server".
-const PROD_API_URL = "https://campuspot-api.onrender.com/api/v1";
+const PROD_API_URL = "https://campusspot-kvjm.onrender.com/api/v1";
 
 function resolveApiUrl(): string {
   const configured = import.meta.env.VITE_API_URL;
