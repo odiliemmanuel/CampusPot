@@ -26,6 +26,7 @@ func (ct *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 	authed := rg.Group("")
 	authed.Use(ct.svc.RequireAuth())
 	authed.GET("/auth/me", ct.me)
+	authed.PATCH("/auth/me", ct.updateMe)
 }
 
 func (ct *Controller) register(c *gin.Context) {
@@ -71,6 +72,24 @@ func (ct *Controller) me(c *gin.Context) {
 		return
 	}
 	response.OK(c, publicUser(&user))
+}
+
+func (ct *Controller) updateMe(c *gin.Context) {
+	var req UpdateProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "INVALID_BODY", err.Error())
+		return
+	}
+	user, err := ct.svc.UpdateProfile(c.Request.Context(), MustUserID(c), req)
+	if err != nil {
+		if errors.Is(err, ErrInvalidProfile) {
+			response.Error(c, http.StatusBadRequest, "INVALID_PROFILE", "provide a name (2+ characters) or a phone number")
+			return
+		}
+		response.Error(c, http.StatusInternalServerError, "UPDATE_FAILED", err.Error())
+		return
+	}
+	response.OK(c, publicUser(user))
 }
 
 // publicUser hides fields that must never leave the server (password hash).

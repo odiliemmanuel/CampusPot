@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Check, Copy, QrCode, Share2 } from "lucide-react";
 import { joinLink } from "../lib/join";
@@ -8,6 +8,15 @@ import { joinLink } from "../lib/join";
 export default function JoinCard({ code }: { code: string }) {
   const link = joinLink(code);
   const [copied, setCopied] = useState<"code" | "link" | "">("");
+  const [qrSize, setQrSize] = useState(104);
+
+  // Scale the QR to the screen so it scans easily on a phone without dominating.
+  useEffect(() => {
+    const update = () => setQrSize(window.innerWidth >= 640 ? 128 : 96);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
 
   const copy = async (value: string, which: "code" | "link") => {
     try {
@@ -36,7 +45,7 @@ export default function JoinCard({ code }: { code: string }) {
   };
 
   return (
-    <div className="rounded-3xl bg-gradient-to-br from-brand-600 to-brand-800 p-6 text-white relative overflow-hidden">
+    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 to-brand-800 p-5 text-white sm:p-6">
       <div className="absolute -top-8 -right-8 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
 
       <div className="relative">
@@ -46,7 +55,7 @@ export default function JoinCard({ code }: { code: string }) {
 
         <div className="mt-4 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
           <div className="shrink-0 rounded-2xl bg-white p-2.5">
-            <QRCodeSVG value={link} size={104} level="M" marginSize={0} />
+            <QRCodeSVG value={link} size={qrSize} level="M" marginSize={0} />
           </div>
           <div className="min-w-0">
             <p className="text-[11px] uppercase tracking-wide text-brand-100">Join code</p>

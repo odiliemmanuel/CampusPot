@@ -4,6 +4,7 @@ import { HandCoins, Loader2 } from "lucide-react";
 
 import AppShell from "../../layouts/AppShell";
 import PageHeader from "../../components/PageHeader";
+import VoicePotButton from "../../components/VoicePotButton";
 import { useGroup } from "../../providers/GroupProvider";
 import { createGroup } from "../../lib/api";
 import { nairaToKobo } from "../../lib/format";
@@ -86,8 +87,20 @@ export default function NewPot() {
               {busy ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating…</> : "Create pot"}
             </button>
           </form>
+
+          <p className="mt-4 text-center text-xs text-slate-400 sm:text-left">
+            Tap the microphone to fill this in by voice.
+          </p>
         </div>
       </div>
+
+      <VoicePotButton
+        onResult={({ name: spokenName, amountKobo }) => {
+          setError("");
+          if (spokenName) setName(spokenName);
+          if (amountKobo != null) setNairaInput(String(Math.round(amountKobo / 100)));
+        }}
+      />
     </AppShell>
   );
 }

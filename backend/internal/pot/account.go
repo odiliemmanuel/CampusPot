@@ -26,6 +26,11 @@ type PotMembership struct {
 	PaidKobo        int64       `json:"paidKobo"`
 	OutstandingKobo int64       `json:"outstandingKobo"`
 	State           string      `json:"state"` // paid | partial | unpaid | none
+
+	// The pot's dedicated collection account, so members know where to pay.
+	VirtualAccountNumber string `json:"virtualAccountNumber,omitempty"`
+	VirtualAccountBank   string `json:"virtualAccountBank,omitempty"`
+	VirtualAccountName   string `json:"virtualAccountName,omitempty"`
 }
 
 // MyTransaction is one of the user's own deposits across every pot.
@@ -66,12 +71,15 @@ func (s *Service) AccountOverview(ctx context.Context, userID uuid.UUID) (*Accou
 			continue
 		}
 		pot := PotMembership{
-			GroupID:   group.ID,
-			GroupName: group.Name,
-			Currency:  group.Currency,
-			Role:      m.Role,
-			JoinedAt:  m.JoinedAt,
-			Reference: m.Reference,
+			GroupID:              group.ID,
+			GroupName:            group.Name,
+			Currency:             group.Currency,
+			Role:                 m.Role,
+			JoinedAt:             m.JoinedAt,
+			Reference:            m.Reference,
+			VirtualAccountNumber: group.VirtualAccountNumber,
+			VirtualAccountBank:   group.VirtualAccountBank,
+			VirtualAccountName:   group.VirtualAccountName,
 		}
 		if bal, err := s.Balance(ctx, group.ID); err == nil {
 			pot.BalanceKobo = bal

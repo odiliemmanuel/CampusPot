@@ -150,8 +150,8 @@ export interface Levy {
 export interface Payment {
   id: string;
   groupId: string;
-  levyId?: string;
   userId?: string;
+  levyId?: string;
   payerName?: string;
   payerAccount?: string;
   amountKobo: number;
@@ -246,6 +246,10 @@ export interface PotMembership {
   paidKobo: number;
   outstandingKobo: number;
   state: "paid" | "partial" | "unpaid" | "none";
+  /** The pot's dedicated collection account — shown on the Balance page. */
+  virtualAccountNumber?: string;
+  virtualAccountBank?: string;
+  virtualAccountName?: string;
 }
 
 export interface MyTransaction {
@@ -286,6 +290,9 @@ export const login = (email: string, password: string) =>
   });
 
 export const getMe = () => request<AuthUser>("/auth/me");
+
+export const updateProfile = (patch: { name?: string; phone?: string }) =>
+  request<AuthUser>("/auth/me", { method: "PATCH", body: JSON.stringify(patch) });
 
 // ---------- Groups ----------
 
@@ -387,7 +394,97 @@ export const sendReminder = (groupId: string, reminderId: string) =>
 
 // ---------- Account ----------
 
-export const getAccountOverview = () => request<AccountOverview>("/account/overview");
+// Build the account overview from endpoints that have existed for longer, so
+// the Balance page still works on a backend that predates /account/overview.
+async function localAccountOverview(): Promise<AccountOverview> {
+  const me = getStoredUser();
+  const groups = await listGroups();
+  const pots: PotMembership[] = [];
+  const transactions: MyTransaction[] = [];
+  let totalContributedKobo = 0;
+  let totalOutstandingKobo = 0;
+
+  const perPot = await Promise.all(
+    groups.map(async (g) => {
+      const [summary, outstanding, members, payments] = await Promise.all([
+        getSummary(g.id).catch(() => null),
+        getOutstanding(g.id).catch(() => ({ members: [] as OutstandingMember[], levy: null })),
+        listMembers(g.id).catch(() => [] as Membership[]),
+        listPayments(g.id).catch(() => [] as Payment[]),
+      ]);
+      return { g, summary, outstanding, members, payments };
+    })
+  );
+
+  for (const { g, summary, outstanding, members, payments } of perPot) {
+    const membership = members.find((m) => m.userId === me?.id);
+    const mine = outstanding.members.find((m) => m.userId === me?.id);
+    const myPayments = payments.filter((p) => p.userId === me?.id);
+
+    const paidKobo = mine?.paidKobo ?? myPayments.reduce((sum, p) => sum + p.amountKobo, 0);
+    const outstandingKobo = mine?.outstandingKobo ?? 0;
+    const levyAmountKobo = mine?.amountKobo ?? outstanding.levy?.amountKobo ?? 0;
+
+    pots.push({
+      groupId: g.id,
+      groupName: g.name,
+      currency: g.currency,
+      role: membership?.role ?? "member",
+      joinedAt: membership?.joinedAt,
+      reference: membership?.reference ?? "",
+      balanceKobo: summary?.balanceKobo ?? 0,
+      levyTitle: outstanding.levy?.title,
+      levyAmountKobo,
+      paidKobo,
+      outstandingKobo,
+      state: mine?.state ?? "none",
+      virtualAccountNumber: g.virtualAccountNumber,
+      virtualAccountBank: g.virtualAccountBank,
+      virtualAccountName: g.virtualAccountName,
+    });
+
+    totalContributedKobo += paidKobo;
+    totalOutstandingKobo += outstandingKobo;
+
+    for (const p of myPayments) {
+      transactions.push({
+        id: p.id,
+        groupId: g.id,
+        groupName: g.name,
+        amountKobo: p.amountKobo,
+        status: p.status,
+        payerName: p.payerName,
+        createdAt: p.createdAt ?? new Date().toISOString(),
+      });
+    }
+  }
+
+  transactions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  return {
+    totalContributedKobo,
+    totalOutstandingKobo,
+    pots,
+    transactions: transactions.slice(0, 200),
+  };
+}
+
+export const getAccountOverview = async (): Promise<AccountOverview> => {
+  try {
+    return await request<AccountOverview>("/account/overview");
+  } catch (err) {
+    // A 404 means this deployment is older than the endpoint — aggregate the
+    // data from the endpoints it does have instead of failing the page.
+    if (err instanceof ApiError && err.status === 404) {
+      try {
+        return await localAccountOverview();
+      } catch {
+        /* fall through and surface the original error */
+      }
+    }
+    throw err;
+  }
+};
 
 // ---------- Meta ----------
 

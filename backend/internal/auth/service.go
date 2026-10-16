@@ -103,6 +103,34 @@ func (s *Service) Login(_ context.Context, req LoginRequest) (*models.User, stri
 	return &user, token, nil
 }
 
+// ErrInvalidProfile is returned when a profile update carries no usable field.
+var ErrInvalidProfile = errors.New("nothing to update")
+
+// UpdateProfile changes the signed-in user's display name and/or phone.
+func (s *Service) UpdateProfile(_ context.Context, userID uuid.UUID, req UpdateProfileRequest) (*models.User, error) {
+	var user models.User
+	if err := s.db.First(&user, "id = ?", userID).Error; err != nil {
+		return nil, err
+	}
+	if req.Name == nil && req.Phone == nil {
+		return nil, ErrInvalidProfile
+	}
+	if req.Name != nil {
+		name := strings.TrimSpace(*req.Name)
+		if len(name) < 2 {
+			return nil, ErrInvalidProfile
+		}
+		user.Name = name
+	}
+	if req.Phone != nil {
+		user.Phone = strings.TrimSpace(*req.Phone)
+	}
+	if err := s.db.Save(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 // IssueToken signs a JWT for the user.
 func (s *Service) IssueToken(u *models.User) (string, error) {
 	claims := jwt.RegisteredClaims{

@@ -19,3 +19,10 @@ type AuthResponse struct {
 	Token string      `json:"token"`
 	User  interface{} `json:"user"`
 }
+
+// UpdateProfileRequest is the JSON body for PATCH /api/v1/auth/me. Both fields
+// are optional; only the ones present are changed.
+type UpdateProfileRequest struct {
+	Name  *string `json:"name"`
+	Phone *string `json:"phone"`
+}

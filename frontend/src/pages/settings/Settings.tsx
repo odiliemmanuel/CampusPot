@@ -1,24 +1,65 @@
 import { useEffect, useState } from "react";
-import { Loader2, LogOut } from "lucide-react";
+import { Link } from "react-router-dom";
+import { CheckCircle2, Loader2, LogOut, PiggyBank, Save, ShieldCheck, UserRound } from "lucide-react";
 
 import AppShell from "../../layouts/AppShell";
 import PageHeader from "../../components/PageHeader";
 import { useGroup } from "../../providers/GroupProvider";
-import { getMe, clearSession, type AuthUser } from "../../lib/api";
-import { formatNaira } from "../../lib/format";
+import {
+  clearSession, getMe, getStoredUser, getToken, setSession, updateProfile,
+  type AuthUser,
+} from "../../lib/api";
 
 export default function Settings() {
   const { activeGroup } = useGroup();
 
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     getMe()
-      .then(setUser)
-      .catch(() => {})
+      .then((u) => {
+        setUser(u);
+        setName(u.name ?? "");
+        setPhone(u.phone ?? "");
+      })
+      .catch(() => {
+        const cached = getStoredUser<AuthUser>();
+        if (cached) {
+          setUser(cached);
+          setName(cached.name ?? "");
+          setPhone(cached.phone ?? "");
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
+
+  const dirty = user !== null && (name !== (user.name ?? "") || phone !== (user.phone ?? ""));
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setNotice("");
+    setSaving(true);
+    try {
+      const updated = await updateProfile({ name, phone });
+      setUser(updated);
+      setName(updated.name ?? "");
+      setPhone(updated.phone ?? "");
+      const token = getToken();
+      if (token) setSession(token, updated);
+      setNotice("Your profile has been updated.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't save your changes.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const logout = () => {
     clearSession();
@@ -27,61 +68,143 @@ export default function Settings() {
 
   return (
     <AppShell>
-      <PageHeader title="Settings" subtitle="Your account and this pot's rules." />
+      <PageHeader title="Settings" subtitle="Your account, and the rules of the pot you're in." />
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Profile */}
-        <div className="cp-card rounded-3xl p-6">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-4">Profile</p>
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2">
+        {/* Profile — editable */}
+        <section className="cp-card rounded-3xl p-4 sm:p-6">
+          <div className="mb-4 flex items-center gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-500/15">
+              <UserRound className="h-4 w-4" />
+            </span>
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Your profile</p>
+          </div>
+
           {loading ? (
-            <Loader2 className="w-5 h-5 text-primary-600 animate-spin" />
+            <Loader2 className="h-5 w-5 animate-spin text-primary-600" />
           ) : (
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-xl font-bold">
-                {(user?.name ?? "?").charAt(0)}
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-400 to-primary-600 text-xl font-bold text-white">
+                  {(name || user?.email || "?").charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate font-sora font-bold text-slate-900 dark:text-white">
+                    {user?.name ?? "—"}
+                  </p>
+                  <p className="truncate text-sm text-slate-500 dark:text-slate-400">
+                    {user?.email ?? "—"}
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="font-sora font-bold text-slate-900 dark:text-white truncate">{user?.name ?? "—"}</p>
-                <p className="text-sm text-slate-500 dark:text-slate-400 truncate">{user?.email ?? "—"}</p>
-                {user?.phone && <p className="text-xs text-slate-400 mt-0.5">{user.phone}</p>}
-              </div>
+
+              <form onSubmit={save} className="space-y-3">
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+                    Display name
+                  </span>
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="cp-input"
+                    placeholder="Your name"
+                    autoComplete="name"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                    Phone
+                  </span>
+                  <input
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="cp-input mt-1"
+                    placeholder="0801 234 5678"
+                    autoComplete="tel"
+                    inputMode="tel"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Email</span>
+                  <input
+                    value={user?.email ?? ""}
+                    readOnly
+                    disabled
+                    className="cp-input mt-1 cursor-not-allowed opacity-60"
+                  />
+                </label>
+
+                {notice && (
+                  <p className="flex items-center gap-1.5 text-sm text-emerald-600">
+                    <CheckCircle2 className="h-4 w-4" /> {notice}
+                  </p>
+                )}
+                {error && <p className="text-sm text-rose-600">{error}</p>}
+
+                <button type="submit" disabled={!dirty || saving} className="cp-btn-primary w-full text-sm sm:w-auto">
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Save changes
+                </button>
+              </form>
             </div>
           )}
-        </div>
+        </section>
 
-        {/* Pot rules */}
-        {activeGroup && (
-          <div className="cp-card rounded-3xl p-6">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-4">Pot rules</p>
-            <div className="space-y-3 text-sm">
-              <Row label="Pot name" value={activeGroup.name} />
-              <Row label="Currency" value={activeGroup.currency} />
-              <Row label="Approvals required" value={`${activeGroup.approvalThreshold} of ${activeGroup.approvalTotal}`} />
-              <Row
-                label="Large-spend alert"
-                value={activeGroup.largeExpenseKobo > 0 ? `${formatNaira(activeGroup.largeExpenseKobo)}+` : "Not set"}
-              />
-              <Row label="Join code" value={activeGroup.joinCode} />
-              {activeGroup.virtualAccountNumber && (
-                <Row label="Pot account" value={`${activeGroup.virtualAccountNumber} · ${activeGroup.virtualAccountBank}`} />
-              )}
-            </div>
-          </div>
-        )}
+        <div className="space-y-4 sm:space-y-6">
+          {/* Pot rules */}
+          {activeGroup && (
+            <section className="cp-card rounded-3xl p-4 sm:p-6">
+              <div className="mb-4 flex items-center gap-2.5">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-500/15">
+                  <PiggyBank className="h-4 w-4" />
+                </span>
+                <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                  {activeGroup.name} · rules
+                </p>
+              </div>
 
-        {/* Session */}
-        <div className="cp-card rounded-3xl p-6">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-4">Session</p>
-          <button
-            onClick={logout}
-            className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition"
-          >
-            <LogOut className="w-4 h-4" /> Log out
-          </button>
+              <div className="space-y-3 text-sm">
+                <Row label="Approvals" value={`${activeGroup.approvalThreshold} of ${activeGroup.approvalTotal} signers`} />
+                <Row
+                  label="Large spend"
+                  value={activeGroup.largeExpenseKobo > 0
+                    ? `${new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 }).format(activeGroup.largeExpenseKobo / 100)}+`
+                    : "Not set"}
+                />
+                <Row label="Join code" value={activeGroup.joinCode} />
+                {activeGroup.virtualAccountNumber && (
+                  <Row
+                    label="Pot account"
+                    value={[activeGroup.virtualAccountBank, activeGroup.virtualAccountNumber].filter(Boolean).join(" · ")}
+                  />
+                )}
+              </div>
+
+              <Link
+                to={`/pots/${activeGroup.id}?tab=settings`}
+                className="cp-btn-ghost mt-4 w-full justify-center text-sm sm:w-auto"
+              >
+                <ShieldCheck className="h-4 w-4" /> Open pot settings
+              </Link>
+            </section>
+          )}
+
+          {/* Session */}
+          <section className="cp-card rounded-3xl p-4 sm:p-6">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Session
+            </p>
+            <button
+              onClick={logout}
+              className="inline-flex items-center gap-2 rounded-xl bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-600 transition hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20"
+            >
+              <LogOut className="h-4 w-4" /> Log out
+            </button>
+          </section>
         </div>
       </div>
 
-      <p className="text-center text-xs text-slate-400 mt-8">
+      <p className="mt-8 text-center text-xs text-slate-400">
         PotKeeper · sandbox build · synthetic data only
       </p>
     </AppShell>
@@ -91,8 +214,8 @@ export default function Settings() {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-4">
-      <span className="text-slate-500 dark:text-slate-400">{label}</span>
-      <span className="font-medium text-slate-800 dark:text-slate-200 text-right truncate">{value}</span>
+      <span className="shrink-0 text-slate-500 dark:text-slate-400">{label}</span>
+      <span className="truncate text-right font-medium text-slate-800 dark:text-slate-200">{value}</span>
     </div>
   );
 }

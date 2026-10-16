@@ -1,8 +1,9 @@
-import { useSearchParams } from "react-router-dom";
+import { useEffect, useState, type ReactNode } from "react";
+import { useParams, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  HandCoins, LayoutDashboard, Receipt, ScrollText, Send, Settings as SettingsIcon,
-  Sparkles, Users,
+  ArrowUpRight, HandCoins, LayoutDashboard, Receipt, ScrollText, Send,
+  Settings as SettingsIcon, Sparkles, TrendingUp, Users, Wallet,
 } from "lucide-react";
 
 import PotDashboard from "./PotDashboard";
@@ -13,9 +14,12 @@ import { ExpensesInner } from "../expenses/Expenses";
 import { MembersInner } from "../members/Members";
 import { LedgerInner } from "../ledger/Ledger";
 import { AssistantInner } from "../assistant/Assistant";
+import { useGroup } from "../../providers/GroupProvider";
+import { getSummary, type GroupSummary } from "../../lib/api";
+import { formatNaira } from "../../lib/format";
 
-// Everything that belongs to one pot lives right here as inline tabs, so the
-// URL stays on /pots/:id and switching sections never leaves the pot.
+// Everything that belongs to one pot lives on this page. The money cards stay
+// put at the top; clicking a tab swaps only the section underneath them.
 const TABS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "contributions", label: "Contributions", icon: HandCoins },
@@ -29,10 +33,58 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
+// A compact money tile that reads well down to a 320px phone.
+function StatTile({
+  icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  tone: "brand" | "green" | "amber" | "rose";
+}) {
+  const tones = {
+    brand: "bg-brand-50 text-brand-600 dark:bg-brand-500/15",
+    green: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15",
+    amber: "bg-amber-50 text-amber-600 dark:bg-amber-500/15",
+    rose: "bg-rose-50 text-rose-600 dark:bg-rose-500/15",
+  } as const;
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm sm:p-4 dark:border-white/10 dark:bg-panel-dark">
+      <div className="flex items-center gap-2">
+        <span className={`flex h-7 w-7 items-center justify-center rounded-lg sm:h-8 sm:w-8 ${tones[tone]}`}>
+          {icon}
+        </span>
+        <span className="text-[11px] font-medium text-slate-500 sm:text-xs dark:text-slate-400">{label}</span>
+      </div>
+      <p className="mt-1.5 truncate font-sora text-base font-bold text-slate-900 sm:mt-2 sm:text-xl dark:text-white">
+        {value}
+      </p>
+    </div>
+  );
+}
+
 export default function PotPage() {
+  const { id } = useParams<{ id: string }>();
+  const { activeGroup } = useGroup();
   const [params, setParams] = useSearchParams();
+  const [summary, setSummary] = useState<GroupSummary | null>(null);
+
   const requested = params.get("tab");
   const tab: TabKey = (TABS.find((t) => t.key === requested)?.key ?? "dashboard") as TabKey;
+
+  useEffect(() => {
+    if (!id) return;
+    let alive = true;
+    getSummary(id)
+      .then((s) => alive && setSummary(s))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [id]);
 
   const select = (key: TabKey) => {
     const next = new URLSearchParams(params);
@@ -42,8 +94,20 @@ export default function PotPage() {
 
   return (
     <>
-      {/* Inline tab bar — pot sections switch without leaving the pot */}
-      <div className="mb-6 -mx-1 flex gap-1 overflow-x-auto pb-1">
+      <h1 className="mb-3 font-sora text-lg font-bold text-slate-900 sm:text-2xl dark:text-white">
+        {activeGroup?.name ?? "Pot"}
+      </h1>
+
+      {/* Money cards — always visible while sections swap underneath */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile icon={<Wallet className="h-4 w-4" />} label="Balance" value={formatNaira(summary?.balanceKobo ?? 0)} tone="brand" />
+        <StatTile icon={<TrendingUp className="h-4 w-4" />} label="Collected" value={formatNaira(summary?.collectedKobo ?? 0)} tone="green" />
+        <StatTile icon={<ArrowUpRight className="h-4 w-4" />} label="Spent" value={formatNaira(summary?.spentKobo ?? 0)} tone="rose" />
+        <StatTile icon={<Users className="h-4 w-4" />} label="Outstanding" value={formatNaira(summary?.outstandingKobo ?? 0)} tone="amber" />
+      </div>
+
+      {/* Inline tab bar — only the section below changes */}
+      <div className="mb-5 mt-4 -mx-1 flex gap-1 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {TABS.map((t) => {
           const active = t.key === tab;
           return (
@@ -52,7 +116,7 @@ export default function PotPage() {
               type="button"
               onClick={() => select(t.key)}
               className={[
-                "relative inline-flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium transition-colors",
+                "relative inline-flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-[13px] font-medium transition-colors sm:px-3.5 sm:text-sm",
                 active
                   ? "text-white"
                   : "text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-100",
