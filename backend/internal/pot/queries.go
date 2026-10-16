@@ -72,19 +72,22 @@ func (s *Service) WhoHasntPaid(ctx context.Context, groupID uuid.UUID, levyID *u
 
 // GroupSummary is the weekly-summary data the AI and dashboard render.
 type GroupSummary struct {
-	GroupID          uuid.UUID    `json:"groupId"`
-	GroupName        string       `json:"groupName"`
-	Currency         string       `json:"currency"`
-	BalanceKobo      int64        `json:"balanceKobo"`
-	CollectedKobo    int64        `json:"collectedKobo"`
-	SpentKobo        int64        `json:"spentKobo"`
-	Levy             *models.Levy `json:"levy,omitempty"`
-	Members          int          `json:"members"`
-	PaidCount        int          `json:"paidCount"`
-	PartialCount     int          `json:"partialCount"`
-	OutstandingCount int          `json:"outstandingCount"`
-	OutstandingKobo  int64        `json:"outstandingKobo"`
-	PendingExpenses  int          `json:"pendingExpenses"`
+	GroupID       uuid.UUID    `json:"groupId"`
+	GroupName     string       `json:"groupName"`
+	Currency      string       `json:"currency"`
+	BalanceKobo   int64        `json:"balanceKobo"`
+	CollectedKobo int64        `json:"collectedKobo"`
+	SpentKobo     int64        `json:"spentKobo"`
+	Levy          *models.Levy `json:"levy,omitempty"`
+	Members       int          `json:"members"`
+	// ExpectedKobo is the pot's full collection target: the levy amount times
+	// the number of joined members. 0 when there is no open levy.
+	ExpectedKobo     int64 `json:"expectedKobo"`
+	PaidCount        int   `json:"paidCount"`
+	PartialCount     int   `json:"partialCount"`
+	OutstandingCount int   `json:"outstandingCount"`
+	OutstandingKobo  int64 `json:"outstandingKobo"`
+	PendingExpenses  int   `json:"pendingExpenses"`
 }
 
 // Summary builds the group's weekly-summary numbers.
@@ -119,6 +122,9 @@ func (s *Service) Summary(ctx context.Context, groupID uuid.UUID, levyID *uuid.U
 
 	if outstanding, levy, err := s.WhoHasntPaid(ctx, groupID, levyID); err == nil {
 		sum.Levy = levy
+		if levy != nil {
+			sum.ExpectedKobo = levy.AmountKobo * int64(sum.Members)
+		}
 		for _, o := range outstanding {
 			switch o.State {
 			case "partial":

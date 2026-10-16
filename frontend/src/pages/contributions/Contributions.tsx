@@ -10,7 +10,7 @@ import PageHeader from "../../components/PageHeader";
 import { useGroup } from "../../providers/GroupProvider";
 import {
   listPayments, getOutstanding, simulateDeposit, recordManualPayment, listMembers,
-  draftReminder, sendReminder, getStoredUser,
+  draftReminder, sendReminder, walletPayPot, getStoredUser,
   type Payment, type OutstandingMember, type Membership, type Levy,
 } from "../../lib/api";
 import { formatNaira, nairaToKobo } from "../../lib/format";
@@ -36,10 +36,14 @@ export function ContributionsInner() {
   const [depPayer, setDepPayer] = useState("");
   const [showDeposit, setShowDeposit] = useState(false);
 
+  const [payAmount, setPayAmount] = useState("");
+  const [payBusy, setPayBusy] = useState(false);
+
   const load = async () => {
     const [p, o, m] = await Promise.all([
       listPayments(gid),
-      getOutstanding(gid),
+      // A pot with no open levy isn't an error — it just has nothing to track.
+      getOutstanding(gid).catch(() => ({ members: [] as OutstandingMember[], levy: null as Levy | null })),
       listMembers(gid),
     ]);
     setPayments(p);
@@ -89,6 +93,23 @@ export function ContributionsInner() {
       setReminded((r) => ({ ...r, [userId]: true }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't send the reminder.");
+    }
+  };
+
+  const handlePayFromWallet = async (full: boolean) => {
+    setError(""); setNotice("");
+    const target = full && mine ? mine.outstandingKobo : nairaToKobo(payAmount);
+    if (target <= 0) { setError("Enter an amount to pay."); return; }
+    setPayBusy(true);
+    try {
+      await walletPayPot(gid, target);
+      setNotice("Paid from your wallet — your contribution is updated.");
+      setPayAmount("");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't pay from your wallet.");
+    } finally {
+      setPayBusy(false);
     }
   };
 
@@ -164,6 +185,15 @@ export function ContributionsInner() {
 
           {canManage ? (
             <>
+              {levy && members.length > 0 && (
+                <p className="mb-4 -mt-1 text-xs text-slate-400">
+                  Target for <span className="font-medium text-slate-500 dark:text-slate-300">{levy.title}</span> ·{" "}
+                  <span className="font-semibold text-slate-600 dark:text-slate-200">
+                    {formatNaira(levy.amountKobo * members.length)}
+                  </span>{" "}
+                  ({formatNaira(levy.amountKobo)} × {members.length} members)
+                </p>
+              )}
               {owe.length === 0 ? (
                 <div className="flex items-center gap-3 text-sm text-emerald-600 dark:text-emerald-400">
                   <CheckCircle2 className="w-5 h-5" /> Everyone is fully paid up.
@@ -220,8 +250,39 @@ export function ContributionsInner() {
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Quote reference <span className="font-mono font-semibold text-slate-600 dark:text-slate-300">{activeGroup!.joinCode}</span>-based code when you transfer, or ask the treasurer to record your cash payment.
+                Quote reference <span className="font-mono font-semibold text-slate-600 dark:text-slate-300">{activeGroup!.joinCode}</span> on a bank transfer, or pay straight from your wallet.
               </p>
+
+              {myStatus.owed > 0 && (
+                <div className="rounded-xl border border-primary-100 dark:border-primary-500/20 p-3 space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Pay from wallet
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={payAmount}
+                      onChange={(e) => setPayAmount(e.target.value)}
+                      placeholder="Amount ₦"
+                      inputMode="numeric"
+                      className="cp-input flex-1"
+                    />
+                    <button
+                      onClick={() => handlePayFromWallet(false)}
+                      disabled={payBusy}
+                      className="cp-btn-primary shrink-0 px-4"
+                    >
+                      {payBusy ? <RefreshCw className="w-4 h-4 animate-spin" /> : "Pay"}
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => handlePayFromWallet(true)}
+                    disabled={payBusy}
+                    className="cp-btn-ghost w-full text-xs"
+                  >
+                    Pay full balance · {formatNaira(myStatus.owed)}
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <p className="text-sm text-slate-400">No open levy right now.</p>

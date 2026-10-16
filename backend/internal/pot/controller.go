@@ -35,6 +35,7 @@ func (ct *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 	g.POST("/:id/levies", ct.createLevy)
 	g.GET("/:id/levies", ct.listLevies)
 	g.POST("/:id/levies/:levyId/close", ct.closeLevy)
+	g.DELETE("/:id/levies/:levyId", ct.deleteLevy)
 
 	g.GET("/:id/payments", ct.listPayments)
 	g.POST("/:id/payments/manual", ct.recordManualPayment)
@@ -52,6 +53,12 @@ func (ct *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 
 	// A user's own cross-pot overview (Balance & History).
 	rg.GET("/account/overview", ct.accountOverview)
+
+	// The signed-in user's personal wallet.
+	rg.GET("/wallet", ct.wallet)
+	rg.POST("/wallet/deposit", ct.walletDeposit)
+	rg.POST("/wallet/transfer", ct.walletTransfer)
+	rg.POST("/wallet/pay", ct.walletPayPot)
 }
 
 func (ct *Controller) createGroup(c *gin.Context) {
@@ -128,6 +135,57 @@ func (ct *Controller) accountOverview(c *gin.Context) {
 		return
 	}
 	response.OK(c, ov)
+}
+
+func (ct *Controller) wallet(c *gin.Context) {
+	ov, err := ct.svc.Wallet(c.Request.Context(), auth.MustUserID(c))
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, ov)
+}
+
+func (ct *Controller) walletDeposit(c *gin.Context) {
+	var req WalletDepositRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "INVALID_BODY", err.Error())
+		return
+	}
+	ov, err := ct.svc.WalletDeposit(c.Request.Context(), auth.MustUserID(c), req)
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, ov)
+}
+
+func (ct *Controller) walletTransfer(c *gin.Context) {
+	var req WalletTransferRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "INVALID_BODY", err.Error())
+		return
+	}
+	ov, err := ct.svc.WalletTransfer(c.Request.Context(), auth.MustUserID(c), req)
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, ov)
+}
+
+func (ct *Controller) walletPayPot(c *gin.Context) {
+	var req WalletPayRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "INVALID_BODY", err.Error())
+		return
+	}
+	payment, err := ct.svc.WalletPayPot(c.Request.Context(), auth.MustUserID(c), req)
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.Created(c, payment)
 }
 
 func (ct *Controller) joinGroup(c *gin.Context) {
@@ -244,6 +302,22 @@ func (ct *Controller) closeLevy(c *gin.Context) {
 		return
 	}
 	response.OK(c, gin.H{"status": "closed"})
+}
+
+func (ct *Controller) deleteLevy(c *gin.Context) {
+	groupID, ok := pathID(c, "id")
+	if !ok {
+		return
+	}
+	levyID, ok := pathID(c, "levyId")
+	if !ok {
+		return
+	}
+	if err := ct.svc.DeleteLevy(c.Request.Context(), groupID, levyID, auth.MustUserID(c)); err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, gin.H{"status": "deleted"})
 }
 
 func (ct *Controller) listPayments(c *gin.Context) {

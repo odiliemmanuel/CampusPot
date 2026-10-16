@@ -8,6 +8,7 @@ package ai
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -56,6 +57,13 @@ func (s *Service) Answer(ctx context.Context, groupID, actorID uuid.UUID, questi
 	case intentOutstanding:
 		outstanding, levy, err := s.pots.WhoHasntPaid(ctx, groupID, nil)
 		if err != nil {
+			if errors.Is(err, pot.ErrNotFound) {
+				return &AnswerResponse{
+					Answer: "There's no open levy in this pot right now, so there's nothing outstanding to track. Create a levy and I'll start keeping score.",
+					Intent: "outstanding",
+					Data:   []pot.OutstandingMember{},
+				}, nil
+			}
 			return nil, err
 		}
 		answer := s.renderOutstanding(ctx, group, outstanding, levy)
@@ -64,6 +72,13 @@ func (s *Service) Answer(ctx context.Context, groupID, actorID uuid.UUID, questi
 	case intentRemind:
 		outstanding, levy, err := s.pots.WhoHasntPaid(ctx, groupID, nil)
 		if err != nil {
+			if errors.Is(err, pot.ErrNotFound) {
+				return &AnswerResponse{
+					Answer: "No open levy, so there's nobody to remind yet. Set up a levy first and I'll draft the nudges.",
+					Intent: "remind",
+					Data:   []pot.OutstandingMember{},
+				}, nil
+			}
 			return nil, err
 		}
 		var b strings.Builder

@@ -270,6 +270,28 @@ export interface AccountOverview {
   transactions: MyTransaction[];
 }
 
+export type WalletTxKind = "deposit" | "transfer_in" | "transfer_out" | "pot_payment";
+
+export interface WalletTransaction {
+  id: string;
+  userId: string;
+  kind: WalletTxKind;
+  amountKobo: number;
+  counterparty?: string;
+  counterpartyUserId?: string;
+  groupId?: string;
+  levyId?: string;
+  reference?: string;
+  note?: string;
+  createdAt: string;
+}
+
+export interface WalletOverview {
+  balanceKobo: number;
+  bmoniUserId?: string;
+  transactions: WalletTransaction[];
+}
+
 export interface AnswerResponse {
   answer: string;
   intent: "outstanding" | "remind" | "summary";
@@ -331,6 +353,8 @@ export const createLevy = (groupId: string, title: string, amountKobo: number, d
   });
 export const closeLevy = (groupId: string, levyId: string) =>
   request<{ status: string }>(`/groups/${groupId}/levies/${levyId}/close`, { method: "POST" });
+export const deleteLevy = (groupId: string, levyId: string) =>
+  request<{ status: string }>(`/groups/${groupId}/levies/${levyId}`, { method: "DELETE" });
 
 // ---------- Payments & ledger ----------
 
@@ -392,6 +416,28 @@ export const draftReminder = (groupId: string, userId: string, tone = "friendly"
 export const listReminders = (groupId: string) => request<Reminder[] | null>(`/groups/${groupId}/reminders`).then((r) => r ?? []);
 export const sendReminder = (groupId: string, reminderId: string) =>
   request<Reminder>(`/groups/${groupId}/reminders/${reminderId}/send`, { method: "POST" });
+
+// ---------- Wallet ----------
+
+export const getWallet = () => request<WalletOverview>("/wallet");
+
+export const walletDeposit = (amountKobo: number, reference = "", note = "") =>
+  request<WalletOverview>("/wallet/deposit", {
+    method: "POST",
+    body: JSON.stringify({ amountKobo, reference, note }),
+  });
+
+export const walletTransfer = (amountKobo: number, recipient: string, note = "") =>
+  request<WalletOverview>("/wallet/transfer", {
+    method: "POST",
+    body: JSON.stringify({ amountKobo, recipient, note }),
+  });
+
+export const walletPayPot = (groupId: string, amountKobo: number, levyId?: string) =>
+  request<Payment>("/wallet/pay", {
+    method: "POST",
+    body: JSON.stringify({ groupId, amountKobo, levyId }),
+  });
 
 // ---------- Account ----------
 

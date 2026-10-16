@@ -1,12 +1,12 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { motion } from "framer-motion";
-import { Loader2, Plus, Receipt, Calendar, Lock, CheckCircle2, X } from "lucide-react";
+import { Loader2, Plus, Receipt, Calendar, Lock, CheckCircle2, X, Trash2 } from "lucide-react";
 
 import AppShell from "../../layouts/AppShell";
 import GroupGate from "../../components/GroupGate";
 import PageHeader from "../../components/PageHeader";
 import { useGroup } from "../../providers/GroupProvider";
-import { listLevies, createLevy, closeLevy, type Levy } from "../../lib/api";
+import { listLevies, createLevy, closeLevy, deleteLevy, type Levy } from "../../lib/api";
 import { formatNaira, nairaToKobo } from "../../lib/format";
 
 export function LeviesInner() {
@@ -150,22 +150,39 @@ export function LeviesInner() {
                 </p>
               )}
 
-              {l.status === "open" && (
+              <div className="mt-4 flex gap-2">
+                {l.status === "open" && (
+                  <button
+                    onClick={async () => {
+                      setError("");
+                      try {
+                        await closeLevy(gid, l.id);
+                        setLevies(await load());
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : "Couldn't close the levy.");
+                      }
+                    }}
+                    className="cp-btn-ghost flex-1"
+                  >
+                    <Lock className="w-4 h-4" /> Close
+                  </button>
+                )}
                 <button
                   onClick={async () => {
+                    if (!window.confirm(`Delete the "${l.title}" levy? This can't be undone.`)) return;
                     setError("");
                     try {
-                      await closeLevy(gid, l.id);
+                      await deleteLevy(gid, l.id);
                       setLevies(await load());
                     } catch (err) {
-                      setError(err instanceof Error ? err.message : "Couldn't close the levy.");
+                      setError(err instanceof Error ? err.message : "Couldn't delete the levy.");
                     }
                   }}
-                  className="mt-4 cp-btn-ghost w-full"
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-rose-200 px-4 py-2.5 text-sm font-medium text-rose-600 transition hover:bg-rose-50 dark:border-rose-500/30 dark:hover:bg-rose-500/10"
                 >
-                  <Lock className="w-4 h-4" /> Close levy
+                  <Trash2 className="w-4 h-4" /> Delete
                 </button>
-              )}
+              </div>
             </motion.div>
           ))}
         </div>

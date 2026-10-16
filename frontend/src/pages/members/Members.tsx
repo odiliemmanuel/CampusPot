@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  Loader2, Copy, Check, ShieldCheck, Shield, User as UserIcon, Landmark, Info,
+  Loader2, Check, ShieldCheck, Shield, User as UserIcon, Landmark, Info, QrCode, ArrowLeft,
 } from "lucide-react";
 
 import AppShell from "../../layouts/AppShell";
@@ -172,31 +173,94 @@ export function MembersInner() {
           )}
         </div>
 
-        {/* Join + pot account */}
+        {/* Pot account */}
         <div className="space-y-6">
-          <JoinCard code={activeGroup!.joinCode} />
-
           {activeGroup!.virtualAccountNumber && (
             <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Landmark className="w-4 h-4 text-brand-600" />
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Pot account
-                  </p>
-                </div>
-                <button
-                  onClick={copyCode}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-brand-600 transition"
-                >
-                  {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copied ? "Copied" : "Copy code"}
-                </button>
+              <div className="mb-3 flex items-center gap-2">
+                <Landmark className="w-4 h-4 text-brand-600" />
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Pot account</p>
               </div>
-              <p className="font-sora text-lg font-bold text-slate-900">{activeGroup!.virtualAccountNumber}</p>
-              <p className="text-xs text-slate-400 mt-0.5">{activeGroup!.virtualAccountBank} · {activeGroup!.virtualAccountName}</p>
+              <p className="font-mono text-lg font-bold text-slate-800 dark:text-slate-100">{activeGroup!.virtualAccountNumber}</p>
+              <p className="mt-0.5 text-xs text-slate-400">
+                {[activeGroup!.virtualAccountBank, activeGroup!.virtualAccountName].filter(Boolean).join(" · ")}
+              </p>
             </div>
           )}
+
+          <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-6 text-center dark:border-white/10 dark:bg-panel-dark">
+            <QrCode className="mx-auto mb-2 h-7 w-7 text-brand-500" />
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Share the QR code and join code from the invite page.
+            </p>
+            <Link to={`/pots/${gid}?tab=invite`} className="cp-btn-primary mt-3 inline-flex w-full justify-center text-sm">
+              <QrCode className="h-4 w-4" /> Open invite page
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Floating invite action */}
+      <Link
+        to={`/pots/${gid}?tab=invite`}
+        className="fixed bottom-24 right-5 z-40 inline-flex items-center gap-2 rounded-full bg-gradient-to-br from-primary-600 to-primary-800 px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-primary-900/30 transition active:scale-95 lg:bottom-8"
+      >
+        <QrCode className="h-5 w-5" /> Invite
+      </Link>
+    </>
+  );
+}
+
+// The Invite page — the pot's QR, join code and share link, kept off the main
+// Members list so that screen stays clean.
+export function InviteInner() {
+  const { activeGroup } = useGroup();
+  const [params, setParams] = useSearchParams();
+  const [copied, setCopied] = useState(false);
+  const gid = activeGroup!.id;
+
+  const joinLink =
+    typeof window !== "undefined" ? `${window.location.origin}/join/${activeGroup!.joinCode}` : "";
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(joinLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      /* clipboard unavailable */
+    }
+  };
+
+  const goBack = () => {
+    const next = new URLSearchParams(params);
+    next.set("tab", "members");
+    setParams(next, { replace: true });
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={goBack}
+        className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
+      >
+        <ArrowLeft className="h-4 w-4" /> Back to members
+      </button>
+
+      <div className="mx-auto max-w-md">
+        <JoinCard code={activeGroup!.joinCode} />
+
+        <div className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-panel-dark">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            Shareable link
+          </p>
+          <div className="mt-2 flex items-center gap-2">
+            <input readOnly value={joinLink} className="cp-input flex-1 text-xs" />
+            <button type="button" onClick={copyLink} className="cp-btn-ghost shrink-0">
+              {copied ? <Check className="h-4 w-4 text-emerald-500" /> : "Copy"}
+            </button>
+          </div>
         </div>
       </div>
     </>

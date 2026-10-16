@@ -11,7 +11,7 @@ import PageHeader from "../../components/PageHeader";
 import { useGroup } from "../../providers/GroupProvider";
 import {
   listExpenses, listApprovals, listMembers, createExpense, decideExpense, executeExpense,
-  getStoredUser, type AuthUser, type ExpenseRequest, type Approval, type Role,
+  getStoredUser, type AuthUser, type ExpenseRequest, type Approval, type Role, type Membership,
 } from "../../lib/api";
 import { formatNaira, nairaToKobo } from "../../lib/format";
 
@@ -49,6 +49,8 @@ export function ExpensesInner() {
   const [destination, setDestination] = useState("");
   const [category, setCategory] = useState("");
   const [note, setNote] = useState("");
+  const [members, setMembers] = useState<Membership[]>([]);
+  const [payee, setMembers2] = useState("");
 
   const uid = getStoredUser<AuthUser>()?.id;
   const [myRole, setMyRole] = useState<Role | null>(null);
@@ -56,6 +58,7 @@ export function ExpensesInner() {
   const load = useCallback(async () => {
     const [list, members] = await Promise.all([listExpenses(gid), listMembers(gid)]);
     setExpenses(list);
+    setMembers(members);
     setMyRole((members.find((m) => m.userId === uid)?.role as Role) ?? null);
     const approvalEntries = await Promise.all(
       list
@@ -127,9 +130,32 @@ export function ExpensesInner() {
             <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Amount (₦)</label>
             <input required value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="15000" className="cp-input mt-1" />
           </div>
-          <div>
-            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Destination</label>
-            <input required value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="e.g. Lagos Bus Terminal" className="cp-input mt-1" />
+          <div className="sm:col-span-2">
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Pay to</label>
+            <div className="mt-1 grid gap-2 sm:grid-cols-2">
+              <select
+                value=""
+                onChange={(e) => {
+                  const m = members.find((x) => x.userId === e.target.value);
+                  if (m) setDestination(`Member: ${m.user?.name ?? "member"} (${m.reference})`);
+                }}
+                className="cp-input"
+              >
+                <option value="">Choose a pot member…</option>
+                {members.map((m) => (
+                  <option key={m.userId} value={m.userId}>
+                    {m.user?.name ?? "Member"} · {m.role}
+                  </option>
+                ))}
+              </select>
+              <input
+                required
+                value={destination}
+                onChange={(e) => setDestination(e.target.value)}
+                placeholder="Or a bank / PotKeeper user / merchant"
+                className="cp-input"
+              />
+            </div>
           </div>
           <div>
             <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Category</label>

@@ -54,6 +54,34 @@ type User struct {
 	// BMoniUserID is the id returned by POST /v1/users. Persisted so we never
 	// create a duplicate B Moni user for the same person.
 	BMoniUserID string `gorm:"index" json:"bmoniUserId,omitempty"`
+	// WalletBalanceKobo is the user's own spendable balance, separate from any
+	// pot. Money added here can be sent to another member or paid into a pot.
+	WalletBalanceKobo int64 `gorm:"not null;default:0" json:"walletBalanceKobo"`
+}
+
+// Wallet transaction kinds.
+const (
+	WalletDeposit     = "deposit"      // money added to the wallet (funding)
+	WalletTransferIn  = "transfer_in"  // received from another PotKeeper user
+	WalletTransferOut = "transfer_out" // sent to a member/user or an external bank
+	WalletPotPayment  = "pot_payment"  // paid from the wallet into a pot levy
+)
+
+// WalletTransaction is one movement in a user's personal wallet. It is an
+// append-only record so the wallet has its own auditable history.
+type WalletTransaction struct {
+	Base
+	UserID       uuid.UUID `gorm:"type:uuid;index;not null" json:"userId"`
+	Kind         string    `gorm:"not null" json:"kind"`
+	AmountKobo   int64     `gorm:"not null" json:"amountKobo"`
+	Counterparty string    `json:"counterparty,omitempty"` // name/email/phone/bank
+	// CounterpartyUserID is set when the money moved to/from another PotKeeper
+	// user's wallet; nil for external (bank) transfers and simulated deposits.
+	CounterpartyUserID *uuid.UUID `gorm:"type:uuid" json:"counterpartyUserId,omitempty"`
+	GroupID            *uuid.UUID `gorm:"type:uuid;index" json:"groupId,omitempty"`
+	LevyID             *uuid.UUID `gorm:"type:uuid" json:"levyId,omitempty"`
+	Reference          string     `json:"reference,omitempty"`
+	Note               string     `json:"note,omitempty"`
 }
 
 // Group is a shared pot (e.g. "200L Mass Comm Dues").
@@ -242,5 +270,6 @@ func AllModels() []interface{} {
 		&Approval{},
 		&WebhookEvent{},
 		&Reminder{},
+		&WalletTransaction{},
 	}
 }

@@ -88,3 +88,19 @@ func (s *Service) CloseLevy(_ context.Context, groupID, levyID, actorID uuid.UUI
 		Where("id = ? AND group_id = ?", levyID, groupID).
 		Update("status", "closed").Error
 }
+
+// DeleteLevy removes a levy. Treasurer only. Payments keep their levy id, so
+// the audit trail survives even after the levy itself is gone.
+func (s *Service) DeleteLevy(_ context.Context, groupID, levyID, actorID uuid.UUID) error {
+	if _, err := s.requireRole(groupID, actorID, models.RoleTreasurer); err != nil {
+		return err
+	}
+	res := s.db.Where("id = ? AND group_id = ?", levyID, groupID).Delete(&models.Levy{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return fmt.Errorf("%w: levy not found", ErrNotFound)
+	}
+	return nil
+}
