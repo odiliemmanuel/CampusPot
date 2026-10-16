@@ -10,9 +10,9 @@ import (
 	"github.com/odiliemmmanuel/campuspot/internal/models"
 )
 
-// ContributionRow is one member's position against the current levy. Amounts
-// are only populated (and ShowAmount only true) for the treasurer and for the
-// viewer's own row; everyone else sees the state (paid / partial / unpaid).
+// ContributionRow is one member's position against the current levy. Every
+// member sees the full breakdown — the per-person amount, what each person has
+// paid, and who is still owing — so the pot is transparent to everyone.
 type ContributionRow struct {
 	UserID     uuid.UUID `json:"userId"`
 	Name       string    `json:"name"`
@@ -33,15 +33,13 @@ type ContributionsResponse struct {
 	Rows           []ContributionRow `json:"rows"`
 }
 
-// Contributions returns the pot's contribution breakdown. The treasurer sees
-// the figures; other members see who has paid and whether it was full or
-// partial, but not the amounts.
+// Contributions returns the pot's contribution breakdown for every member: the
+// amount each person is asked to contribute, what they have paid towards it,
+// and who is still owing.
 func (s *Service) Contributions(_ context.Context, groupID, actorID uuid.UUID) (*ContributionsResponse, error) {
-	caller, err := s.requireMember(groupID, actorID)
-	if err != nil {
+	if _, err := s.requireMember(groupID, actorID); err != nil {
 		return nil, err
 	}
-	treasurer := caller.Role == models.RoleTreasurer
 
 	levy, err := s.resolveLevy(groupID, nil)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -59,7 +57,7 @@ func (s *Service) Contributions(_ context.Context, groupID, actorID uuid.UUID) (
 
 	resp := &ContributionsResponse{
 		Rows:        make([]ContributionRow, 0, len(members)),
-		ShowAmounts: treasurer,
+		ShowAmounts: true,
 	}
 	if levy != nil {
 		resp.LevyAmountKobo = levy.AmountKobo
@@ -86,7 +84,6 @@ func (s *Service) Contributions(_ context.Context, groupID, actorID uuid.UUID) (
 			row.Name = m.User.Name
 		}
 
-		visible := treasurer || row.IsMe
 		if levy != nil {
 			row.AmountKobo = levy.AmountKobo
 			switch {
@@ -98,12 +95,8 @@ func (s *Service) Contributions(_ context.Context, groupID, actorID uuid.UUID) (
 				row.State = "paid"
 			}
 		}
-		if visible {
-			row.PaidKobo = paid
-			row.ShowAmount = true
-		} else {
-			row.AmountKobo = 0
-		}
+		row.PaidKobo = paid
+		row.ShowAmount = true
 		resp.Rows = append(resp.Rows, row)
 	}
 	return resp, nil

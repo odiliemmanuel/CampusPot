@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { motion } from "framer-motion";
 import {
-  Loader2, Bell, CheckCircle2, Landmark, ArrowDownLeft, RefreshCw, Plus, Lock,
+  Loader2, Bell, CheckCircle2, Landmark, ArrowDownLeft, RefreshCw, Plus,
 } from "lucide-react";
 
 import AppShell from "../../layouts/AppShell";
@@ -142,9 +142,7 @@ export function ContributionsInner() {
     <>
       <PageHeader
         title="Contributions"
-        subtitle={canManage
-          ? "Every deposit reconciles to a member automatically."
-          : "See who has paid — figures stay with the treasurer."}
+        subtitle="What each member is asked to contribute, how much they've paid, and who is still owing."
         action={canManage ? (
           <button onClick={() => setShowDeposit((v) => !v)} className="cp-btn-primary">
             <Landmark className="w-4 h-4" /> Simulate deposit
@@ -188,16 +186,11 @@ export function ContributionsInner() {
         <div className="lg:col-span-2 cp-card rounded-3xl p-6">
           <div className="mb-4 flex items-center justify-between gap-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              {canManage ? "Who has paid" : "Contribution status"}
+              Who has paid
             </p>
-            {!canManage && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400">
-                <Lock className="w-3 h-3" /> amounts visible to treasurer
-              </span>
-            )}
           </div>
 
-          {canManage && contrib && (
+          {contrib && (
             <div className="mb-5 grid grid-cols-2 gap-3">
               <div className="rounded-2xl bg-emerald-50 p-4 dark:bg-emerald-500/10">
                 <p className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">Collected</p>
@@ -291,6 +284,16 @@ export function ContributionsInner() {
                   {formatNaira(Math.max(0, mine.amountKobo - mine.paidKobo))}
                 </span>
                 <span className="text-xs text-slate-400">left to pay</span>
+              </div>
+              <div className="mt-3 space-y-1 border-t border-slate-100 pt-3 text-xs dark:border-slate-800">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 dark:text-slate-400">Your dues</span>
+                  <span className="font-medium text-slate-700 dark:text-slate-200">{formatNaira(mine.amountKobo)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 dark:text-slate-400">Paid so far</span>
+                  <span className="font-medium text-emerald-600 dark:text-emerald-400">{formatNaira(mine.paidKobo)}</span>
+                </div>
               </div>
               {myOwed > 0 && (
                 <div className="mt-4 space-y-2">
