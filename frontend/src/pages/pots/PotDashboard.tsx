@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import {
-  ArrowDownLeft, ArrowUpRight, HandCoins, Loader2, Receipt, ScrollText,
+  ArrowDownLeft, ArrowUpRight, CheckCircle2, Loader2, ScrollText,
   TrendingUp, Users, Wallet,
 } from "lucide-react";
 
@@ -9,7 +9,10 @@ import PageHeader from "../../components/PageHeader";
 import DataTable, { type Column } from "../../components/DataTable";
 import Pagination from "../../components/Pagination";
 import { useGroup } from "../../providers/GroupProvider";
-import { getSummary, listLedger, type GroupSummary, type LedgerEntry } from "../../lib/api";
+import {
+  getOutstanding, getStoredUser, getSummary, listLedger, listMembers,
+  type GroupSummary, type LedgerEntry, type Membership, type OutstandingMember,
+} from "../../lib/api";
 import { formatNaira } from "../../lib/format";
 
 const kindLabel: Record<string, string> = {
@@ -117,6 +120,8 @@ export default function PotDashboard() {
 
   const [summary, setSummary] = useState<GroupSummary | null>(null);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
+  const [members, setMembers] = useState<Membership[]>([]);
+  const [outstanding, setOutstanding] = useState<OutstandingMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
@@ -127,11 +132,18 @@ export default function PotDashboard() {
     let alive = true;
     setLoading(true);
     setError("");
-    Promise.all([getSummary(id), listLedger(id)])
-      .then(([s, l]) => {
+    Promise.all([
+      getSummary(id),
+      listLedger(id),
+      listMembers(id),
+      getOutstanding(id).then((o) => o.members).catch(() => [] as OutstandingMember[]),
+    ])
+      .then(([s, l, m, o]) => {
         if (!alive) return;
         setSummary(s);
         setLedger(l);
+        setMembers(m);
+        setOutstanding(o);
       })
       .catch((err) => {
         if (alive) setError(err instanceof Error ? err.message : "Couldn't load this pot.");
@@ -155,7 +167,15 @@ export default function PotDashboard() {
     [ordered, page, pageSize]
   );
 
-  const base = `/pots/${id}`;
+  const myId = getStoredUser()?.id;
+  const mine = outstanding.find((o) => o.userId === myId);
+  const levy = summary?.levy;
+  // The signed-in user's own position against the current levy, if any.
+  const myStatus = levy
+    ? mine
+      ? { amount: mine.amountKobo, paid: mine.paidKobo, owed: mine.outstandingKobo, state: mine.state }
+      : { amount: levy.amountKobo, paid: levy.amountKobo, owed: 0, state: "paid" as const }
+    : null;
 
   return (
     <>
@@ -194,21 +214,42 @@ export default function PotDashboard() {
         />
       </div>
 
-      {/* Shortcuts into this pot's other pages */}
-      <div className="mt-6 flex flex-wrap gap-2">
-        <Link to={`${base}/contributions`} className="cp-btn-ghost text-sm">
-          <HandCoins className="h-4 w-4" /> Contributions
-        </Link>
-        <Link to={`${base}/levies`} className="cp-btn-ghost text-sm">
-          <Receipt className="h-4 w-4" /> Levies
-        </Link>
-        <Link to={`${base}/members`} className="cp-btn-ghost text-sm">
-          <Users className="h-4 w-4" /> Members
-        </Link>
-        <Link to={`${base}/ledger`} className="cp-btn-ghost text-sm">
-          <ScrollText className="h-4 w-4" /> Full ledger
-        </Link>
-      </div>
+      {/* Your own position in this pot */}
+      {myStatus && (
+        <div
+          className={[
+            "mt-6 flex flex-wrap items-center gap-3 rounded-2xl px-5 py-4",
+            myStatus.owed > 0
+              ? "bg-amber-50 dark:bg-amber-500/10"
+              : "bg-emerald-50 dark:bg-emerald-500/10",
+          ].join(" ")}
+        >
+          <span
+            className={[
+              "flex h-10 w-10 items-center justify-center rounded-xl",
+              myStatus.owed > 0 ? "bg-amber-100 text-amber-600" : "bg-emerald-100 text-emerald-600",
+            ].join(" ")}
+          >
+            {myStatus.owed > 0 ? <Wallet className="h-5 w-5" /> : <CheckCircle2 className="h-5 w-5" />}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+              {myStatus.owed > 0
+                ? `You've paid ${formatNaira(myStatus.paid)} of ${formatNaira(myStatus.amount)}`
+                : `You're all paid up — ${formatNaira(myStatus.amount)}`}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {levy?.title ? `Toward “${levy.title}”` : "Current levy"}
+              {myStatus.owed > 0 && ` · ${formatNaira(myStatus.owed)} remaining`}
+            </p>
+          </div>
+          {myStatus.owed > 0 && (
+            <span className="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">
+              {formatNaira(myStatus.owed)} due
+            </span>
+          )}
+        </div>
+      )}
 
       {/* This pot's transactions only */}
       <section className="mt-6 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">

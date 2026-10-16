@@ -223,6 +223,82 @@ func (s *Service) Invite(_ context.Context, groupID, actorID uuid.UUID, req Invi
 	return m, nil
 }
 
+// UpdateGroupRequest edits a pot's settings. Pointers let the treasurer change
+// one field without resending the rest; LargeExpenseKobo uses a pointer so that
+// 0 (no soft limit) is a valid, explicit value.
+type UpdateGroupRequest struct {
+	Name              *string `json:"name"`
+	ApprovalThreshold *int    `json:"approvalThreshold"`
+	ApprovalTotal     *int    `json:"approvalTotal"`
+	LargeExpenseKobo  *int64  `json:"largeExpenseKobo"`
+}
+
+// UpdateGroup changes a pot's name and spending rules. Treasurer only.
+func (s *Service) UpdateGroup(_ context.Context, groupID, actorID uuid.UUID, req UpdateGroupRequest) (*models.Group, error) {
+	if _, err := s.requireRole(groupID, actorID, models.RoleTreasurer); err != nil {
+		return nil, err
+	}
+	var group models.Group
+	if err := s.db.First(&group, "id = ?", groupID).Error; err != nil {
+		return nil, ErrNotFound
+	}
+
+	if req.Name != nil {
+		name := strings.TrimSpace(*req.Name)
+		if len(name) < 2 {
+			return nil, fmt.Errorf("%w: name must be at least 2 characters", ErrInvalid)
+		}
+		group.Name = name
+	}
+	if req.ApprovalThreshold != nil {
+		group.ApprovalThreshold = *req.ApprovalThreshold
+	}
+	if req.ApprovalTotal != nil {
+		group.ApprovalTotal = *req.ApprovalTotal
+	}
+	if req.LargeExpenseKobo != nil {
+		group.LargeExpenseKobo = *req.LargeExpenseKobo
+	}
+
+	if group.ApprovalThreshold <= 0 || group.ApprovalTotal <= 0 {
+		return nil, fmt.Errorf("%w: approval rules must be positive", ErrInvalid)
+	}
+	if group.ApprovalThreshold > group.ApprovalTotal {
+		return nil, fmt.Errorf("%w: approval threshold cannot exceed total approvers", ErrInvalid)
+	}
+
+	if err := s.db.Save(&group).Error; err != nil {
+		return nil, err
+	}
+	return &group, nil
+}
+
+// RegenerateJoinCode issues a fresh join code for a pot. The old code stops
+// working immediately; references already handed out to existing members keep
+// working because they are stored per membership. Treasurer only.
+func (s *Service) RegenerateJoinCode(_ context.Context, groupID, actorID uuid.UUID) (*models.Group, error) {
+	if _, err := s.requireRole(groupID, actorID, models.RoleTreasurer); err != nil {
+		return nil, err
+	}
+	var group models.Group
+	if err := s.db.First(&group, "id = ?", groupID).Error; err != nil {
+		return nil, ErrNotFound
+	}
+	for i := 0; i < 5; i++ {
+		code, err := generateJoinCode()
+		if err != nil {
+			return nil, err
+		}
+		group.JoinCode = code
+		if err := s.db.Save(&group).Error; err == nil {
+			return &group, nil
+		} else if !isUniqueViolation(err) {
+			return nil, err
+		}
+	}
+	return nil, fmt.Errorf("%w: could not generate a unique join code", ErrConflict)
+}
+
 // UpdateRoleRequest changes a member's role within a pot.
 type UpdateRoleRequest struct {
 	Role models.Role `json:"role"`

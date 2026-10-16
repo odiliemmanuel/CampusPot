@@ -233,6 +233,38 @@ export interface Reminder {
   createdAt: string;
 }
 
+export interface PotMembership {
+  groupId: string;
+  groupName: string;
+  currency: string;
+  role: Role;
+  joinedAt?: string;
+  reference: string;
+  balanceKobo: number;
+  levyTitle?: string;
+  levyAmountKobo: number;
+  paidKobo: number;
+  outstandingKobo: number;
+  state: "paid" | "partial" | "unpaid" | "none";
+}
+
+export interface MyTransaction {
+  id: string;
+  groupId: string;
+  groupName: string;
+  amountKobo: number;
+  status: string;
+  payerName?: string;
+  createdAt: string;
+}
+
+export interface AccountOverview {
+  totalContributedKobo: number;
+  totalOutstandingKobo: number;
+  pots: PotMembership[];
+  transactions: MyTransaction[];
+}
+
 export interface AnswerResponse {
   answer: string;
   intent: "outstanding" | "remind" | "summary";
@@ -264,6 +296,12 @@ export const createGroup = (name: string, approvalThreshold = 2, approvalTotal =
     body: JSON.stringify({ name, approvalThreshold, approvalTotal, largeExpenseKobo }),
   });
 export const getGroup = (id: string) => request<Group>(`/groups/${id}`);
+export const updateGroup = (
+  id: string,
+  patch: Partial<Pick<Group, "name" | "approvalThreshold" | "approvalTotal" | "largeExpenseKobo">>
+) => request<Group>(`/groups/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
+export const regenerateJoinCode = (id: string) =>
+  request<Group>(`/groups/${id}/join-code`, { method: "POST" });
 export const joinGroup = (joinCode: string) =>
   request<Group>("/groups/join", { method: "POST", body: JSON.stringify({ joinCode }) });
 export const listMembers = (groupId: string) => request<Membership[] | null>(`/groups/${groupId}/members`).then((m) => m ?? []);
@@ -346,6 +384,10 @@ export const draftReminder = (groupId: string, userId: string, tone = "friendly"
 export const listReminders = (groupId: string) => request<Reminder[] | null>(`/groups/${groupId}/reminders`).then((r) => r ?? []);
 export const sendReminder = (groupId: string, reminderId: string) =>
   request<Reminder>(`/groups/${groupId}/reminders/${reminderId}/send`, { method: "POST" });
+
+// ---------- Account ----------
+
+export const getAccountOverview = () => request<AccountOverview>("/account/overview");
 
 // ---------- Meta ----------
 

@@ -10,8 +10,10 @@ import PageHeader from "../../components/PageHeader";
 import JoinCard from "../../components/JoinCard";
 import { useGroup } from "../../providers/GroupProvider";
 import {
-  listMembers, updateMemberRole, getStoredUser, type Membership, type Role,
+  listMembers, updateMemberRole, getStoredUser, getOutstanding, getSummary,
+  type Membership, type Role, type OutstandingMember, type Levy,
 } from "../../lib/api";
+import { formatNaira } from "../../lib/format";
 
 const roleMeta: Record<Role, { label: string; icon: typeof Shield; tint: string }> = {
   treasurer: { label: "Treasurer", icon: ShieldCheck, tint: "bg-brand-50 text-brand-700" },
@@ -27,24 +29,48 @@ export function MembersInner() {
   const myId = getStoredUser()?.id;
 
   const [members, setMembers] = useState<Membership[]>([]);
+  const [outstanding, setOutstanding] = useState<OutstandingMember[]>([]);
+  const [levy, setLevy] = useState<Levy | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [savingId, setSavingId] = useState("");
   const [copied, setCopied] = useState(false);
 
-  const load = () => listMembers(gid);
+  const load = async () => {
+    const [m, o, s] = await Promise.all([
+      listMembers(gid),
+      getOutstanding(gid).catch(() => ({ members: [] as OutstandingMember[], levy: undefined })),
+      getSummary(gid).catch(() => null),
+    ]);
+    setMembers(m);
+    setOutstanding(o.members);
+    setLevy(o.levy ?? s?.levy);
+    return m;
+  };
 
   useEffect(() => {
     setLoading(true);
     load()
-      .then(setMembers)
       .catch((err) => setError(err instanceof Error ? err.message : "Couldn't load members."))
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeGroup?.id]);
 
   const myRole = members.find((m) => m.userId === myId)?.role ?? null;
   const canManage = myRole === "treasurer";
+
+  // A member's payment position against the current levy, if there is one.
+  const statusFor = (userId: string) => {
+    if (!levy) return null;
+    const o = outstanding.find((x) => x.userId === userId);
+    if (o) {
+      return o.state === "partial"
+        ? { label: `Paid ${formatNaira(o.paidKobo)} of ${formatNaira(o.amountKobo)}`, tint: "bg-amber-50 text-amber-600 dark:bg-amber-500/10" }
+        : { label: `Owes ${formatNaira(o.amountKobo)}`, tint: "bg-rose-50 text-rose-600 dark:bg-rose-500/10" };
+    }
+    return { label: "Paid in full", tint: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10" };
+  };
 
   const changeRole = async (userId: string, role: Role) => {
     setError(""); setNotice(""); setSavingId(userId);
@@ -86,6 +112,7 @@ export function MembersInner() {
           {members.map((m) => {
             const meta = roleMeta[m.role];
             const isMe = m.userId === myId;
+            const status = statusFor(m.userId);
             return (
               <motion.div
                 key={m.userId}
@@ -103,6 +130,11 @@ export function MembersInner() {
                       {isMe && <span className="ml-1.5 text-xs font-normal text-slate-400">(you)</span>}
                     </p>
                     <p className="text-xs text-slate-400 truncate">{m.user?.email ?? "—"}</p>
+                    {status && (canManage || isMe) && (
+                      <span className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${status.tint}`}>
+                        {status.label}
+                      </span>
+                    )}
                   </div>
                 </div>
 

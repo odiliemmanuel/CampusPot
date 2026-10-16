@@ -26,6 +26,8 @@ func (ct *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 	g.GET("", ct.listGroups)
 	g.POST("/join", ct.joinGroup)
 	g.GET("/:id", ct.getGroup)
+	g.PATCH("/:id", ct.updateGroup)
+	g.POST("/:id/join-code", ct.regenerateJoinCode)
 	g.POST("/:id/invite", ct.invite)
 	g.GET("/:id/members", ct.listMembers)
 	g.PATCH("/:id/members/:userId", ct.updateMemberRole)
@@ -47,6 +49,9 @@ func (ct *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 
 	g.GET("/:id/summary", ct.summary)
 	g.GET("/:id/outstanding", ct.outstanding)
+
+	// A user's own cross-pot overview (Balance & History).
+	rg.GET("/account/overview", ct.accountOverview)
 }
 
 func (ct *Controller) createGroup(c *gin.Context) {
@@ -83,6 +88,46 @@ func (ct *Controller) getGroup(c *gin.Context) {
 		return
 	}
 	response.OK(c, group)
+}
+
+func (ct *Controller) updateGroup(c *gin.Context) {
+	groupID, ok := pathID(c, "id")
+	if !ok {
+		return
+	}
+	var req UpdateGroupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "INVALID_BODY", err.Error())
+		return
+	}
+	group, err := ct.svc.UpdateGroup(c.Request.Context(), groupID, auth.MustUserID(c), req)
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, group)
+}
+
+func (ct *Controller) regenerateJoinCode(c *gin.Context) {
+	groupID, ok := pathID(c, "id")
+	if !ok {
+		return
+	}
+	group, err := ct.svc.RegenerateJoinCode(c.Request.Context(), groupID, auth.MustUserID(c))
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, group)
+}
+
+func (ct *Controller) accountOverview(c *gin.Context) {
+	ov, err := ct.svc.AccountOverview(c.Request.Context(), auth.MustUserID(c))
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, ov)
 }
 
 func (ct *Controller) joinGroup(c *gin.Context) {

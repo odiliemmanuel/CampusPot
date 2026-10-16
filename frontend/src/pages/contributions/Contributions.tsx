@@ -10,17 +10,19 @@ import PageHeader from "../../components/PageHeader";
 import { useGroup } from "../../providers/GroupProvider";
 import {
   listPayments, getOutstanding, simulateDeposit, recordManualPayment, listMembers,
-  draftReminder, sendReminder,
-  type Payment, type OutstandingMember, type Membership,
+  draftReminder, sendReminder, getStoredUser,
+  type Payment, type OutstandingMember, type Membership, type Levy,
 } from "../../lib/api";
 import { formatNaira, nairaToKobo } from "../../lib/format";
 
 export function ContributionsInner() {
   const { activeGroup } = useGroup();
   const gid = activeGroup!.id;
+  const myId = getStoredUser()?.id;
 
   const [payments, setPayments] = useState<Payment[]>([]);
   const [outstanding, setOutstanding] = useState<OutstandingMember[]>([]);
+  const [levy, setLevy] = useState<Levy | undefined>(undefined);
   const [members, setMembers] = useState<Membership[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -42,6 +44,7 @@ export function ContributionsInner() {
     ]);
     setPayments(p);
     setOutstanding(o.members);
+    setLevy(o.levy ?? undefined);
     setMembers(m);
   };
 
@@ -95,16 +98,27 @@ export function ContributionsInner() {
 
   const owe = outstanding.filter((m) => m.state !== "paid");
 
+  const myRole = members.find((m) => m.userId === myId)?.role ?? null;
+  const canManage = myRole === "treasurer";
+  const mine = outstanding.find((m) => m.userId === myId);
+  const myStatus = levy
+    ? mine
+      ? { amount: mine.amountKobo, paid: mine.paidKobo, owed: mine.outstandingKobo }
+      : { amount: levy.amountKobo, paid: levy.amountKobo, owed: 0 }
+    : null;
+
   return (
     <>
       <PageHeader
         title="Contributions"
-        subtitle="Every deposit reconciles to a member automatically."
-        action={
+        subtitle={canManage
+          ? "Every deposit reconciles to a member automatically."
+          : "Your dues and every deposit in this pot."}
+        action={canManage ? (
           <button onClick={() => setShowDeposit((v) => !v)} className="cp-btn-primary">
             <Landmark className="w-4 h-4" /> Simulate deposit
           </button>
-        }
+        ) : undefined}
       />
 
       {notice && (
@@ -114,7 +128,7 @@ export function ContributionsInner() {
       )}
       {error && <p className="mb-4 text-sm text-rose-600">{error}</p>}
 
-      {showDeposit && (
+      {canManage && showDeposit && (
         <motion.form
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: "auto" }}
@@ -140,49 +154,77 @@ export function ContributionsInner() {
       )}
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Outstanding */}
+        {/* Outstanding — treasurers see the full breakdown; members see their own */}
         <div className="lg:col-span-2 cp-card rounded-3xl p-6">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-4">
-            Outstanding · {formatNaira(owe.reduce((s, m) => s + m.outstandingKobo, 0))}
+            {canManage
+              ? `Outstanding · ${formatNaira(owe.reduce((s, m) => s + m.outstandingKobo, 0))}`
+              : "Your status"}
           </p>
-          {owe.length === 0 ? (
-            <div className="flex items-center gap-3 text-sm text-emerald-600 dark:text-emerald-400">
-              <CheckCircle2 className="w-5 h-5" /> Everyone is fully paid up.
+
+          {canManage ? (
+            <>
+              {owe.length === 0 ? (
+                <div className="flex items-center gap-3 text-sm text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="w-5 h-5" /> Everyone is fully paid up.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {owe.map((m) => (
+                    <div key={m.userId} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-white dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{m.name}</p>
+                        <p className="text-xs text-slate-400">
+                          {m.state === "partial" ? `Paid ${formatNaira(m.paidKobo)} of ${formatNaira(m.amountKobo)}` : `Owes ${formatNaira(m.amountKobo)}`}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-sm font-bold text-amber-600">{formatNaira(m.outstandingKobo)}</span>
+                        <button
+                          onClick={() => handleRemind(m.userId)}
+                          disabled={reminded[m.userId]}
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg bg-primary-50 dark:bg-primary-500/15 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-500/25 transition disabled:opacity-60"
+                        >
+                          {reminded[m.userId] ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Bell className="w-3.5 h-3.5" />}
+                          {reminded[m.userId] ? "Sent" : "Remind"}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Manual record for treasurers */}
+              {members.length > 0 && (
+                <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-3">
+                    Record a cash payment
+                  </p>
+                  <ManualPayRow members={members} onSubmit={handleManual} />
+                </div>
+              )}
+            </>
+          ) : myStatus ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3 rounded-xl bg-white dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700 p-4">
+                <div>
+                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
+                    {levy?.title ?? "Current levy"}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    Paid {formatNaira(myStatus.paid)} of {formatNaira(myStatus.amount)}
+                  </p>
+                </div>
+                <span className={`text-sm font-bold ${myStatus.owed > 0 ? "text-amber-600" : "text-emerald-600"}`}>
+                  {myStatus.owed > 0 ? `${formatNaira(myStatus.owed)} left` : "Paid up"}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                Quote reference <span className="font-mono font-semibold text-slate-600 dark:text-slate-300">{activeGroup!.joinCode}</span>-based code when you transfer, or ask the treasurer to record your cash payment.
+              </p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {owe.map((m) => (
-                <div key={m.userId} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-white dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{m.name}</p>
-                    <p className="text-xs text-slate-400">
-                      {m.state === "partial" ? `Paid ${formatNaira(m.paidKobo)} of ${formatNaira(m.amountKobo)}` : `Owes ${formatNaira(m.amountKobo)}`}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-sm font-bold text-amber-600">{formatNaira(m.outstandingKobo)}</span>
-                    <button
-                      onClick={() => handleRemind(m.userId)}
-                      disabled={reminded[m.userId]}
-                      className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg bg-primary-50 dark:bg-primary-500/15 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-500/25 transition disabled:opacity-60"
-                    >
-                      {reminded[m.userId] ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Bell className="w-3.5 h-3.5" />}
-                      {reminded[m.userId] ? "Sent" : "Remind"}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Manual record for treasurers */}
-          {members.length > 0 && (
-            <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-3">
-                Record a cash payment
-              </p>
-              <ManualPayRow members={members} onSubmit={handleManual} />
-            </div>
+            <p className="text-sm text-slate-400">No open levy right now.</p>
           )}
         </div>
 
