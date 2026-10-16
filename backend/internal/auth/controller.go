@@ -27,6 +27,7 @@ func (ct *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 	authed.Use(ct.svc.RequireAuth())
 	authed.GET("/auth/me", ct.me)
 	authed.PATCH("/auth/me", ct.updateMe)
+	authed.DELETE("/auth/me", ct.deleteMe)
 }
 
 func (ct *Controller) register(c *gin.Context) {
@@ -39,6 +40,14 @@ func (ct *Controller) register(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, ErrEmailTaken) {
 			response.Error(c, http.StatusConflict, "EMAIL_TAKEN", "that email is already registered")
+			return
+		}
+		if errors.Is(err, ErrPhoneTaken) {
+			response.Error(c, http.StatusConflict, "PHONE_TAKEN", "that phone number is already registered")
+			return
+		}
+		if errors.Is(err, ErrPhoneRequired) {
+			response.Error(c, http.StatusBadRequest, "PHONE_REQUIRED", "a phone number is required")
 			return
 		}
 		response.Error(c, http.StatusInternalServerError, "REGISTER_FAILED", err.Error())
@@ -90,6 +99,19 @@ func (ct *Controller) updateMe(c *gin.Context) {
 		return
 	}
 	response.OK(c, publicUser(user))
+}
+
+func (ct *Controller) deleteMe(c *gin.Context) {
+	err := ct.svc.DeleteAccount(c.Request.Context(), MustUserID(c))
+	if err != nil {
+		if errors.Is(err, ErrSoleTreasurer) {
+			response.Error(c, http.StatusConflict, "SOLE_TREASURER", err.Error())
+			return
+		}
+		response.Error(c, http.StatusInternalServerError, "DELETE_FAILED", err.Error())
+		return
+	}
+	response.OK(c, gin.H{"deleted": true})
 }
 
 // publicUser hides fields that must never leave the server (password hash).

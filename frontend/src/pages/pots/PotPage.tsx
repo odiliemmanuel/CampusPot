@@ -96,28 +96,18 @@ export default function PotPage() {
         {activeGroup?.name ?? "Pot"}
       </h1>
 
-      {/* Money cards — always visible while sections swap underneath */}
+      {/* Money cards — always visible while sections swap underneath. "Expected"
+          is what the pot should hold (members × per-person), not a fixed sum. */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile icon={<Wallet className="h-4 w-4" />} label="Balance" value={formatNaira(summary?.balanceKobo ?? 0)} tone="brand" />
+        <StatTile icon={<Wallet className="h-4 w-4" />} label="Expected" value={formatNaira(summary?.expectedKobo ?? 0)} tone="brand" />
         <StatTile icon={<TrendingUp className="h-4 w-4" />} label="Collected" value={formatNaira(summary?.collectedKobo ?? 0)} tone="green" />
-        <StatTile icon={<ArrowUpRight className="h-4 w-4" />} label="Spent" value={formatNaira(summary?.spentKobo ?? 0)} tone="rose" />
         <StatTile icon={<Users className="h-4 w-4" />} label="Outstanding" value={formatNaira(summary?.outstandingKobo ?? 0)} tone="amber" />
+        <StatTile icon={<ArrowUpRight className="h-4 w-4" />} label="Spent" value={formatNaira(summary?.spentKobo ?? 0)} tone="rose" />
       </div>
 
-      <div className="mb-4 mt-4 flex items-center justify-between gap-3">
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Manage contributions, payouts and members for this pot.
-        </p>
-        {chatActive && (
-          <Link
-            to={`/pots/${id}/chat`}
-            className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
-          >
-            <MessageSquare className="h-4 w-4" />
-            Chat
-          </Link>
-        )}
-      </div>
+      <p className="mb-4 mt-4 text-sm text-slate-500 dark:text-slate-400">
+        Manage contributions, payouts and members for this pot.
+      </p>
 
       {/* Inline tab bar — only the section below changes. Chat opens as its
           own full-screen page from the header button. */}
@@ -165,6 +155,17 @@ export default function PotPage() {
         {tab === "assistant" && <AssistantInner />}
         {tab === "settings" && <PotSettings />}
       </motion.div>
+
+      {/* Floating button that opens the full-screen pot chat. */}
+      {chatActive && (
+        <Link
+          to={`/pots/${id}/chat`}
+          aria-label="Open pot chat"
+          className="fixed bottom-24 right-4 z-30 inline-flex h-14 w-14 items-center justify-center rounded-full bg-brand-600 text-white shadow-lg shadow-brand-600/30 transition hover:bg-brand-700 hover:shadow-xl lg:bottom-8 lg:right-8"
+        >
+          <MessageSquare className="h-6 w-6" />
+        </Link>
+      )}
     </>
   );
 }

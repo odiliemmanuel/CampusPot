@@ -27,6 +27,12 @@ const demoWelcomeKobo int64 = 1_000_000
 // ErrEmailTaken is returned when registering an email that already exists.
 var ErrEmailTaken = errors.New("email already registered")
 
+// ErrPhoneTaken is returned when the phone (a wallet account) is already used.
+var ErrPhoneTaken = errors.New("phone number already registered")
+
+// ErrPhoneRequired is returned when registration omits the phone number.
+var ErrPhoneRequired = errors.New("a phone number is required")
+
 // ErrInvalidCredentials is returned on a failed login. The message is
 // deliberately identical whether the email or the password was wrong.
 var ErrInvalidCredentials = errors.New("invalid email or password")
@@ -46,12 +52,25 @@ func NewService(db *gorm.DB, cfg *config.Config, client bmoni.Client) *Service {
 // Register creates a user, hashes the password, best-effort provisions a
 // B Moni user, and returns a signed token.
 func (s *Service) Register(ctx context.Context, req RegisterRequest) (*models.User, string, error) {
+	phone := strings.TrimSpace(req.Phone)
+	if phone == "" {
+		return nil, "", ErrPhoneRequired
+	}
+
 	var count int64
 	if err := s.db.Model(&models.User{}).Where("email = ?", req.Email).Count(&count).Error; err != nil {
 		return nil, "", err
 	}
 	if count > 0 {
 		return nil, "", ErrEmailTaken
+	}
+
+	// The phone number is the user's wallet account, so it must be unique.
+	if err := s.db.Model(&models.User{}).Where("phone = ?", phone).Count(&count).Error; err != nil {
+		return nil, "", err
+	}
+	if count > 0 {
+		return nil, "", ErrPhoneTaken
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -143,6 +162,50 @@ func (s *Service) UpdateProfile(_ context.Context, userID uuid.UUID, req UpdateP
 		return nil, err
 	}
 	return &user, nil
+}
+
+// ErrSoleTreasurer is returned when a user tries to delete an account while
+// still the only treasurer of a pot.
+var ErrSoleTreasurer = errors.New("you are the only treasurer of a pot — promote someone before deleting")
+
+// DeleteAccount removes the signed-in user's account. Their pot memberships are
+// ended (so they leave every pot's chat and lists), their wallet history is
+// cleared, and the account row is deleted. A pot must always keep a treasurer,
+// so this is refused if the user is a pot's only treasurer.
+func (s *Service) DeleteAccount(_ context.Context, userID uuid.UUID) error {
+	var memberships []models.Membership
+	if err := s.db.Where("user_id = ? AND status = ?", userID, models.MembershipActive).
+		Find(&memberships).Error; err != nil {
+		return err
+	}
+	for _, m := range memberships {
+		if m.Role != models.RoleTreasurer {
+			continue
+		}
+		var others int64
+		if err := s.db.Model(&models.Membership{}).
+			Where("group_id = ? AND role = ? AND status = ? AND user_id <> ?",
+				m.GroupID, models.RoleTreasurer, models.MembershipActive, userID).
+			Count(&others).Error; err != nil {
+			return err
+		}
+		if others == 0 {
+			return ErrSoleTreasurer
+		}
+	}
+
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&models.Membership{}).
+			Where("user_id = ?", userID).
+			Update("status", models.MembershipRemoved).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("user_id = ?", userID).
+			Delete(&models.WalletTransaction{}).Error; err != nil {
+			return err
+		}
+		return tx.Where("id = ?", userID).Delete(&models.User{}).Error
+	})
 }
 
 // IssueToken signs a JWT for the user.

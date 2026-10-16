@@ -44,9 +44,9 @@ function PotCard({
 
       <div className="shrink-0 text-right">
         <p className="font-sora text-sm font-bold text-slate-900">
-          {summary ? formatNaira(summary.balanceKobo) : "—"}
+          {summary ? formatNaira(summary.expectedKobo) : "—"}
         </p>
-        <p className="text-[10px] uppercase tracking-wide text-slate-400">Balance</p>
+        <p className="text-[10px] uppercase tracking-wide text-slate-400">Expected</p>
       </div>
 
       <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />

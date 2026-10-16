@@ -54,12 +54,110 @@ func (s *Service) assessRisk(group *models.Group, amountKobo, balanceKobo int64,
 	return ra
 }
 
-// CreateExpenseRequest proposes a withdrawal from the pot.
+// CreateExpenseRequest proposes a withdrawal from the pot. A payout targets
+// either a PotKeeper account (member/user, identified by Recipient as a user
+// id or email/phone) or an external bank account (Recipient as the account
+// number, with BankName/AccountName).
 type CreateExpenseRequest struct {
-	AmountKobo  int64  `json:"amountKobo" binding:"required,gt=0"`
-	Destination string `json:"destination"` // registered bank-account id or description
-	Category    string `json:"category"`
-	Note        string `json:"note"`
+	AmountKobo      int64  `json:"amountKobo" binding:"required,gt=0"`
+	DestinationType string `json:"destinationType"` // member | user | bank
+	Recipient       string `json:"recipient"`
+	BankName        string `json:"bankName"`
+	AccountName     string `json:"accountName"`
+	Category        string `json:"category"`
+	Note            string `json:"note"`
+	// Destination is an optional free-text target, kept for backwards compat.
+	Destination string `json:"destination"`
+}
+
+// payoutTarget is the resolved destination of a payout.
+type payoutTarget struct {
+	destType   string
+	dest       string
+	user       *models.User
+	bankName   string
+	accountNo  string
+	accountNam string
+}
+
+// resolvePayout turns a create request into a concrete payout target. A
+// member/user payout must resolve to a real PotKeeper account; a bank payout
+// only needs an account number.
+func (s *Service) resolvePayout(groupID uuid.UUID, req CreateExpenseRequest) (*payoutTarget, error) {
+	destType := strings.TrimSpace(req.DestinationType)
+	recipient := strings.TrimSpace(req.Recipient)
+
+	if destType == "" {
+		// Backwards compatible: a named bank is a bank payout, a recipient is a
+		// PotKeeper user, and a bare free-text destination is treated as an
+		// external bank account.
+		if strings.TrimSpace(req.BankName) != "" {
+			destType = models.ExpenseBank
+		} else if recipient != "" {
+			destType = models.ExpenseUser
+		} else if legacy := strings.TrimSpace(req.Destination); legacy != "" {
+			destType = models.ExpenseBank
+			recipient = legacy
+		} else {
+			return nil, fmt.Errorf("%w: a payout destination is required", ErrInvalid)
+		}
+	}
+
+	t := &payoutTarget{
+		destType:   destType,
+		bankName:   strings.TrimSpace(req.BankName),
+		accountNo:  recipient,
+		accountNam: strings.TrimSpace(req.AccountName),
+	}
+
+	switch destType {
+	case models.ExpenseBank:
+		if recipient == "" {
+			return nil, fmt.Errorf("%w: an account number is required", ErrInvalid)
+		}
+		parts := []string{}
+		if t.bankName != "" {
+			parts = append(parts, t.bankName)
+		}
+		parts = append(parts, recipient)
+		if t.accountNam != "" {
+			parts = append(parts, t.accountNam)
+		}
+		t.dest = "Bank: " + strings.Join(parts, " · ")
+
+	case models.ExpenseMember:
+		uid, err := uuid.Parse(recipient)
+		if err != nil {
+			return nil, fmt.Errorf("%w: choose a pot member to pay", ErrInvalid)
+		}
+		var m models.Membership
+		if err := s.db.Preload("User").
+			Where("group_id = ? AND user_id = ? AND status = ?", groupID, uid, models.MembershipActive).
+			First(&m).Error; err != nil {
+			return nil, fmt.Errorf("%w: that person is not an active member of this pot", ErrNotFound)
+		}
+		t.user = m.User
+		if m.User != nil {
+			t.dest = fmt.Sprintf("Member: %s (%s)", m.User.Name, m.Reference)
+		} else {
+			t.dest = "Member: " + recipient
+		}
+	case models.ExpenseUser:
+		if recipient == "" {
+			return nil, fmt.Errorf("%w: a recipient is required", ErrInvalid)
+		}
+		var user models.User
+		err := s.db.Where("LOWER(email) = ?", strings.ToLower(recipient)).
+			Or("phone = ?", recipient).First(&user).Error
+		if err != nil {
+			return nil, fmt.Errorf("%w: no PotKeeper user matches that email or phone", ErrNotFound)
+		}
+		t.user = &user
+		t.dest = fmt.Sprintf("PotKeeper: %s (%s)", user.Name, recipient)
+	default:
+		return nil, fmt.Errorf("%w: unknown payout destination", ErrInvalid)
+	}
+	return t, nil
 }
 
 // CreateExpense records a spend request, risk-checks it, and parks it in
@@ -80,24 +178,36 @@ func (s *Service) CreateExpense(ctx context.Context, groupID, actorID uuid.UUID,
 	if err := s.db.First(&group, "id = ?", groupID).Error; err != nil {
 		return nil, ErrNotFound
 	}
+	t, err := s.resolvePayout(groupID, req)
+	if err != nil {
+		return nil, err
+	}
 	balance, err := s.Balance(ctx, groupID)
 	if err != nil {
 		return nil, err
 	}
 
-	ra := s.assessRisk(&group, req.AmountKobo, balance, req.Destination)
+	ra := s.assessRisk(&group, req.AmountKobo, balance, t.dest)
 	reasonsJSON, _ := json.Marshal(ra.Reasons)
 
 	expense := &models.ExpenseRequest{
-		GroupID:     groupID,
-		RequestedBy: actorID,
-		AmountKobo:  req.AmountKobo,
-		Destination: req.Destination,
-		Category:    req.Category,
-		Note:        req.Note,
-		Status:      models.ExpensePendingApproval,
-		RiskLevel:   ra.Level,
-		RiskReasons: string(reasonsJSON),
+		GroupID:         groupID,
+		RequestedBy:     actorID,
+		AmountKobo:      req.AmountKobo,
+		Destination:     t.dest,
+		DestinationType: t.destType,
+		BankName:        t.bankName,
+		AccountNumber:   t.accountNo,
+		AccountName:     t.accountNam,
+		Category:        req.Category,
+		Note:            req.Note,
+		Status:          models.ExpensePendingApproval,
+		RiskLevel:       ra.Level,
+		RiskReasons:     string(reasonsJSON),
+	}
+	if t.user != nil {
+		uid := t.user.ID
+		expense.RecipientUserID = &uid
 	}
 	if err := s.db.Create(expense).Error; err != nil {
 		return nil, err
@@ -204,10 +314,26 @@ func (s *Service) Execute(ctx context.Context, groupID, expenseID, actorID uuid.
 		return nil, ErrNotFound
 	}
 
+	balance, err := s.Balance(ctx, groupID)
+	if err != nil {
+		return nil, err
+	}
+	if expense.AmountKobo > balance {
+		return nil, fmt.Errorf("%w: the pot balance is too low for this payout", ErrConflict)
+	}
+
+	// A payout to another PotKeeper account is the same movement as a wallet
+	// transfer: credit the recipient's wallet and debit the pot ledger. No bank
+	// rail is involved.
+	if expense.RecipientUserID != nil {
+		return s.executeWalletPayout(groupID, actorID, &expense, *expense.RecipientUserID)
+	}
+
+	bankRef := firstNonEmpty(strings.TrimSpace(expense.AccountNumber), expense.Destination)
 	proposal, err := s.bmoni.CreateNigeriaOfframp(ctx, bmoni.OfframpRequest{
 		BMoniUserID:   group.BMoniUserID,
 		WalletID:      group.BMoniWalletID,
-		BankAccountID: expense.Destination,
+		BankAccountID: bankRef,
 		FromAmount:    money.Kobo(expense.AmountKobo).String(),
 	})
 	if err != nil {
@@ -260,6 +386,54 @@ func (s *Service) Execute(ctx context.Context, groupID, expenseID, actorID uuid.
 		return nil, err
 	}
 	return &expense, nil
+}
+
+// executeWalletPayout credits a PotKeeper account (a pot member or any other
+// user) straight into their wallet and debits the pot, mirroring a wallet
+// transfer. The caller must have verified approval, disputes and balance.
+func (s *Service) executeWalletPayout(groupID, actorID uuid.UUID, expense *models.ExpenseRequest, recipientID uuid.UUID) (*models.ExpenseRequest, error) {
+	var recipient models.User
+	if err := s.db.First(&recipient, "id = ?", recipientID).Error; err != nil {
+		return nil, fmt.Errorf("%w: the payout recipient no longer exists", ErrNotFound)
+	}
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := creditWallet(tx, recipient.ID, expense.AmountKobo); err != nil {
+			return err
+		}
+		if err := tx.Create(&models.WalletTransaction{
+			UserID:       recipient.ID,
+			Kind:         models.WalletTransferIn,
+			AmountKobo:   expense.AmountKobo,
+			Counterparty: "Pot payout",
+			Note:         firstNonEmpty(expense.Category, expense.Note),
+		}).Error; err != nil {
+			return err
+		}
+		entry := &models.LedgerEntry{
+			GroupID:     groupID,
+			Kind:        models.LedgerDebit,
+			AmountKobo:  expense.AmountKobo,
+			Description: "Payout: " + firstNonEmpty(expense.Category, expense.Note, "approved payout"),
+			RefType:     "expense",
+			RefID:       expense.ID.String(),
+			ActorUserID: &actorID,
+		}
+		if err := s.appendLedger(tx, entry); err != nil {
+			return err
+		}
+		now := s.now()
+		return tx.Model(expense).Updates(map[string]interface{}{
+			"status":      models.ExpenseCompleted,
+			"executed_at": &now,
+		}).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := s.db.First(expense, "id = ?", expense.ID).Error; err != nil {
+		return nil, err
+	}
+	return expense, nil
 }
 
 // ApplyWithdrawalEvent reconciles a withdrawal after B Moni reports a new state

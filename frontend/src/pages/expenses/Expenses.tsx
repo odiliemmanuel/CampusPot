@@ -104,7 +104,16 @@ export function ExpensesInner() {
     e.preventDefault();
     setError(""); setBusy(true);
     try {
-      await createExpense(gid, nairaToKobo(amount), destination, category, note);
+      await createExpense(gid, {
+        amountKobo: nairaToKobo(amount),
+        destinationType: destMode,
+        recipient:
+          destMode === "member" ? memberId : destMode === "user" ? recipient.trim() : accountNumber.trim(),
+        bankName: destMode === "bank" ? bankName : undefined,
+        accountName: destMode === "bank" ? accountName.trim() : undefined,
+        category,
+        note,
+      });
       resetForm();
       setShowForm(false);
       await load();

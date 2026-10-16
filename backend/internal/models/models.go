@@ -196,6 +196,13 @@ const (
 	ExpenseFailed          = "failed"
 )
 
+// Payout destination kinds for a withdrawal.
+const (
+	ExpenseMember = "member" // another member of the same pot
+	ExpenseUser   = "user"   // any PotKeeper account (email or phone)
+	ExpenseBank   = "bank"   // an external bank account
+)
+
 // Risk levels assigned by the AI risk check.
 const (
 	RiskLow    = "low"
@@ -203,21 +210,32 @@ const (
 	RiskHigh   = "high"
 )
 
-// ExpenseRequest is a withdrawal the treasurer wants to make from the pot.
+// ExpenseRequest is a withdrawal the treasurer wants to make from the pot. Its
+// payout follows the same rails as a wallet transfer: another member, any
+// PotKeeper account (by email/phone), or an external bank account.
 type ExpenseRequest struct {
 	Base
-	GroupID     uuid.UUID  `gorm:"type:uuid;index;not null" json:"groupId"`
-	RequestedBy uuid.UUID  `gorm:"type:uuid;not null" json:"requestedBy"`
-	AmountKobo  int64      `gorm:"not null" json:"amountKobo"`
-	Destination string     `json:"destination"` // description / bank account / bmoni user
-	Category    string     `json:"category,omitempty"`
-	Note        string     `json:"note,omitempty"`
-	Status      string     `gorm:"not null;default:pending_approval" json:"status"`
-	RiskLevel   string     `gorm:"default:low" json:"riskLevel"`
-	RiskReasons string     `json:"riskReasons,omitempty"` // JSON array stored as text
-	ProposalID  string     `json:"proposalId,omitempty"`
-	ApprovedAt  *time.Time `json:"approvedAt,omitempty"`
-	ExecutedAt  *time.Time `json:"executedAt,omitempty"`
+	GroupID     uuid.UUID `gorm:"type:uuid;index;not null" json:"groupId"`
+	RequestedBy uuid.UUID `gorm:"type:uuid;not null" json:"requestedBy"`
+	AmountKobo  int64     `gorm:"not null" json:"amountKobo"`
+	// Destination is the human-readable payout target shown in the UI.
+	Destination string `json:"destination"`
+	// DestinationType is member | user | bank. When the target is a PotKeeper
+	// account, RecipientUserID is set and the payout credits that wallet
+	// directly (like a wallet transfer); a bank payout goes through B Moni.
+	DestinationType string     `gorm:"default:bank" json:"destinationType"`
+	RecipientUserID *uuid.UUID `gorm:"type:uuid;index" json:"recipientUserId,omitempty"`
+	BankName        string     `json:"bankName,omitempty"`
+	AccountNumber   string     `json:"accountNumber,omitempty"`
+	AccountName     string     `json:"accountName,omitempty"`
+	Category        string     `json:"category,omitempty"`
+	Note            string     `json:"note,omitempty"`
+	Status          string     `gorm:"not null;default:pending_approval" json:"status"`
+	RiskLevel       string     `gorm:"default:low" json:"riskLevel"`
+	RiskReasons     string     `json:"riskReasons,omitempty"` // JSON array stored as text
+	ProposalID      string     `json:"proposalId,omitempty"`
+	ApprovedAt      *time.Time `json:"approvedAt,omitempty"`
+	ExecutedAt      *time.Time `json:"executedAt,omitempty"`
 }
 
 // Approval decisions.

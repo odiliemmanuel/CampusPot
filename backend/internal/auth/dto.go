@@ -1,10 +1,12 @@
 package auth
 
-// RegisterRequest is the JSON body for POST /api/v1/auth/register.
+// RegisterRequest is the JSON body for POST /api/v1/auth/register. Phone is
+// required: it doubles as the user's PotKeeper wallet account, so money can be
+// sent to them by phone number.
 type RegisterRequest struct {
 	Name     string `json:"name" binding:"required,min=2"`
 	Email    string `json:"email" binding:"required,email"`
-	Phone    string `json:"phone"`
+	Phone    string `json:"phone" binding:"required,min=7"`
 	Password string `json:"password" binding:"required,min=6"`
 }
 

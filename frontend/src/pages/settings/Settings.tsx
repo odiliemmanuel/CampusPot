@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, Loader2, LogOut, PiggyBank, Save, ShieldCheck, UserRound } from "lucide-react";
+import { CheckCircle2, Loader2, LogOut, PiggyBank, Save, ShieldCheck, Trash2, UserRound } from "lucide-react";
 
 import AppShell from "../../layouts/AppShell";
 import PageHeader from "../../components/PageHeader";
 import { useGroup } from "../../providers/GroupProvider";
 import {
-  clearSession, getMe, getStoredUser, getToken, setSession, updateProfile,
+  clearSession, deleteAccount, getMe, getStoredUser, getToken, setSession, updateProfile,
   type AuthUser,
 } from "../../lib/api";
 
@@ -20,6 +20,8 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     getMe()
@@ -64,6 +66,21 @@ export default function Settings() {
   const logout = () => {
     clearSession();
     window.location.href = "/login";
+  };
+
+  const removeAccount = async () => {
+    setError("");
+    setNotice("");
+    setDeleting(true);
+    try {
+      await deleteAccount();
+      clearSession();
+      window.location.href = "/login";
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't delete your account.");
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
   };
 
   return (
@@ -200,6 +217,49 @@ export default function Settings() {
             >
               <LogOut className="h-4 w-4" /> Log out
             </button>
+          </section>
+
+          {/* Danger zone */}
+          <section className="cp-card rounded-3xl border border-rose-200 p-4 sm:p-6 dark:border-rose-500/30">
+            <div className="mb-3 flex items-center gap-2.5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-500/15">
+                <Trash2 className="h-4 w-4" />
+              </span>
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Delete account</p>
+            </div>
+            <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+              This removes your PotKeeper account, wallet history and membership of every pot. You
+              can't undo it. Pots where you're the only treasurer must be handed over first.
+            </p>
+            {confirmDelete ? (
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={removeAccount}
+                  disabled={deleting}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-rose-600 to-rose-700 px-4 py-3 text-sm font-semibold text-white transition hover:shadow-lg disabled:opacity-60"
+                >
+                  {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Yes, delete my account
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(false)}
+                  disabled={deleting}
+                  className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(true)}
+                className="flex items-center gap-2 rounded-xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 dark:border-rose-500/30 dark:hover:bg-rose-500/10"
+              >
+                <Trash2 className="h-4 w-4" /> Delete account
+              </button>
+            )}
           </section>
         </div>
       </div>

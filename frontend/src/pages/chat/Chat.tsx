@@ -4,9 +4,18 @@ import { ArrowLeft, Loader2, MessageSquare, Send, X } from "lucide-react";
 
 import { useGroup } from "../../providers/GroupProvider";
 import {
-  getStoredUser, listChat, listChatParticipants, markChatRead, postChat,
+  ApiError, getStoredUser, listChat, listChatParticipants, markChatRead, postChat,
   type ChatMessage, type Membership,
 } from "../../lib/api";
+
+// A missing /chat route means this backend predates the chat endpoints. Show a
+// plain message instead of the raw "request failed (404)".
+function describeError(err: unknown, fallback: string) {
+  if (err instanceof ApiError && err.status === 404) {
+    return "Pot chat isn't available on this deployment yet. It'll appear after the next update.";
+  }
+  return err instanceof Error ? err.message : fallback;
+}
 
 function timeLabel(iso: string) {
   return new Date(iso).toLocaleString("en-NG", {
@@ -53,7 +62,7 @@ function ChatRoom({ groupId, groupName }: { groupId: string; groupName: string }
         if (alive && last) markChatRead(groupId, last.id).catch(() => {});
       })
       .catch((err) => {
-        if (alive) setError(err instanceof Error ? err.message : "Couldn't load the chat.");
+        if (alive) setError(describeError(err, "Couldn't load the chat."));
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -81,7 +90,7 @@ function ChatRoom({ groupId, groupName }: { groupId: string; groupName: string }
       const last = msgs[msgs.length - 1];
       if (last) await markChatRead(groupId, last.id).catch(() => {});
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't send the message.");
+      setError(describeError(err, "Couldn't send the message."));
     } finally {
       setSending(false);
     }

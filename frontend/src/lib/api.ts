@@ -179,12 +179,31 @@ export interface ExpenseRequest {
   requestedBy: string;
   amountKobo: number;
   destination: string;
+  /** How the payout is delivered: a pot member, a PotKeeper account, or a bank. */
+  destinationType?: PayoutDestination;
+  recipientUserId?: string;
+  bankName?: string;
+  accountNumber?: string;
+  accountName?: string;
   category?: string;
   note?: string;
   status: "pending_approval" | "approved" | "rejected" | "executing" | "completed" | "failed";
   riskLevel: "low" | "medium" | "high";
   riskReasons?: string;
   createdAt: string;
+}
+
+export type PayoutDestination = "member" | "user" | "bank";
+
+export interface CreateExpenseInput {
+  amountKobo: number;
+  destinationType: "member" | "user" | "bank";
+  /** A user id (member), email/phone (user), or account number (bank). */
+  recipient: string;
+  bankName?: string;
+  accountName?: string;
+  category?: string;
+  note?: string;
 }
 
 export interface Approval {
@@ -349,7 +368,7 @@ export interface AnswerResponse {
 
 // ---------- Auth ----------
 
-export const register = (name: string, email: string, password: string, phone?: string) =>
+export const register = (name: string, email: string, phone: string, password: string) =>
   request<{ token: string; user: AuthUser }>("/auth/register", {
     method: "POST",
     body: JSON.stringify({ name, email, password, phone }),
@@ -365,6 +384,8 @@ export const getMe = () => request<AuthUser>("/auth/me");
 
 export const updateProfile = (patch: { name?: string; phone?: string }) =>
   request<AuthUser>("/auth/me", { method: "PATCH", body: JSON.stringify(patch) });
+
+export const deleteAccount = () => request<{ deleted: boolean }>("/auth/me", { method: "DELETE" });
 
 // ---------- Groups ----------
 
@@ -493,10 +514,10 @@ export const getOutstanding = (groupId: string) =>
 // ---------- Expenses ----------
 
 export const listExpenses = (groupId: string) => request<ExpenseRequest[] | null>(`/groups/${groupId}/expenses`).then((e) => e ?? []);
-export const createExpense = (groupId: string, amountKobo: number, destination: string, category = "", note = "") =>
+export const createExpense = (groupId: string, input: CreateExpenseInput) =>
   request<ExpenseRequest>(`/groups/${groupId}/expenses`, {
     method: "POST",
-    body: JSON.stringify({ amountKobo, destination, category, note }),
+    body: JSON.stringify(input),
   });
 export const decideExpense = (groupId: string, expenseId: string, decision: "approve" | "reject", comment = "") =>
   request<ExpenseRequest>(`/groups/${groupId}/expenses/${expenseId}/decisions`, {

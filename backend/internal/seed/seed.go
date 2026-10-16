@@ -186,11 +186,23 @@ func Run(ctx context.Context, db *gorm.DB, cfg *config.Config) (*Result, error) 
 }
 
 func register(ctx context.Context, svc *auth.Service, name, email string) (*models.User, error) {
-	u, _, err := svc.Register(ctx, auth.RegisterRequest{Name: name, Email: email, Password: Password})
+	u, _, err := svc.Register(ctx, auth.RegisterRequest{
+		Name: name, Email: email, Phone: seedPhone(email), Password: Password,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("register %s: %w", email, err)
 	}
 	return u, nil
+}
+
+// seedPhone derives a stable, unique-looking Nigerian phone number from an
+// email so seeded accounts satisfy the phone-as-wallet-account rule.
+func seedPhone(email string) string {
+	var h uint32 = 2166136261
+	for _, r := range email {
+		h = (h ^ uint32(r)) * 16777619
+	}
+	return fmt.Sprintf("0803%07d", h%10_000_000)
 }
 
 func addMember(ctx context.Context, svc *pot.Service, group *models.Group, treasurerID uuid.UUID, u *models.User, role models.Role) error {
