@@ -28,7 +28,7 @@ export default function AuthLayout({
           <div className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center">
             <HandCoins className="w-5 h-5 text-white" />
           </div>
-          <span className="font-sora text-xl font-bold text-white">CampusPot</span>
+          <span className="font-sora text-xl font-bold text-white">PotKeeper</span>
         </div>
 
         <div className="relative">
@@ -73,7 +73,7 @@ export default function AuthLayout({
           </div>
         </div>
 
-        <p className="relative text-primary-100 text-sm">© 2026 CampusPot · B Moni x TINC26</p>
+        <p className="relative text-primary-100 text-sm">© 2026 PotKeeper · B Moni x TINC26</p>
       </div>
 
       {/* Right form panel */}
@@ -88,7 +88,7 @@ export default function AuthLayout({
             <div className="w-9 h-9 rounded-xl bg-primary-600 flex items-center justify-center">
               <HandCoins className="w-5 h-5 text-white" />
             </div>
-            <span className="font-sora font-bold text-lg text-slate-900 dark:text-white">CampusPot</span>
+            <span className="font-sora font-bold text-lg text-slate-900 dark:text-white">PotKeeper</span>
           </div>
           <h1 className="font-sora text-2xl font-bold text-slate-900 dark:text-white">{title}</h1>
           <p className="mt-1.5 text-slate-500 dark:text-slate-400 text-sm">{subtitle}</p>

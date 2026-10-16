@@ -1,4 +1,4 @@
-// Package seed builds the CampusPot demo dataset: a class pot, its executives,
+// Package seed builds the PotKeeper demo dataset: a class pot, its executives,
 // members, a levy, a spread of payments, and two expense requests (one
 // medium-risk, one over-budget). It uses the real treasurer engine, so the
 // seeded data behaves exactly like live data.
@@ -54,26 +54,26 @@ func Run(ctx context.Context, db *gorm.DB, cfg *config.Config) (*Result, error) 
 	potSvc := pot.NewService(db, cfg, client)
 	authSvc := auth.NewService(db, cfg, client)
 
-	treasurer, err := register(ctx, authSvc, "Ada Okafor", "ada@campuspot.ng")
+	treasurer, err := register(ctx, authSvc, "Ada Okafor", "ada@potkeeper.ng")
 	if err != nil {
 		return nil, err
 	}
-	cos1, err := register(ctx, authSvc, "Tunde Bello", "tunde@campuspot.ng")
+	cos1, err := register(ctx, authSvc, "Tunde Bello", "tunde@potkeeper.ng")
 	if err != nil {
 		return nil, err
 	}
-	cos2, err := register(ctx, authSvc, "Ngozi Eze", "ngozi@campuspot.ng")
+	cos2, err := register(ctx, authSvc, "Ngozi Eze", "ngozi@potkeeper.ng")
 	if err != nil {
 		return nil, err
 	}
 
 	memberSpecs := []struct{ name, email string }{
-		{"Chidi Nwosu", "chidi@campuspot.ng"},
-		{"Fatima Yusuf", "fatima@campuspot.ng"},
-		{"Emeka Obi", "emeka@campuspot.ng"},
-		{"Blessing Ade", "blessing@campuspot.ng"},
-		{"Seun Ajayi", "seun@campuspot.ng"},
-		{"Halima Sani", "halima@campuspot.ng"},
+		{"Chidi Nwosu", "chidi@potkeeper.ng"},
+		{"Fatima Yusuf", "fatima@potkeeper.ng"},
+		{"Emeka Obi", "emeka@potkeeper.ng"},
+		{"Blessing Ade", "blessing@potkeeper.ng"},
+		{"Seun Ajayi", "seun@potkeeper.ng"},
+		{"Halima Sani", "halima@potkeeper.ng"},
 	}
 	members := make([]*models.User, 0, len(memberSpecs))
 	for _, spec := range memberSpecs {

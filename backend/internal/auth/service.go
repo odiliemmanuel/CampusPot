@@ -139,7 +139,7 @@ func splitName(name string) (first, last string) {
 	parts := strings.Fields(name)
 	switch len(parts) {
 	case 0:
-		return "CampusPot", "Member"
+		return "PotKeeper", "Member"
 	case 1:
 		return parts[0], "Member"
 	default:

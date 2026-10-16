@@ -9,7 +9,7 @@ export default {
         sora: ["Sora", "system-ui", "sans-serif"],
       },
       colors: {
-        // Vivid royal blue — the shared CampusPot/LearnQuest product palette.
+        // Vivid royal blue — the shared PotKeeper/LearnQuest product palette.
         primary: {
           50: "#EEF0FD",
           100: "#DCE0FB",

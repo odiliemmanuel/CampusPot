@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, HandCoins, Check, Plus } from "lucide-react";
+import { ChevronDown, HandCoins, Check, Plus, LogIn } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGroup } from "../providers/GroupProvider";
@@ -59,12 +59,23 @@ export default function GroupSwitcher({ onNavigate }: { onNavigate?: () => void 
               onClick={() => {
                 setOpen(false);
                 onNavigate?.();
+                navigate("/pots/new");
+              }}
+              className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition text-left"
+            >
+              <Plus className="w-4 h-4 shrink-0 text-primary-300" />
+              <span className="truncate flex-1 text-sm text-primary-300">Create a pot</span>
+            </button>
+            <button
+              onClick={() => {
+                setOpen(false);
+                onNavigate?.();
                 navigate("/join");
               }}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-primary-300 hover:bg-white/5 hover:text-white transition text-left"
+              className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition text-left"
             >
-              <Plus className="w-4 h-4 shrink-0" />
-              <span className="truncate flex-1">Join another pot</span>
+              <LogIn className="w-4 h-4 shrink-0 text-primary-300" />
+              <span className="truncate flex-1 text-sm text-primary-300">Join another pot</span>
             </button>
           </motion.div>
         )}

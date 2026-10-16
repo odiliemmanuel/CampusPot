@@ -82,7 +82,7 @@ export default function Settings() {
       </div>
 
       <p className="text-center text-xs text-slate-400 mt-8">
-        CampusPot · sandbox build · synthetic data only
+        PotKeeper · sandbox build · synthetic data only
       </p>
     </AppShell>
   );

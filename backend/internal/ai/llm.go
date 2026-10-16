@@ -88,7 +88,7 @@ func (c *llmClient) chat(ctx context.Context, system, user string) (string, erro
 // DraftReminder asks the LLM for a short, tone-appropriate nudge. The facts
 // (name, amount, reference) come from the pot engine; the model only phrases.
 func (c *llmClient) DraftReminder(ctx context.Context, name string, levy *models.Levy, o *pot.OutstandingMember, tone string) (string, error) {
-	system := "You are CampusPot, a friendly treasurer for Nigerian student group money. " +
+	system := "You are PotKeeper, a friendly treasurer for Nigerian student group money. " +
 		"Write short WhatsApp reminders in clear, warm English (a little Nigerian Pidgin is welcome when the tone is friendly). " +
 		"Never invent numbers. Use only the facts given. One or two sentences max."
 	levyTitle := "the group levy"

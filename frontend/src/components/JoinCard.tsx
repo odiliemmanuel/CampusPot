@@ -23,8 +23,8 @@ export default function JoinCard({ code }: { code: string }) {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "Join the pot on CampusPot",
-          text: `Join our pot on CampusPot with code ${code}`,
+          title: "Join the pot on PotKeeper",
+          text: `Join our pot on PotKeeper with code ${code}`,
           url: link,
         });
       } catch {
@@ -44,13 +44,13 @@ export default function JoinCard({ code }: { code: string }) {
           <QrCode className="h-3.5 w-3.5" /> Share this to join
         </p>
 
-        <div className="mt-4 flex items-center gap-4">
+        <div className="mt-4 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
           <div className="shrink-0 rounded-2xl bg-white p-2.5">
             <QRCodeSVG value={link} size={104} level="M" marginSize={0} />
           </div>
           <div className="min-w-0">
             <p className="text-[11px] uppercase tracking-wide text-brand-100">Join code</p>
-            <p className="font-sora text-3xl font-extrabold tracking-widest">{code}</p>
+            <p className="font-sora text-2xl font-extrabold tracking-[0.3em] sm:text-3xl sm:tracking-widest">{code}</p>
             <p className="mt-1 text-[11px] text-brand-100">
               Others enter the code, scan the QR, or open your link.
             </p>

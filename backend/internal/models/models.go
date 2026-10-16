@@ -1,4 +1,4 @@
-// Package models holds every GORM entity for CampusPot. Keeping them in one
+// Package models holds every GORM entity for PotKeeper. Keeping them in one
 // package avoids import cycles between feature packages (groups, payments,
 // expenses) that all need to reference each other. Money is always stored as
 // integer kobo (see common/money); never as a float.
@@ -44,7 +44,7 @@ const (
 	MembershipActive  MembershipStatus = "active"
 )
 
-// User is a CampusPot account. It maps 1:1 to a B Moni user/wallet.
+// User is a PotKeeper account. It maps 1:1 to a B Moni user/wallet.
 type User struct {
 	Base
 	Name         string `gorm:"not null" json:"name"`

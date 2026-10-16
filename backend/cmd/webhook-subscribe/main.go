@@ -1,4 +1,4 @@
-// Command webhook-subscribe registers CampusPot's callback URL with B Moni so
+// Command webhook-subscribe registers PotKeeper's callback URL with B Moni so
 // deposits and payouts arrive as employee.* events on the partner-scoped
 // subscription. Run it once per environment; it prints the secretKey B Moni
 // issues, which you then store as BMONI_WEBHOOK_SECRET.

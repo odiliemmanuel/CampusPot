@@ -1,8 +1,8 @@
-# CampusPot
+# PotKeeper
 
 **One pot. Everyone can see it. No one can run with it.**
 
-CampusPot is a shared group wallet and AI treasurer for Nigerian campus groups
+PotKeeper is a shared group wallet and AI treasurer for Nigerian campus groups
 (class reps, societies, hostels). Contributions land in *one* dedicated pot, and
 money can only leave when a quorum of members co-signs — never on one person's
 say-so. An AI treasurer answers "who hasn't paid?" in plain English.
@@ -21,7 +21,7 @@ people's money in their *personal* bank account with no tools and no records:
 - "Who has paid?" means scrolling WhatsApp screenshots against bank alerts.
 - Payouts happen on trust alone, with no record of who approved what.
 
-## What CampusPot does
+## What PotKeeper does
 
 1. **One pot per group.** Each group gets its own wallet + NUBAN through B Moni.
    Nobody's personal account is involved.
@@ -43,6 +43,7 @@ campuspot/
 │   │            AI, ledger, webhooks)
 │   ├── cmd/api          HTTP server entry point
 │   ├── cmd/seed         demo-data seeder
+│   ├── cmd/reset        wipes every table, then re-seeds (clean demo slate)
 │   ├── cmd/webhook-subscribe  registers the B Moni webhook subscription
 │   ├── common/          response envelope + money (kobo) helpers
 │   ├── config/          env-driven configuration
@@ -97,6 +98,9 @@ GOTOOLCHAIN=local go run ./cmd/api     # serves http://localhost:8080
 
 Health check: `curl http://localhost:8080/healthz` (or `/health`)
 
+To start over from zero at any time: `GOTOOLCHAIN=local go run ./cmd/reset`
+(wipe + re-seed) or `... ./cmd/reset -seed=false` for a blank database.
+
 > Prefer Postgres? `docker compose up -d db` then set `DB_DRIVER=postgres` and the
 > `DB_*` vars. See `backend/README.md`.
 
@@ -108,8 +112,10 @@ npm install
 npm run dev          # http://localhost:5173
 ```
 
-`.env` already points at `http://localhost:8080/api/v1`. The backend allows
-CORS from localhost origins, so the two talk out of the box.
+The API base is resolved at runtime: localhost talks to `http://localhost:8080/api/v1`
+automatically, so no `.env` is needed for local dev. In any other environment
+(e.g. Vercel) set `VITE_API_URL=https://your-api/api/v1`; if it is missing the
+app falls back to the deployed API, so a deploy still connects.
 
 ---
 
@@ -119,10 +125,10 @@ Password for all: **`password123`**
 
 | Role        | Email |
 |-------------|-------|
-| Treasurer   | `ada@campuspot.ng` |
-| Co-signer 1 | `tunde@campuspot.ng` |
-| Co-signer 2 | `ngozi@campuspot.ng` |
-| Members     | `chidi@`, `fatima@`, `emeka@`, `blessing@`, `seun@`, `halima@campuspot.ng` |
+| Treasurer   | `ada@potkeeper.ng` |
+| Co-signer 1 | `tunde@potkeeper.ng` |
+| Co-signer 2 | `ngozi@potkeeper.ng` |
+| Members     | `chidi@`, `fatima@`, `emeka@`, `blessing@`, `seun@`, `halima@potkeeper.ng` |
 
 ### 90-second demo script
 
@@ -174,7 +180,7 @@ All responses share the envelope `{ success, data, error, meta }`.
 
 ## B Moni integration
 
-Everything CampusPot needs from B Moni goes through one Go interface
+Everything PotKeeper needs from B Moni goes through one Go interface
 (`internal/bmoni.Client`). There are two implementations and a wrapper:
 
 - **`HTTPClient`** — the real Embedded API. Base URL is **origin-only**
@@ -191,7 +197,7 @@ Everything CampusPot needs from B Moni goes through one Go interface
 
 B Moni signs every delivery with the subscription's `secretKey`:
 `X-Webhook-Signature` is the hex HMAC-SHA256 of the **raw** request body (the
-`X-Webhook-Id` header equals the body `id`). CampusPot verifies it in constant
+`X-Webhook-Id` header equals the body `id`). PotKeeper verifies it in constant
 time, deduplicates on the event `id` (primary key), and returns `401` for a bad
 signature and `5xx` (never `4xx`) for transient failures so B Moni retries.
 
@@ -257,6 +263,9 @@ The app is built to run on free tiers: **Neon** (Postgres), **Render** (API),
     - `DATABASE_URL` — the Neon string from step 1.
     - `CORS_ORIGINS` — your Vercel URL, e.g. `https://campus-spot-six.vercel.app`.
     - `JWT_SECRET` is generated automatically.
+    - Optional `AUTO_SEED` (default `true`) — on a blank database the API
+      self-seeds the demo accounts on boot. Set `AUTO_SEED=false` for a truly
+      empty start with only the accounts you create yourself.
 4. Note the deployed API URL, e.g. `https://campuspot-api.onrender.com`.
 
 > If you create the service manually instead of via Blueprint, set **Runtime**
@@ -266,6 +275,23 @@ The app is built to run on free tiers: **Neon** (Postgres), **Render** (API),
 
 Optional: seed the demo data once with `go run ./cmd/seed` against the same
 `DATABASE_URL`.
+
+#### Resetting a deployed database
+
+To wipe Neon and start clean (e.g. an old demo left stale logins behind):
+
+1. **Wipe + re-seed in one command** against the Neon URL:
+   ```bash
+   cd backend
+   DATABASE_URL='postgres://…sslmode=require' GOTOOLCHAIN=local go run ./cmd/reset
+   ```
+   Add `-seed=false` to leave it empty. Then restart the Render service so the
+   API reconnects.
+2. Or, in the Neon **SQL Editor**: `DROP SCHEMA public CASCADE; CREATE SCHEMA public;`
+   and restart the API (it re-migrates on boot, and re-seeds if `AUTO_SEED` is on).
+
+Note: wiping the database does **not** log anyone out — the JWT lives in the
+browser's `localStorage`. Clear site data (or use a fresh session) to drop it.
 
 ### 3. Frontend — Vercel
 
@@ -284,5 +310,5 @@ Optional: seed the demo data once with `go run ./cmd/seed` against the same
 - SQLite is for local demos; production uses PostgreSQL.
 - This is a hackathon prototype, not a production financial product.
 
-© 2026 CampusPot · B Moni × TINC26
+© 2026 PotKeeper · B Moni × TINC26
 # CampusSpot

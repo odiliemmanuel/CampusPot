@@ -1,6 +1,6 @@
 # AI Disclosure
 
-CampusPot uses AI in one place: the **AI Treasurer** (`backend/internal/ai`).
+PotKeeper uses AI in one place: the **AI Treasurer** (`backend/internal/ai`).
 This document states exactly what it does, what it does not do, and how it
 behaves when no model is configured.
 
@@ -30,7 +30,7 @@ behaves when no model is configured.
 
 - When `AI_API_KEY` is set, the treasurer calls an **OpenAI-compatible chat
   completions endpoint** (`AI_BASE_URL`, `AI_MODEL`).
-- When `AI_API_KEY` is empty, CampusPot uses a **deterministic rule-based
+- When `AI_API_KEY` is empty, PotKeeper uses a **deterministic rule-based
   fallback** that answers the same outstanding/summary/reminder questions
   offline. Every feature works with the AI switched off.
 - The UI shows which mode is active (`AI: LLM` vs `AI: rule-based`).

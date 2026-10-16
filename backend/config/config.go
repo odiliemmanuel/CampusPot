@@ -1,5 +1,5 @@
 // Package config centralises every environment-driven setting for the
-// CampusPot backend. No package outside this one calls os.Getenv directly;
+// PotKeeper backend. No package outside this one calls os.Getenv directly;
 // everything receives a *Config instead.
 package config
 

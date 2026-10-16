@@ -1,4 +1,4 @@
-# Render Blueprint for the CampusPot API.
+# Render Blueprint for the PotKeeper API.
 #
 # Database is Neon (external) — no Render Postgres here. Set DATABASE_URL and
 # CORS_ORIGINS in the Render Dashboard after the first deploy (sync:false keeps
@@ -29,7 +29,7 @@ services:
       # Neon connection string: host + user + password + db (sslmode=require)
       - key: DATABASE_URL
         sync: false
-      # Your Vercel URL(s), comma-separated. The deployed CampusPot frontend:
+      # Your Vercel URL(s), comma-separated. The deployed PotKeeper frontend:
       # https://campus-spot-six.vercel.app
       - key: CORS_ORIGINS
         sync: false

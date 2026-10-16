@@ -1,4 +1,4 @@
-// Command api is the CampusPot backend entry point.
+// Command api is the PotKeeper backend entry point.
 //
 // It loads config, connects to PostgreSQL, runs auto-migration, wires the
 // B Moni client (real or mock), the treasurer engine, the AI treasurer, and
@@ -48,7 +48,7 @@ func main() {
 			if _, err := seed.Run(context.Background(), db, cfg); err != nil {
 				log.Printf("seed: auto-seed failed: %v", err)
 			} else {
-				log.Printf("seed: demo data ready (login ada@campuspot.ng / password123)")
+				log.Printf("seed: demo data ready (login ada@potkeeper.ng / password123)")
 			}
 		}
 	}

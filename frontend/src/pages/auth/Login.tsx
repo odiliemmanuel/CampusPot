@@ -30,7 +30,7 @@ export default function Login() {
   };
 
   const useDemo = () => {
-    setForm({ email: "ada@campuspot.ng", password: "password123" });
+    setForm({ email: "ada@potkeeper.ng", password: "password123" });
   };
 
   return (
@@ -88,7 +88,7 @@ export default function Login() {
         onClick={useDemo}
         className="mt-4 w-full text-center text-xs font-medium text-slate-400 hover:text-primary-600 transition"
       >
-        Use demo account (ada@campuspot.ng)
+        Use demo account (ada@potkeeper.ng)
       </button>
 
       <p className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">

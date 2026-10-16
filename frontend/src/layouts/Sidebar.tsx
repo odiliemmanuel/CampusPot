@@ -7,7 +7,7 @@ import {
 import { useGroup } from "../providers/GroupProvider";
 import GroupSwitcher from "./GroupSwitcher";
 
-// Sidebar navigation. Labels are CampusPot terms (not the design's logistics
+// Sidebar navigation. Labels are PotKeeper terms (not the design's logistics
 // wording): contributions, levies, payouts, members, the ledger and the AI
 // treasurer. Icons come from lucide-react.
 const navItems = [
@@ -62,7 +62,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           <HandCoins className="h-5 w-5 text-white" />
         </div>
         <div className="min-w-0">
-          <p className="font-sora text-lg font-bold leading-tight text-white">CampusPot</p>
+          <p className="font-sora text-lg font-bold leading-tight text-white">PotKeeper</p>
           <p className="truncate text-[11px] text-brand-200">One pot. Everyone can see it.</p>
         </div>
       </div>

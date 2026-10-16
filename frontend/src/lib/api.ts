@@ -1,4 +1,22 @@
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
+// Resolve the API base at runtime. Prefer VITE_API_URL when it was set at build
+// time; otherwise local dev talks to the local API and everywhere else falls
+// back to the deployed API. This makes a deploy work even when the Vercel env
+// var is missing, which previously showed "cannot connect to server".
+const PROD_API_URL = "https://campuspot-api.onrender.com/api/v1";
+
+function resolveApiUrl(): string {
+  const configured = import.meta.env.VITE_API_URL;
+  if (configured) return configured.replace(/\/$/, "");
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host === "localhost" || host === "127.0.0.1" || host === "[::1]") {
+      return "http://localhost:8080/api/v1";
+    }
+  }
+  return PROD_API_URL;
+}
+
+const API_URL = resolveApiUrl();
 
 const TOKEN_KEY = "campuspot_token";
 const USER_KEY = "campuspot_user";
@@ -32,7 +50,7 @@ export class ApiError extends Error {
   }
 }
 
-// Every CampusPot response is wrapped in { success, data, error, meta }.
+// Every PotKeeper response is wrapped in { success, data, error, meta }.
 interface Envelope<T> {
   success: boolean;
   data: T;
@@ -56,7 +74,7 @@ async function requestEnvelope<T>(
     res = await fetch(`${API_URL}${path}`, { ...options, headers });
   } catch {
     throw new ApiError(
-      "Can't reach the CampusPot server. Is the backend running on http://localhost:8080?",
+      "Can't reach the PotKeeper server. It may be waking up — please try again in a moment.",
       0,
       "NETWORK"
     );

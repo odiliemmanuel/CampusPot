@@ -1,6 +1,6 @@
-// Package bmoni is the CampusPot wrapper around the B Moni Embedded API.
+// Package bmoni is the PotKeeper wrapper around the B Moni Embedded API.
 //
-// Everything CampusPot needs from B Moni goes through the Client interface, so
+// Everything PotKeeper needs from B Moni goes through the Client interface, so
 // the rest of the app never talks HTTP directly. Two implementations exist:
 //
 //   - HTTPClient talks to the sandbox (or production) API.
@@ -12,7 +12,7 @@ package bmoni
 
 import "context"
 
-// Client is the full surface CampusPot uses from B Moni.
+// Client is the full surface PotKeeper uses from B Moni.
 type Client interface {
 	// Lifecycle: create the user and provision a smart wallet.
 	CreateUser(ctx context.Context, req CreateUserRequest) (User, error)

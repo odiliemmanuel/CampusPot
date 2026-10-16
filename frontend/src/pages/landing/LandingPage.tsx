@@ -19,14 +19,14 @@ const steps = [
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-canvas dark:bg-[#0b0c1a] transition-colors duration-300">
+    <div className="min-h-screen overflow-x-hidden bg-canvas dark:bg-[#0b0c1a] transition-colors duration-300">
       {/* Nav */}
       <header className="max-w-6xl mx-auto flex items-center justify-between px-6 py-6">
         <div className="flex items-center gap-2">
           <div className="w-9 h-9 rounded-xl bg-primary-600 flex items-center justify-center">
             <HandCoins className="w-5 h-5 text-white" />
           </div>
-          <span className="font-sora font-bold text-lg text-slate-900 dark:text-white">CampusPot</span>
+          <span className="font-sora font-bold text-lg text-slate-900 dark:text-white">PotKeeper</span>
         </div>
         <div className="flex items-center gap-3">
           <Link to="/login" className="text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-primary-600 px-4 py-2">
@@ -48,7 +48,7 @@ export default function LandingPage() {
             One pot. Everyone can see it. No one can run with it.
           </h1>
           <p className="mt-5 text-lg text-slate-500 dark:text-slate-400">
-            CampusPot gives Nigerian campus groups a shared wallet, an AI treasurer
+            PotKeeper gives Nigerian campus groups a shared wallet, an AI treasurer
             that answers "who hasn't paid?", and a 2-of-3 approval rule on every payout.
           </p>
           <div className="flex flex-wrap gap-3 mt-8">
@@ -148,7 +148,7 @@ export default function LandingPage() {
       {/* How it works */}
       <section className="max-w-6xl mx-auto px-6 py-16">
         <h2 className="font-sora text-3xl font-bold text-slate-900 dark:text-white text-center mb-12">
-          How CampusPot works
+          How PotKeeper works
         </h2>
         <div className="grid md:grid-cols-3 gap-6">
           {steps.map((s, i) => (
@@ -190,7 +190,7 @@ export default function LandingPage() {
           </div>
         </div>
         <p className="text-center text-sm text-slate-400 mt-8">
-          © 2026 CampusPot · B Moni x TINC26 · Sandbox & synthetic data only
+          © 2026 PotKeeper · B Moni x TINC26 · Sandbox & synthetic data only
         </p>
       </section>
     </div>

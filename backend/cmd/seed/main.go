@@ -39,7 +39,7 @@ func main() {
 	aiSvc := ai.NewService(db, res.Service, cfg)
 
 	fmt.Println()
-	fmt.Println("================ CampusPot demo seed ================")
+	fmt.Println("================ PotKeeper demo seed ================")
 	fmt.Printf("Group            : %s\n", res.Group.Name)
 	fmt.Printf("Group ID         : %s\n", res.Group.ID)
 	fmt.Printf("Join code        : %s\n", res.Group.JoinCode)

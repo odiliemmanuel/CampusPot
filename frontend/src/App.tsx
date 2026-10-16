@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import ThemeProvider from "./providers/ThemeProvider";
 import { GroupProvider } from "./providers/GroupProvider";
 import ProtectedRoute from "./components/ProtectedRoute";
-import ServerWakeBanner from "./components/ServerWakeBanner";
 
 import LandingPage from "./pages/landing/LandingPage";
 import SignUp from "./pages/auth/SignUp";
@@ -16,11 +15,11 @@ import Ledger from "./pages/ledger/Ledger";
 import Assistant from "./pages/assistant/Assistant";
 import Settings from "./pages/settings/Settings";
 import JoinPot from "./pages/join/JoinPot";
+import NewPot from "./pages/pots/NewPot";
 
 export default function App() {
   return (
     <ThemeProvider>
-      <ServerWakeBanner />
       <BrowserRouter>
         <GroupProvider>
           <Routes>
@@ -38,6 +37,9 @@ export default function App() {
             <Route path="/ledger" element={<ProtectedRoute><Ledger /></ProtectedRoute>} />
             <Route path="/assistant" element={<ProtectedRoute><Assistant /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+
+            {/* Start an additional pot (treasurers with existing pots) */}
+            <Route path="/pots/new" element={<ProtectedRoute><NewPot /></ProtectedRoute>} />
 
             {/* Join by code or scanned QR link */}
             <Route path="/join" element={<ProtectedRoute><JoinPot /></ProtectedRoute>} />

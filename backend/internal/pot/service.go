@@ -1,4 +1,4 @@
-// Package pot is the CampusPot "treasurer engine". It owns the shared pot:
+// Package pot is the PotKeeper "treasurer engine". It owns the shared pot:
 // groups, memberships, levies, payment reconciliation, the append-only ledger,
 // and rule-based spending with co-signer approvals.
 //

@@ -1,4 +1,4 @@
-// Package ai is CampusPot's "AI treasurer". It answers questions about a pot
+// Package ai is PotKeeper's "AI treasurer". It answers questions about a pot
 // in plain English or Pidgin, drafts member reminders, and narrates risk flags.
 //
 // Design rule: the AI only ever READS. It calls the pot engine's read-only

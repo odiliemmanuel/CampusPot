@@ -1,8 +1,8 @@
-# CampusPot
+# PotKeeper
 
 **An AI treasurer for campus group money.**
 
-CampusPot is a shared group wallet with a safety rail: money can only leave the
+PotKeeper is a shared group wallet with a safety rail: money can only leave the
 pot when a quorum of co-signers approves it, and an AI treasurer answers the
 questions every class rep and society treasurer gets asked a hundred times a
 week — *"Who hasn't paid?"*, *"How much do we have left?"*, *"Can we afford
@@ -32,7 +32,7 @@ problems:
   approved what.
 - When the semester ends, there is **no clean statement** to hand over.
 
-CampusPot gives that person a real account for the group, automatic payment
+PotKeeper gives that person a real account for the group, automatic payment
 reconciliation, and an assistant that does the awkward asking — while making it
 *structurally impossible* for any single person (including the AI) to move
 money alone.
@@ -42,14 +42,14 @@ money alone.
 ## What it does
 
 ### 1. A real home for the money
-When a treasurer creates a pot, CampusPot provisions a **B Moni smart wallet**
+When a treasurer creates a pot, PotKeeper provisions a **B Moni smart wallet**
 plus a dedicated **Naira virtual account (NUBAN)**. Members pay into that
 account the way they already pay anyone — a normal bank transfer. The money is
 never mixed with anyone's personal account.
 
 ### 2. Automatic reconciliation
 Every member gets a **unique payment reference**. When an incoming transfer
-arrives (via B Moni's deposit webhook, or a manual entry for cash), CampusPot
+arrives (via B Moni's deposit webhook, or a manual entry for cash), PotKeeper
 matches it to the member who owes, updates the ledger, and flips their status
 from `unpaid` → `partial` → `paid`. Unmatched payments are still banked and
 flagged for review — no money is ever lost.
@@ -58,7 +58,7 @@ flagged for review — no money is ever lost.
 Ask in plain language and get answers grounded in the ledger:
 
 > **Treasurer:** Who hasn't paid the excursion levy?
-> **CampusPot:** 3 member(s) still owing on "Excursion levy" (₦5,000.00 each):
+> **PotKeeper:** 3 member(s) still owing on "Excursion levy" (₦5,000.00 each):
 > Chidi Nwosu (₦5,000.00, unpaid), Fatima Yusuf (₦3,000.00, partial), …
 > Total outstanding: ₦13,000.00.
 
@@ -135,9 +135,9 @@ flagged high-risk).
 
 | Role        | Email                                             |
 | ----------- | ------------------------------------------------- |
-| Treasurer   | `ada@campuspot.ng`                                 |
-| Co-signer 1 | `tunde@campuspot.ng`                               |
-| Co-signer 2 | `ngozi@campuspot.ng`                               |
+| Treasurer   | `ada@potkeeper.ng`                                 |
+| Co-signer 1 | `tunde@potkeeper.ng`                               |
+| Co-signer 2 | `ngozi@potkeeper.ng`                               |
 | Members     | `chidi@…`, `fatima@…`, `emeka@…`, `blessing@…`, …  |
 
 ### Quickstart with PostgreSQL (production path)
@@ -275,7 +275,7 @@ classification.
 
 ## B Moni integration
 
-CampusPot uses the B Moni Embedded API (sandbox):
+PotKeeper uses the B Moni Embedded API (sandbox):
 
 - `POST /v1/users` — provision a user, returns `bmoniUserId`.
 - `POST /v1/smart-wallets/create-managed` — create the CNGN smart wallet.
