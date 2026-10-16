@@ -290,6 +290,8 @@ export interface WalletOverview {
   balanceKobo: number;
   bmoniUserId?: string;
   transactions: WalletTransaction[];
+  /** False when this deployment predates the wallet endpoints (404 fallback). */
+  ready?: boolean;
 }
 
 export interface AnswerResponse {
@@ -419,7 +421,19 @@ export const sendReminder = (groupId: string, reminderId: string) =>
 
 // ---------- Wallet ----------
 
-export const getWallet = () => request<WalletOverview>("/wallet");
+export const getWallet = async (): Promise<WalletOverview> => {
+  try {
+    return await request<WalletOverview>("/wallet");
+  } catch (err) {
+    // A 404 means this deployment is older than the wallet endpoints. Don't
+    // hard-fail the Balance page — show an empty wallet and let the rest of
+    // the page work until the backend is redeployed.
+    if (err instanceof ApiError && err.status === 404) {
+      return { balanceKobo: 0, transactions: [], ready: false };
+    }
+    throw err;
+  }
+};
 
 export const walletDeposit = (amountKobo: number, reference = "", note = "") =>
   request<WalletOverview>("/wallet/deposit", {

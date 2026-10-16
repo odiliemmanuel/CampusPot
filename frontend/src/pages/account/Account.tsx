@@ -412,6 +412,7 @@ function WalletHome() {
   const balance = wallet?.balanceKobo ?? 0;
   const txs = wallet?.transactions ?? [];
   const funded = txs.some((t) => t.kind === "deposit" || t.kind === "transfer_in");
+  const walletReady = wallet?.ready !== false;
 
   if (loading) {
     return <div className="flex justify-center py-24"><Loader2 className="h-6 w-6 animate-spin text-[#AF01AF]" /></div>;
@@ -423,6 +424,12 @@ function WalletHome() {
       <h1 className="mb-3 font-sora text-lg font-bold text-slate-900 sm:text-2xl dark:text-white">
         Hi{(me?.name ?? "").trim() ? `, ${me!.name.split(" ")[0]}` : ""} 👋
       </h1>
+
+      {!walletReady && (
+        <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
+          Wallet service is still deploying on the server. Balances and add/send/pay will activate once the backend finishes deploying.
+        </div>
+      )}
 
       {/* Compact wallet card — B Moni palette */}
       <div className={`relative overflow-hidden rounded-3xl p-5 text-white shadow-lg shadow-[#AF01AF]/25 ${BMONI}`}>
@@ -436,7 +443,7 @@ function WalletHome() {
           </div>
           <p className="mt-1 font-sora text-3xl font-extrabold tracking-tight">{money(balance)}</p>
 
-          <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className={`mt-3 grid grid-cols-3 gap-2 ${walletReady ? "" : "pointer-events-none opacity-50"}`}>
             <button type="button" onClick={() => setSheet("add")} className="flex flex-col items-center gap-1 rounded-2xl bg-white/15 py-2.5 text-[11px] font-semibold backdrop-blur transition active:scale-95 hover:bg-white/25">
               <Plus className="h-4 w-4" /> Add money
             </button>
@@ -451,7 +458,7 @@ function WalletHome() {
       </div>
 
       {/* Secondary actions — consistent tiles */}
-      <div className="mt-3 grid grid-cols-4 gap-2 sm:gap-3">
+      <div className={`mt-3 grid grid-cols-4 gap-2 sm:gap-3 ${walletReady ? "" : "pointer-events-none opacity-50"}`}>
         <QuickAction icon={<Banknote className="h-5 w-5" />} label="Add money" onClick={() => setSheet("add")} />
         <QuickAction icon={<Send className="h-4 w-4" />} label="Send" onClick={() => setSheet("send")} />
         <QuickAction icon={<QrCode className="h-4 w-4" />} label="Join pot" to="/join" />
@@ -512,7 +519,7 @@ function WalletHome() {
             })}
           </ul>
         )}
-        {!funded && (
+        {!funded && walletReady && (
           <button
             type="button"
             onClick={() => setSheet("add")}
