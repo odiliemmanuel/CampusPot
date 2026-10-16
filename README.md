@@ -61,7 +61,7 @@ campuspot/
         ├── providers/       theme + active-group context
         ├── layouts/         AppShell (sidebar), AuthLayout
         ├── components/      GroupGate (onboarding), ProtectedRoute
-        └── pages/           landing, auth, dashboard, contributions,
+        └── pages/           pots (list + per-pot dashboard), contributions,
                              levies, expenses, members, ledger, assistant,
                              settings
 ```

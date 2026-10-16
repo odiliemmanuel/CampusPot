@@ -46,7 +46,7 @@ export default function JoinPot() {
         setGroupName(group.name);
         setStatus("done");
         redirectRef.current = window.setTimeout(
-          () => navigate("/dashboard", { replace: true }),
+          () => navigate("/pots", { replace: true }),
           900
         );
       } catch (err) {
@@ -89,10 +89,10 @@ export default function JoinPot() {
               <CheckCircle2 className="h-9 w-9 text-emerald-500" />
               <p className="font-sora text-lg font-bold text-slate-900">You're in!</p>
               <p className="text-sm text-slate-500">
-                Joined <span className="font-semibold text-slate-700">{groupName}</span>. Taking you to the dashboard…
+                Joined <span className="font-semibold text-slate-700">{groupName}</span>. Taking you to your pots…
               </p>
               <Link
-                to="/dashboard"
+                to="/pots"
                 className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-600 hover:underline"
               >
                 Go now <ArrowRight className="h-4 w-4" />

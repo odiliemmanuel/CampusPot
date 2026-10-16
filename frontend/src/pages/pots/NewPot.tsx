@@ -29,7 +29,7 @@ export default function NewPot() {
       const group = await createGroup(name, 2, 3, nairaToKobo(nairaInput));
       await refresh();
       setActiveGroupById(group.id);
-      navigate("/dashboard", { replace: true });
+      navigate(`/pots/${group.id}`, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create the pot.");
     } finally {

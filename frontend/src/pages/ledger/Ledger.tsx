@@ -9,10 +9,8 @@ import { listLedger, type LedgerEntry } from "../../lib/api";
 import { formatNaira } from "../../lib/format";
 
 const kindLabel: Record<string, string> = {
-  deposit: "Deposit",
-  manual_payment: "Cash payment",
-  expense: "Payout",
-  reversal: "Reversal",
+  credit: "Deposit",
+  debit: "Payout",
   opening: "Opening balance",
 };
 
@@ -36,7 +34,7 @@ function LedgerInner() {
     return <div className="flex justify-center py-24"><Loader2 className="w-6 h-6 text-primary-600 animate-spin" /></div>;
   }
 
-  const latestBalance = ledger.length > 0 ? ledger[0].balanceAfterKobo : 0;
+  const latestBalance = ledger.length > 0 ? ledger[ledger.length - 1].balanceAfterKobo : 0;
 
   return (
     <>

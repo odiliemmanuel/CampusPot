@@ -1,17 +1,15 @@
 import { Link, NavLink } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  ArrowRight, HandCoins, LayoutDashboard, Receipt, ScrollText, Send,
+  ArrowRight, HandCoins, PiggyBank, Receipt, ScrollText, Send,
   Settings, Sparkles, Users, X,
 } from "lucide-react";
-import { useGroup } from "../providers/GroupProvider";
-import GroupSwitcher from "./GroupSwitcher";
 
-// Sidebar navigation. Labels are PotKeeper terms (not the design's logistics
-// wording): contributions, levies, payouts, members, the ledger and the AI
-// treasurer. Icons come from lucide-react.
+// Sidebar navigation. "Pots" lists every pot as a card; opening one shows that
+// pot's own dashboard and scopes the rest of the app to it. Icons from
+// lucide-react.
 const navItems = [
-  { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  { to: "/pots", icon: PiggyBank, label: "Pots" },
   { to: "/contributions", icon: HandCoins, label: "Contributions" },
   { to: "/levies", icon: Receipt, label: "Levies" },
   { to: "/expenses", icon: Send, label: "Payouts" },
@@ -52,8 +50,6 @@ function PromoCard({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
-  const { groups } = useGroup();
-
   return (
     <div className="flex h-full flex-col">
       {/* Logo + tagline */}
@@ -67,13 +63,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </div>
       </div>
 
-      {groups.length > 0 && (
-        <div className="mt-6">
-          <GroupSwitcher onNavigate={onNavigate} />
-        </div>
-      )}
-
-      <nav className="mt-5 flex flex-col gap-1" aria-label="Primary">
+      <nav className="mt-6 flex flex-col gap-1" aria-label="Primary">
         {navItems.map((item) => (
           <NavLink key={item.to} to={item.to} onClick={onNavigate} className={navClass}>
             <item.icon className="h-4 w-4 shrink-0" />

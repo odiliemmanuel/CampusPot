@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import ThemeProvider from "./providers/ThemeProvider";
 import { GroupProvider } from "./providers/GroupProvider";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -6,7 +6,8 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import LandingPage from "./pages/landing/LandingPage";
 import SignUp from "./pages/auth/SignUp";
 import Login from "./pages/auth/Login";
-import Dashboard from "./pages/dashboard/Dashboard";
+import Pots from "./pages/pots/Pots";
+import PotDashboard from "./pages/pots/PotDashboard";
 import Contributions from "./pages/contributions/Contributions";
 import Levies from "./pages/levies/Levies";
 import Expenses from "./pages/expenses/Expenses";
@@ -29,7 +30,9 @@ export default function App() {
             <Route path="/login" element={<Login />} />
 
             {/* Authenticated — redirects to /login if there's no session */}
-            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/pots" element={<ProtectedRoute><Pots /></ProtectedRoute>} />
+            <Route path="/pots/new" element={<ProtectedRoute><NewPot /></ProtectedRoute>} />
+            <Route path="/pots/:id" element={<ProtectedRoute><PotDashboard /></ProtectedRoute>} />
             <Route path="/contributions" element={<ProtectedRoute><Contributions /></ProtectedRoute>} />
             <Route path="/levies" element={<ProtectedRoute><Levies /></ProtectedRoute>} />
             <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
@@ -38,8 +41,8 @@ export default function App() {
             <Route path="/assistant" element={<ProtectedRoute><Assistant /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
-            {/* Start an additional pot (treasurers with existing pots) */}
-            <Route path="/pots/new" element={<ProtectedRoute><NewPot /></ProtectedRoute>} />
+            {/* The old dashboard now lives per pot. */}
+            <Route path="/dashboard" element={<Navigate to="/pots" replace />} />
 
             {/* Join by code or scanned QR link */}
             <Route path="/join" element={<ProtectedRoute><JoinPot /></ProtectedRoute>} />
