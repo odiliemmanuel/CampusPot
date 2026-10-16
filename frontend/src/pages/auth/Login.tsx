@@ -3,12 +3,13 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import AuthLayout from "../../layouts/AuthLayout";
 import { login, setSession } from "../../lib/api";
+import { homeRoute } from "../../lib/device";
 
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   // Where to go after login — set by ProtectedRoute (e.g. a scanned join link).
-  const from = (location.state as { from?: string } | null)?.from ?? "/pots";
+  const from = (location.state as { from?: string } | null)?.from ?? homeRoute();
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);

@@ -25,14 +25,14 @@ export default function MobileNav() {
       aria-label="Primary"
     >
       <div className="mx-auto grid max-w-md grid-cols-4 items-center px-2 py-1.5">
+        <NavLink to="/account" className={itemClass(balanceActive)}>
+          <Wallet className="h-5 w-5" />
+          Wallet
+        </NavLink>
+
         <NavLink to="/pots" className={itemClass(potsActive)}>
           <LayoutGrid className="h-5 w-5" />
           Pots
-        </NavLink>
-
-        <NavLink to="/account" className={itemClass(balanceActive)}>
-          <Wallet className="h-5 w-5" />
-          Balance
         </NavLink>
 
         <button

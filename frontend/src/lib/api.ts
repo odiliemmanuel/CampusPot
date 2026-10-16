@@ -250,6 +250,7 @@ export interface PotMembership {
   virtualAccountNumber?: string;
   virtualAccountBank?: string;
   virtualAccountName?: string;
+  bmoniWalletAddress?: string;
 }
 
 export interface MyTransaction {
@@ -441,6 +442,7 @@ async function localAccountOverview(): Promise<AccountOverview> {
       virtualAccountNumber: g.virtualAccountNumber,
       virtualAccountBank: g.virtualAccountBank,
       virtualAccountName: g.virtualAccountName,
+      bmoniWalletAddress: g.bmoniWalletAddress,
     });
 
     totalContributedKobo += paidKobo;

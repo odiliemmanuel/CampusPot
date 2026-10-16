@@ -31,6 +31,7 @@ type PotMembership struct {
 	VirtualAccountNumber string `json:"virtualAccountNumber,omitempty"`
 	VirtualAccountBank   string `json:"virtualAccountBank,omitempty"`
 	VirtualAccountName   string `json:"virtualAccountName,omitempty"`
+	BMoniWalletAddress   string `json:"bmoniWalletAddress,omitempty"`
 }
 
 // MyTransaction is one of the user's own deposits across every pot.
@@ -80,6 +81,7 @@ func (s *Service) AccountOverview(ctx context.Context, userID uuid.UUID) (*Accou
 			VirtualAccountNumber: group.VirtualAccountNumber,
 			VirtualAccountBank:   group.VirtualAccountBank,
 			VirtualAccountName:   group.VirtualAccountName,
+			BMoniWalletAddress:   group.BMoniWalletAddress,
 		}
 		if bal, err := s.Balance(ctx, group.ID); err == nil {
 			pot.BalanceKobo = bal
