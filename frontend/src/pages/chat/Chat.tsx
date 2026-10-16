@@ -97,7 +97,7 @@ function ChatRoom({ groupId, groupName }: { groupId: string; groupName: string }
   };
 
   return (
-    <div className="flex h-[calc(100dvh-9rem)] min-h-[440px] flex-col overflow-hidden rounded-3xl border border-slate-100 bg-white dark:border-white/10 dark:bg-panel-dark">
+    <div className="fixed inset-x-0 bottom-16 top-[3.75rem] z-20 flex flex-col overflow-hidden border-slate-100 bg-white lg:bottom-0 lg:left-60 dark:border-white/10 dark:bg-panel-dark">
       <div className="flex items-center gap-3 border-b border-slate-100 px-3 py-3 dark:border-white/10">
         <Link
           to={`/pots/${id}`}
