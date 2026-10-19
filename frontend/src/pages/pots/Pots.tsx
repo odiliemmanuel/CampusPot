@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { ChevronRight, Loader2, PiggyBank, Plus } from "lucide-react";
 
 import AppShell from "../../layouts/AppShell";
-import GroupGate from "../../components/GroupGate";
 import PageHeader from "../../components/PageHeader";
 import { useGroup } from "../../providers/GroupProvider";
 import { getSummary, type Group, type GroupSummary } from "../../lib/api";
@@ -103,6 +102,18 @@ function PotsGrid() {
         }
       />
 
+      {groups.length === 0 ? (
+        <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center dark:border-white/10 dark:bg-panel-dark">
+          <PiggyBank className="mx-auto mb-3 h-8 w-8 text-slate-300" />
+          <h2 className="font-semibold text-slate-800 dark:text-white">No pots yet</h2>
+          <p className="mt-1 text-sm text-slate-500">Create a pot or join one with a code from its treasurer.</p>
+          <div className="mt-4 flex justify-center gap-2">
+            <Link to="/pots/new" className="cp-btn-primary text-sm"><Plus className="h-4 w-4" /> Create a pot</Link>
+            <Link to="/join" className="inline-flex items-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-white/15 dark:text-slate-200">Join a pot</Link>
+          </div>
+        </div>
+      ) : (
+
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {groups.map((group) => (
           <PotCard
@@ -120,6 +131,7 @@ function PotsGrid() {
           <Plus className="h-4 w-4" /> Create a pot
         </Link>
       </div>
+      )}
     </>
   );
 }
@@ -127,9 +139,7 @@ function PotsGrid() {
 export default function Pots() {
   return (
     <AppShell>
-      <GroupGate>
-        <PotsGrid />
-      </GroupGate>
+      <PotsGrid />
     </AppShell>
   );
 }
