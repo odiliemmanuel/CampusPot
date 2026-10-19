@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -17,6 +18,9 @@ import (
 // CreateGroupRequest is the body for creating a pot.
 type CreateGroupRequest struct {
 	Name              string `json:"name" binding:"required,min=2"`
+	PotType           string `json:"potType"` // goal | rotating
+	ContributionFrequency string `json:"contributionFrequency"` // one_time | daily | weekly | monthly | quarterly
+	ContributionDueDate *FlexTime `json:"contributionDueDate"`
 	ApprovalThreshold int    `json:"approvalThreshold"` // defaults to 2
 	ApprovalTotal     int    `json:"approvalTotal"`     // defaults to 3
 	LargeExpenseKobo  int64  `json:"largeExpenseKobo"`  // 0 = no soft limit
@@ -36,6 +40,37 @@ func (s *Service) CreateGroup(ctx context.Context, treasurerID uuid.UUID, req Cr
 	if req.ApprovalThreshold <= 0 {
 		req.ApprovalThreshold = 2
 	}
+	if req.PotType == "" {
+		req.PotType = "goal"
+	}
+	if req.PotType != "goal" && req.PotType != "rotating" {
+		return nil, fmt.Errorf("%w: pot type must be goal or rotating", ErrInvalid)
+	}
+	if req.ContributionFrequency == "" {
+		if req.PotType == "goal" {
+			req.ContributionFrequency = "one_time"
+		} else {
+			req.ContributionFrequency = "weekly"
+		}
+	}
+	validFrequency := map[string]bool{"one_time": true, "daily": true, "weekly": true, "monthly": true, "quarterly": true}
+	if !validFrequency[req.ContributionFrequency] || (req.PotType == "goal" && req.ContributionFrequency != "one_time") || (req.PotType == "rotating" && req.ContributionFrequency == "one_time") {
+		return nil, fmt.Errorf("%w: contribution frequency does not match pot type", ErrInvalid)
+	}
+	if req.PerMemberKobo <= 0 {
+		return nil, fmt.Errorf("%w: contribution amount must be greater than zero", ErrInvalid)
+	}
+	var contributionDueDate *time.Time
+	if req.ContributionDueDate != nil && !req.ContributionDueDate.Time().IsZero() {
+		due := req.ContributionDueDate.Time()
+		contributionDueDate = &due
+	}
+	if contributionDueDate == nil {
+		return nil, fmt.Errorf("%w: contribution deadline is required", ErrInvalid)
+	}
+	if contributionDueDate.UTC().Format("2006-01-02") < s.now().UTC().Format("2006-01-02") {
+		return nil, fmt.Errorf("%w: contribution deadline must be today or later", ErrInvalid)
+	}
 	if req.ApprovalTotal <= 0 {
 		req.ApprovalTotal = 3
 	}
@@ -45,6 +80,10 @@ func (s *Service) CreateGroup(ctx context.Context, treasurerID uuid.UUID, req Cr
 
 	group := &models.Group{
 		Name:              req.Name,
+		PotType:           req.PotType,
+		ContributionFrequency: req.ContributionFrequency,
+		ContributionAmountKobo: req.PerMemberKobo,
+		ContributionDueDate: contributionDueDate,
 		Currency:          "NGN",
 		CreatedBy:         treasurerID,
 		ApprovalThreshold: req.ApprovalThreshold,
@@ -96,6 +135,7 @@ func (s *Service) CreateGroup(ctx context.Context, treasurerID uuid.UUID, req Cr
 			AmountKobo: req.PerMemberKobo,
 			Status:     "open",
 			CreatedBy:  treasurerID,
+			DueDate:    contributionDueDate,
 		}
 		if err := s.db.Create(levy).Error; err != nil {
 			return nil, err

@@ -54,7 +54,7 @@ func (s *Service) WalletDeposit(_ context.Context, userID uuid.UUID, req WalletD
 		if err := creditWallet(tx, userID, req.AmountKobo); err != nil {
 			return err
 		}
-		return tx.Create(&models.WalletTransaction{
+		if err := tx.Create(&models.WalletTransaction{
 			UserID:       userID,
 			Kind:         models.WalletDeposit,
 			AmountKobo:   req.AmountKobo,
@@ -235,7 +235,8 @@ func (s *Service) WalletPayPot(_ context.Context, userID uuid.UUID, req WalletPa
 			GroupID:      &req.GroupID,
 			LevyID:       levyID,
 			Note:         levy.Title,
-		}).Error
+		}).Error; err != nil { return err }
+		return s.advanceRecurringContributionTx(tx, req.GroupID, levy.ID)
 	})
 	if err != nil {
 		return nil, err

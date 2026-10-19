@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -156,7 +157,78 @@ func (s *Service) reconcileTx(tx *gorm.DB, ev *DepositEvent, out *models.Payment
 		return err
 	}
 	*out = payment
+	if payment.LevyID != nil {
+		if err := s.advanceRecurringContributionTx(tx, payment.GroupID, *payment.LevyID); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+// advanceRecurringContributionTx closes a fully-paid rotating contribution
+// cycle and opens the next one. Payouts remain manual and use the normal
+// treasurer approval process.
+func (s *Service) advanceRecurringContributionTx(tx *gorm.DB, groupID, levyID uuid.UUID) error {
+	var group models.Group
+	if err := tx.First(&group, "id = ?", groupID).Error; err != nil { return err }
+	if group.PotType != "rotating" {
+		return nil
+	}
+	var levy models.Levy
+	if err := tx.First(&levy, "id = ? AND group_id = ?", levyID, groupID).Error; err != nil {
+		return err
+	}
+	if levy.Status != "open" {
+		return nil
+	}
+	var members []models.Membership
+	if err := tx.Where("group_id = ? AND status = ?", groupID, models.MembershipActive).Order("joined_at ASC, created_at ASC").Find(&members).Error; err != nil {
+		return err
+	}
+	if len(members) == 0 {
+		return nil
+	}
+	for _, member := range members {
+		paid, err := paidByUserTx(tx, groupID, levyID, member.UserID)
+		if err != nil { return err }
+		if paid < levy.AmountKobo { return nil }
+	}
+	closed := tx.Model(&levy).Where("status = ?", "open").Update("status", "closed")
+	if closed.Error != nil {
+		return closed.Error
+	}
+	if closed.RowsAffected == 0 {
+		return nil
+	}
+	var nextDue time.Time
+	if levy.DueDate != nil { nextDue = *levy.DueDate } else { nextDue = s.now() }
+	switch group.ContributionFrequency {
+	case "daily":
+		nextDue = nextDue.AddDate(0, 0, 1)
+	case "weekly":
+		nextDue = nextDue.AddDate(0, 0, 7)
+	case "monthly":
+		nextDue = addMonthsClamped(nextDue, 1)
+	case "quarterly":
+		nextDue = addMonthsClamped(nextDue, 3)
+	default:
+		return nil
+	}
+	amount := group.ContributionAmountKobo
+	if amount <= 0 { amount = levy.AmountKobo }
+	next := &models.Levy{GroupID: groupID, Title: levy.Title, AmountKobo: amount, DueDate: &nextDue, Status: "open", CreatedBy: group.CreatedBy}
+	if err := tx.Create(next).Error; err != nil { return err }
+	return tx.Model(&group).Update("contribution_due_date", nextDue).Error
+}
+
+func addMonthsClamped(date time.Time, months int) time.Time {
+	firstOfTarget := time.Date(date.Year(), date.Month()+time.Month(months), 1, date.Hour(), date.Minute(), date.Second(), date.Nanosecond(), date.Location())
+	lastDay := time.Date(firstOfTarget.Year(), firstOfTarget.Month()+1, 0, date.Hour(), date.Minute(), date.Second(), date.Nanosecond(), date.Location()).Day()
+	day := date.Day()
+	if day > lastDay {
+		day = lastDay
+	}
+	return time.Date(firstOfTarget.Year(), firstOfTarget.Month(), day, date.Hour(), date.Minute(), date.Second(), date.Nanosecond(), date.Location())
 }
 
 // paidByUserTx sums a member's matched/partial payments toward one levy.

@@ -19,6 +19,9 @@ export default function NewPot() {
 
   const [name, setName] = useState("");
   const [nairaInput, setNairaInput] = useState("");
+  const [potType, setPotType] = useState<"goal" | "rotating">("goal");
+  const [frequency, setFrequency] = useState<"daily" | "weekly" | "monthly" | "quarterly">("weekly");
+  const [dueDate, setDueDate] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -27,7 +30,11 @@ export default function NewPot() {
     setError("");
     setBusy(true);
     try {
-      const group = await createGroup(name, 2, 3, 0, nairaToKobo(nairaInput));
+      const group = await createGroup(name, 2, 3, 0, nairaToKobo(nairaInput), {
+        potType,
+        contributionFrequency: potType === "goal" ? "one_time" : frequency,
+        contributionDueDate: dueDate,
+      });
       await refresh();
       setActiveGroupById(group.id);
       navigate(`/pots/${group.id}`, { replace: true });
@@ -59,7 +66,7 @@ export default function NewPot() {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
             <div>
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Pot name</label>
               <input
@@ -70,21 +77,45 @@ export default function NewPot() {
                 className="cp-input mt-1.5"
               />
             </div>
+            <fieldset>
+              <legend className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Pot type</legend>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => setPotType("goal")} className={`rounded-xl border p-3 text-left transition ${potType === "goal" ? "border-violet-500 bg-violet-50 text-violet-800 dark:bg-violet-500/10 dark:text-violet-200" : "border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"}`}>
+                  <span className="block text-sm font-semibold">Goal pot</span><span className="mt-0.5 block text-[11px] opacity-75">One-time contributions</span>
+                </button>
+                <button type="button" onClick={() => setPotType("rotating")} className={`rounded-xl border p-3 text-left transition ${potType === "rotating" ? "border-violet-500 bg-violet-50 text-violet-800 dark:bg-violet-500/10 dark:text-violet-200" : "border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"}`}>
+                  <span className="block text-sm font-semibold">Rotating pot</span><span className="mt-0.5 block text-[11px] opacity-75">Recurring contributions</span>
+                </button>
+              </div>
+            </fieldset>
             <div>
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                Amount each member pays (₦)
+                {potType === "goal" ? "One-time amount per member (₦)" : "Amount per member, each cycle (₦)"}
               </label>
               <input
                 required
+                type="number"
+                min="1"
+                step="1"
                 value={nairaInput}
                 onChange={(e) => setNairaInput(e.target.value)}
                 placeholder="e.g. 5000"
                 inputMode="numeric"
                 className="cp-input mt-1.5"
               />
-              <p className="text-xs text-slate-400 mt-1">
-                The pot's target is this amount × the number of members who join.
-              </p>
+              {potType === "rotating" ? (
+                <label className="mt-3 block text-sm font-medium text-slate-700 dark:text-slate-300">Contribution and payout cycle
+                  <select value={frequency} onChange={(e) => setFrequency(e.target.value as typeof frequency)} className="cp-input mt-1">
+                    <option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="quarterly">Every 3 months</option>
+                  </select>
+                </label>
+              ) : <p className="mt-1 text-xs text-slate-400">The target is this amount × the number of members.</p>}
+              {potType === "rotating" && <p className="mt-1 text-xs text-slate-400">When everyone has contributed, the next cycle opens automatically. Payouts stay manual and follow this pot’s approval rules.</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Contributions due by</label>
+              <input required type="date" min={new Date().toLocaleDateString("en-CA")} value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="cp-input mt-1" />
+              <p className="mt-1 text-xs text-slate-400">Set the firm deadline for this contribution cycle.</p>
             </div>
             {error && <p className="text-sm text-violet-600">{error}</p>}
             <button type="submit" disabled={busy} className="cp-btn-primary w-full">

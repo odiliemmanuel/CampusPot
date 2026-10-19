@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import {
-  AlertTriangle, ArrowDownLeft, CheckCircle2, Loader2, Lock, ShieldAlert, Wallet,
+  AlertTriangle, ArrowDownLeft, CheckCircle2, Loader2, Lock, ShieldAlert, Wallet, Send,
 } from "lucide-react";
 
 import DataTable, { type Column } from "../../components/DataTable";
 import Pagination from "../../components/Pagination";
 import { useGroup } from "../../providers/GroupProvider";
 import {
-  getOutstanding, getStoredUser, getSummary, listMembers, listPayments,
+  getOutstanding, getStoredUser, getSummary, listMembers, listPayments, listExpenses,
   listDisputes, raiseDispute, resolveDispute,
-  type Dispute, type Membership, type OutstandingMember, type Payment, type GroupSummary,
+  type Dispute, type Membership, type OutstandingMember, type Payment, type GroupSummary, type ExpenseRequest,
 } from "../../lib/api";
 import { formatNaira } from "../../lib/format";
 
@@ -24,6 +24,7 @@ export default function PotDashboard() {
 
   const [summary, setSummary] = useState<GroupSummary | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [expenses, setExpenses] = useState<ExpenseRequest[]>([]);
   const [outstanding, setOutstanding] = useState<OutstandingMember[]>([]);
   const [members, setMembers] = useState<Membership[]>([]);
   const [disputes, setDisputes] = useState<Dispute[]>([]);
@@ -51,14 +52,16 @@ export default function PotDashboard() {
     Promise.all([
       getSummary(id),
       listPayments(id),
+      listExpenses(id).catch(() => [] as ExpenseRequest[]),
       listMembers(id).catch(() => [] as Membership[]),
       getOutstanding(id).catch(() => ({ members: [] as OutstandingMember[], levy: null })),
       listDisputes(id).catch(() => [] as Dispute[]),
     ])
-      .then(([s, p, m, o, d]) => {
+      .then(([s, p, e, m, o, d]) => {
         if (!alive) return;
         setSummary(s);
         setPayments(p);
+        setExpenses(e);
         setMembers(m);
         setOutstanding(o.members);
         setDisputes(d);
@@ -267,6 +270,7 @@ export default function PotDashboard() {
             </h2>
           </div>
           <div className="flex items-center gap-2">
+            <Link to={`/pots/${id}/members`} className="rounded-lg px-2 py-1.5 text-[11px] font-semibold text-violet-700 hover:bg-violet-50 dark:text-violet-300 dark:hover:bg-white/5 sm:text-xs">See members</Link>
             {!canManage && (
               <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400">
                 <Lock className="w-3 h-3" /> amounts hidden
@@ -292,6 +296,14 @@ export default function PotDashboard() {
             onPageSizeChange={setPageSize}
           />
         </div>
+      </section>
+
+      <section className="mt-3 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-panel-dark sm:mt-4 sm:p-4">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-200"><Send className="h-4 w-4" /></span><h2 className="text-sm font-semibold text-slate-900 dark:text-white">Recent payouts</h2></div>
+          <Link to={`/pots/${id}/payouts`} className="shrink-0 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-violet-700 hover:bg-violet-50 dark:text-violet-300 dark:hover:bg-white/5 sm:text-xs">See all</Link>
+        </div>
+        {expenses.length === 0 ? <p className="px-1 py-1 text-xs text-slate-400">No payouts yet.</p> : <div className="divide-y divide-slate-100 dark:divide-white/5">{expenses.slice(0, 3).map((expense) => <div key={expense.id} className="flex items-center justify-between gap-2 py-2"><div className="min-w-0"><p className="truncate text-xs font-medium text-slate-700 dark:text-slate-200">{expense.destination}</p><p className="text-[10px] capitalize text-slate-400">{expense.status.replace("_", " ")}</p></div><span className="shrink-0 text-xs font-semibold text-violet-700 dark:text-violet-300">{formatNaira(expense.amountKobo)}</span></div>)}</div>}
       </section>
     </>
   );

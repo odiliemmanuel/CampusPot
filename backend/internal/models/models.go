@@ -95,6 +95,10 @@ type Group struct {
 	JoinCode  string    `gorm:"uniqueIndex;not null" json:"joinCode"`
 	Currency  string    `gorm:"not null;default:NGN" json:"currency"`
 	CreatedBy uuid.UUID `gorm:"type:uuid;index" json:"createdBy"`
+	PotType                   string     `gorm:"not null;default:goal" json:"potType"`
+	ContributionFrequency     string     `gorm:"not null;default:one_time" json:"contributionFrequency"`
+	ContributionAmountKobo    int64      `gorm:"not null;default:0" json:"contributionAmountKobo"`
+	ContributionDueDate       *time.Time `json:"contributionDueDate,omitempty"`
 
 	// B Moni wallet + virtual Naira account (NUBAN) that members pay into.
 	// BMoniUserID is the owner (treasurer) B Moni user id that owns the

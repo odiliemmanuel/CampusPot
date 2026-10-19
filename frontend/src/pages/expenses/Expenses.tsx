@@ -170,7 +170,9 @@ export function ExpensesInner() {
         title="Payouts"
         subtitle={
           isTreasurer
-            ? `Move pot money out. Every payout needs ${activeGroup!.approvalThreshold} of ${activeGroup!.approvalTotal} approvals.`
+            ? members.length === 1
+              ? "Move pot money out. As the only member, your payout requests are approved immediately."
+              : `Move pot money out. Every payout needs ${activeGroup!.approvalThreshold} of ${activeGroup!.approvalTotal} approvals.`
             : "Track what the treasurer spends. Raise a dispute if a payout looks wrong."
         }
         action={
@@ -330,6 +332,12 @@ export function ExpensesInner() {
 
                 {/* Approval progress */}
                 <div className="mt-2.5 sm:mt-3">
+                  {members.length === 1 && e.status === "approved" ? (
+                    <p className="inline-flex items-center gap-1.5 text-[11px] font-medium text-violet-600 dark:text-violet-300">
+                      <ShieldCheck className="w-3.5 h-3.5" /> Approved automatically · only member
+                    </p>
+                  ) : (
+                    <>
                   <div className="mb-1 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 sm:text-xs">
                     <span className="inline-flex items-center gap-1.5">
                       <ShieldCheck className="w-3.5 h-3.5" />
@@ -343,6 +351,8 @@ export function ExpensesInner() {
                       style={{ width: rejection ? "100%" : `${pct}%` }}
                     />
                   </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Actions */}

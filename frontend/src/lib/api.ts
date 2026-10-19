@@ -117,6 +117,10 @@ export interface Group {
   joinCode: string;
   currency: string;
   createdBy: string;
+  potType: "goal" | "rotating";
+  contributionFrequency: "one_time" | "daily" | "weekly" | "monthly" | "quarterly";
+  contributionAmountKobo: number;
+  contributionDueDate?: string;
   bmoniUserId?: string;
   bmoniWalletId?: string;
   bmoniWalletAddress?: string;
@@ -403,10 +407,11 @@ export const createGroup = (
   approvalTotal = 3,
   largeExpenseKobo = 0,
   perMemberKobo = 0,
+  options: { potType?: "goal" | "rotating"; contributionFrequency?: "one_time" | "daily" | "weekly" | "monthly" | "quarterly"; contributionDueDate?: string } = {},
 ) =>
   request<Group>("/groups", {
     method: "POST",
-    body: JSON.stringify({ name, approvalThreshold, approvalTotal, largeExpenseKobo, perMemberKobo }),
+    body: JSON.stringify({ name, approvalThreshold, approvalTotal, largeExpenseKobo, perMemberKobo, ...options }),
   });
 export const getGroup = (id: string) => request<Group>(`/groups/${id}`);
 export const updateGroup = (

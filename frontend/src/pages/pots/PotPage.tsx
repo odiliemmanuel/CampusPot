@@ -87,7 +87,7 @@ export default function PotPage() {
   const select = (key: TabKey) => {
     const next = new URLSearchParams(params);
     next.set("tab", key);
-    setParams(next, { replace: true });
+    setParams(next);
   };
 
   return (

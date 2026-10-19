@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -189,6 +190,19 @@ func (s *Service) CreateExpense(ctx context.Context, groupID, actorID uuid.UUID,
 
 	ra := s.assessRisk(&group, req.AmountKobo, balance, t.dest)
 	reasonsJSON, _ := json.Marshal(ra.Reasons)
+	var activeMembers int64
+	if err := s.db.Model(&models.Membership{}).
+		Where("group_id = ? AND status = ?", groupID, models.MembershipActive).
+		Count(&activeMembers).Error; err != nil {
+		return nil, err
+	}
+	status := models.ExpensePendingApproval
+	var approvedAt *time.Time
+	if activeMembers == 1 {
+		status = models.ExpenseApproved
+		now := s.now()
+		approvedAt = &now
+	}
 
 	expense := &models.ExpenseRequest{
 		GroupID:         groupID,
@@ -201,7 +215,8 @@ func (s *Service) CreateExpense(ctx context.Context, groupID, actorID uuid.UUID,
 		AccountName:     t.accountNam,
 		Category:        req.Category,
 		Note:            req.Note,
-		Status:          models.ExpensePendingApproval,
+		Status:          status,
+		ApprovedAt:      approvedAt,
 		RiskLevel:       ra.Level,
 		RiskReasons:     string(reasonsJSON),
 	}

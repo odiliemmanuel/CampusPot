@@ -15,6 +15,9 @@ export default function GroupGate({ children }: { children: ReactNode }) {
   const [mode, setMode] = useState<"create" | "join">("create");
   const [name, setName] = useState("");
   const [nairaInput, setNairaInput] = useState("");
+  const [potType, setPotType] = useState<"goal" | "rotating">("goal");
+  const [frequency, setFrequency] = useState<"daily" | "weekly" | "monthly" | "quarterly">("weekly");
+  const [dueDate, setDueDate] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -37,7 +40,11 @@ export default function GroupGate({ children }: { children: ReactNode }) {
     setError("");
     setBusy(true);
     try {
-      await createGroup(name, 2, 3, nairaToKobo(nairaInput));
+      await createGroup(name, 2, 3, 0, nairaToKobo(nairaInput), {
+        potType,
+        contributionFrequency: potType === "goal" ? "one_time" : frequency,
+        contributionDueDate: dueDate,
+      });
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create the pot.");
@@ -122,10 +129,30 @@ export default function GroupGate({ children }: { children: ReactNode }) {
               />
             </div>
             <div>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Pot type</label>
+              <div className="mt-1.5 grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => setPotType("goal")} className={`rounded-xl border p-2.5 text-left text-xs font-semibold ${potType === "goal" ? "border-violet-500 bg-violet-50 text-violet-800 dark:bg-violet-500/10 dark:text-violet-200" : "border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"}`}>Goal · one-time</button>
+                <button type="button" onClick={() => setPotType("rotating")} className={`rounded-xl border p-2.5 text-left text-xs font-semibold ${potType === "rotating" ? "border-violet-500 bg-violet-50 text-violet-800 dark:bg-violet-500/10 dark:text-violet-200" : "border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"}`}>Rotating · recurring</button>
+              </div>
+            </div>
+            {potType === "rotating" && <div>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Contribution frequency</label>
+              <select value={frequency} onChange={(e) => setFrequency(e.target.value as typeof frequency)} className="cp-input mt-1.5"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="quarterly">Every 3 months</option></select>
+              <p className="mt-1 text-xs text-slate-400">Cycles open automatically after everyone pays. Payouts remain manual.</p>
+            </div>}
+            <div>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Contributions due by</label>
+              <input required type="date" min={new Date().toLocaleDateString("en-CA")} value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="cp-input mt-1.5" />
+            </div>
+            <div>
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
                 Large-spend alert (₦, optional)
               </label>
               <input
+                required
+                type="number"
+                min="1"
+                step="1"
                 value={nairaInput}
                 onChange={(e) => setNairaInput(e.target.value)}
                 placeholder="e.g. 20000"
