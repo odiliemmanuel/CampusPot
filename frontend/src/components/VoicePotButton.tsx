@@ -244,13 +244,13 @@ export default function VoicePotButton({
         className={[
           "fixed bottom-24 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-xl transition active:scale-95 sm:bottom-8 sm:right-6",
           listening
-            ? "animate-pulse bg-rose-500 shadow-rose-500/40"
+            ? "animate-pulse bg-violet-500 shadow-violet-500/40"
             : "bg-gradient-to-br from-brand-500 to-brand-700 shadow-brand-600/40",
         ].join(" ")}
       >
         {listening ? <Square className="h-5 w-5" /> : <Mic className="h-6 w-6" />}
         {listening && (
-          <span className="absolute inset-0 animate-ping rounded-full bg-rose-400/40" />
+          <span className="absolute inset-0 animate-ping rounded-full bg-violet-400/40" />
         )}
       </button>
     </>

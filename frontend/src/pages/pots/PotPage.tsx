@@ -112,7 +112,7 @@ export default function PotPage() {
 
       {/* Inline tab bar — only the section below changes. Chat opens as its
           own full-screen page from the header button. */}
-      <div className="mb-5 mt-4 -mx-1 flex gap-1 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="mb-4 mt-3 -mx-1 flex gap-1 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mb-5 sm:mt-4">
         {TABS.map((t) => {
           const active = t.key === tab;
           return (
@@ -121,7 +121,7 @@ export default function PotPage() {
               type="button"
               onClick={() => select(t.key)}
               className={[
-                "relative inline-flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-[13px] font-medium transition-colors sm:px-3.5 sm:text-sm",
+                "relative inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition-colors sm:gap-2 sm:rounded-xl sm:px-3.5 sm:py-2 sm:text-sm",
                 active
                   ? "text-white"
                   : "text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-100",
@@ -135,7 +135,7 @@ export default function PotPage() {
                   transition={{ type: "spring", stiffness: 420, damping: 34 }}
                 />
               )}
-              <t.icon className="relative z-10 h-4 w-4" />
+              <t.icon className="relative z-10 h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <span className="relative z-10">{t.label}</span>
             </button>
           );
@@ -162,7 +162,7 @@ export default function PotPage() {
         <Link
           to={`/pots/${id}/chat`}
           aria-label="Open pot chat"
-          className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-30 inline-flex h-14 w-14 items-center justify-center rounded-[1.25rem] bg-gradient-to-br from-teal-500 to-lime-300 text-[#10283b] shadow-xl shadow-teal-900/25 transition hover:-translate-y-0.5 hover:shadow-2xl lg:bottom-8 lg:right-8"
+          className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-30 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-purple-800 text-white shadow-xl shadow-violet-900/25 transition hover:-translate-y-0.5 hover:shadow-2xl sm:h-14 sm:w-14 lg:bottom-8 lg:right-8"
         >
           <MessageSquare className="h-6 w-6" />
         </Link>

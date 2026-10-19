@@ -67,7 +67,7 @@ export default function ConnectBank() {
                 onClick={() => toggle(bank)}
                 className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition ${
                   linked
-                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400"
+                    ? "bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-400"
                     : "bg-brand-600 text-white hover:bg-brand-700"
                 }`}
               >

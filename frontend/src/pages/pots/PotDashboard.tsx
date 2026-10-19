@@ -96,7 +96,7 @@ export default function PotDashboard() {
         header: "Amount",
         className: "text-right",
         headerClassName: "text-right",
-        render: (p) => <span className="font-semibold text-emerald-600">+{formatNaira(p.amountKobo)}</span>,
+        render: (p) => <span className="font-semibold text-violet-600">+{formatNaira(p.amountKobo)}</span>,
       });
     }
     base.push({
@@ -157,14 +157,14 @@ export default function PotDashboard() {
 
   return (
     <>
-      {error && <p className="mb-4 text-sm text-rose-600">{error}</p>}
+      {error && <p className="mb-4 text-sm text-violet-600">{error}</p>}
 
       {frozen && (
-        <div className="mb-5 flex items-start gap-3 rounded-2xl bg-rose-50 px-4 py-3.5 dark:bg-rose-500/10">
-          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
+        <div className="mb-5 flex items-start gap-3 rounded-2xl bg-violet-50 px-4 py-3.5 dark:bg-violet-500/10">
+          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-violet-600" />
           <div>
-            <p className="text-sm font-semibold text-rose-700 dark:text-rose-300">Spending is frozen</p>
-            <p className="text-xs text-rose-600/80 dark:text-rose-400/80">
+            <p className="text-sm font-semibold text-violet-700 dark:text-violet-300">Spending is frozen</p>
+            <p className="text-xs text-violet-600/80 dark:text-violet-400/80">
               {openDisputes.length} member{openDisputes.length === 1 ? "" : "s"} have raised a dispute, so
               the treasurer can't move money until it's resolved.
             </p>
@@ -176,10 +176,10 @@ export default function PotDashboard() {
         <div
           className={[
             "mb-6 flex flex-wrap items-center gap-3 rounded-2xl px-4 py-3.5 sm:px-5 sm:py-4",
-            myStatus.owed > 0 ? "bg-amber-50 dark:bg-amber-500/10" : "bg-emerald-50 dark:bg-emerald-500/10",
+            myStatus.owed > 0 ? "bg-violet-50 dark:bg-violet-500/10" : "bg-violet-50 dark:bg-violet-500/10",
           ].join(" ")}
         >
-          <span className={["flex h-10 w-10 items-center justify-center rounded-xl", myStatus.owed > 0 ? "bg-amber-100 text-amber-600" : "bg-emerald-100 text-emerald-600"].join(" ")}>
+          <span className={["flex h-10 w-10 items-center justify-center rounded-xl", myStatus.owed > 0 ? "bg-violet-100 text-violet-600" : "bg-violet-100 text-violet-600"].join(" ")}>
             {myStatus.owed > 0 ? <Wallet className="h-5 w-5" /> : <CheckCircle2 className="h-5 w-5" />}
           </span>
           <div className="min-w-0 flex-1">
@@ -197,7 +197,7 @@ export default function PotDashboard() {
       {/* Member disputes */}
       <section className="mb-6 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-5 dark:border-white/10 dark:bg-panel-dark">
         <div className="mb-3 flex items-center gap-2.5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-500/15">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-500/15">
             <AlertTriangle className="h-4 w-4" />
           </span>
           <div>
@@ -211,7 +211,7 @@ export default function PotDashboard() {
         {openDisputes.length > 0 && (
           <div className="mb-4 space-y-2">
             {openDisputes.map((d) => (
-              <div key={d.id} className="flex items-center justify-between gap-3 rounded-xl border border-rose-100 bg-rose-50/50 p-3 dark:border-rose-500/20 dark:bg-rose-500/5">
+              <div key={d.id} className="flex items-center justify-between gap-3 rounded-xl border border-violet-100 bg-violet-50/50 p-3 dark:border-violet-500/20 dark:bg-violet-500/5">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{d.name || d.userId}</p>
                   {d.reason && <p className="text-xs text-slate-500 dark:text-slate-400">{d.reason}</p>}
@@ -220,7 +220,7 @@ export default function PotDashboard() {
                   <button
                     onClick={() => handleResolve(d.id)}
                     disabled={disputeBusy}
-                    className="shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 shadow-sm disabled:opacity-60 dark:bg-slate-800"
+                    className="shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-violet-600 shadow-sm disabled:opacity-60 dark:bg-slate-800"
                   >
                     Resolve
                   </button>
@@ -244,13 +244,13 @@ export default function PotDashboard() {
               placeholder="Why? (optional)"
               className="cp-input flex-1 min-w-[160px]"
             />
-            <button onClick={handleRaise} disabled={disputeBusy} className="cp-btn-ghost shrink-0 text-rose-600">
+            <button onClick={handleRaise} disabled={disputeBusy} className="cp-btn-ghost shrink-0 text-violet-600">
               {disputeBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4" />}
               Raise a dispute
             </button>
           </div>
         ) : (
-          <p className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-600">
+          <p className="inline-flex items-center gap-1.5 text-xs font-medium text-violet-600">
             <AlertTriangle className="w-3.5 h-3.5" /> You have an open dispute on this pot.
           </p>
         )}

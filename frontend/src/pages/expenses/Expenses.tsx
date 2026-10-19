@@ -19,12 +19,12 @@ import { formatNaira, nairaToKobo } from "../../lib/format";
 const BANKS = ["B Moni", "GTBank", "Opay", "Access Bank", "Zenith Bank", "UBA", "Kuda", "Moniepoint"];
 
 const statusStyle: Record<string, string> = {
-  pending_approval: "bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-400",
-  approved: "bg-sky-100 dark:bg-sky-500/15 text-sky-700 dark:text-sky-400",
-  executing: "bg-sky-100 dark:bg-sky-500/15 text-sky-700 dark:text-sky-400",
-  completed: "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
-  rejected: "bg-rose-100 dark:bg-rose-500/15 text-rose-700 dark:text-rose-400",
-  failed: "bg-rose-100 dark:bg-rose-500/15 text-rose-700 dark:text-rose-400",
+  pending_approval: "bg-violet-100 dark:bg-violet-500/15 text-violet-800 dark:text-violet-200",
+  approved: "bg-violet-100 dark:bg-violet-500/15 text-violet-800 dark:text-violet-200",
+  executing: "bg-violet-100 dark:bg-violet-500/15 text-violet-800 dark:text-violet-200",
+  completed: "bg-violet-100 dark:bg-violet-500/15 text-violet-800 dark:text-violet-200",
+  rejected: "bg-violet-100 dark:bg-violet-500/15 text-violet-700 dark:text-violet-400",
+  failed: "bg-violet-100 dark:bg-violet-500/15 text-violet-700 dark:text-violet-400",
 };
 
 type DestMode = "member" | "user" | "bank";
@@ -182,14 +182,14 @@ export function ExpensesInner() {
         }
       />
 
-      {error && <p className="mb-4 text-sm text-rose-600">{error}</p>}
+      {error && <p className="mb-4 text-sm text-violet-600">{error}</p>}
 
       {showForm && isTreasurer && (
         <motion.form
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           onSubmit={handleCreate}
-          className="cp-card rounded-3xl p-6 mb-6 grid sm:grid-cols-2 gap-4"
+          className="cp-card mb-4 grid gap-3 rounded-2xl p-3 sm:mb-6 sm:grid-cols-2 sm:gap-4 sm:rounded-3xl sm:p-5"
         >
           <div>
             <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Amount (₦)</label>
@@ -269,7 +269,7 @@ export function ExpensesInner() {
           <p className="text-slate-500 dark:text-slate-400">No payouts yet.</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-2.5 sm:space-y-3">
           {expenses.map((e) => {
             const approvalsFor = approvals[e.id] ?? [];
             const approvalsCount = approvalsFor.filter((a) => a.decision === "approve").length;
@@ -285,8 +285,8 @@ export function ExpensesInner() {
               ["pending_approval", "approved", "executing", "completed"].includes(e.status);
 
             return (
-              <motion.div key={e.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="cp-card rounded-3xl p-5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
+              <motion.div key={e.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="cp-card rounded-2xl p-3 sm:rounded-3xl sm:p-4">
+                <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-sora font-bold text-slate-900 dark:text-white">{formatNaira(e.amountKobo)}</h3>
@@ -294,33 +294,33 @@ export function ExpensesInner() {
                         {e.status.replace("_", " ")}
                       </span>
                       {disputed && (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-rose-100 dark:bg-rose-500/15 text-rose-700 dark:text-rose-400">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-violet-100 dark:bg-violet-500/15 text-violet-700 dark:text-violet-400">
                           <Gavel className="w-3 h-3" /> Disputed
                         </span>
                       )}
                       {e.riskLevel !== "low" && (
                         <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full ${
                           e.riskLevel === "high"
-                            ? "bg-rose-100 dark:bg-rose-500/15 text-rose-700 dark:text-rose-400"
-                            : "bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-400"
+                            ? "bg-violet-100 dark:bg-violet-500/15 text-violet-700 dark:text-violet-400"
+                            : "bg-violet-100 dark:bg-violet-500/15 text-violet-700 dark:text-violet-400"
                         }`}>
                           <AlertTriangle className="w-3 h-3" /> {e.riskLevel} risk
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-slate-600 dark:text-slate-300 mt-1.5">To {e.destination}{e.category ? ` · ${e.category}` : ""}</p>
-                    {e.note && <p className="text-xs text-slate-400 mt-0.5">{e.note}</p>}
+                    <p className="mt-1 text-xs text-slate-600 dark:text-slate-300 sm:text-sm">To {e.destination}{e.category ? ` · ${e.category}` : ""}</p>
+                    {e.note && <p className="mt-0.5 text-[11px] text-slate-400">{e.note}</p>}
                   </div>
                 </div>
 
                 {e.riskReasons && (
-                  <p className="mt-3 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 rounded-lg px-3 py-2">
+                  <p className="mt-3 text-xs text-violet-700 dark:text-violet-400 bg-violet-50 dark:bg-violet-500/10 rounded-lg px-3 py-2">
                     {e.riskReasons}
                   </p>
                 )}
 
                 {disputed && (
-                  <p className="mt-3 text-xs text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 rounded-lg px-3 py-2">
+                  <p className="mt-3 text-xs text-violet-700 dark:text-violet-400 bg-violet-50 dark:bg-violet-500/10 rounded-lg px-3 py-2">
                     {expenseDisputes.length} member{expenseDisputes.length === 1 ? "" : "s"} disputed this payout
                     {expenseDisputes.map((d) => d.name).filter(Boolean).length
                       ? `: ${expenseDisputes.map((d) => d.name).filter(Boolean).join(", ")}`
@@ -329,38 +329,38 @@ export function ExpensesInner() {
                 )}
 
                 {/* Approval progress */}
-                <div className="mt-4">
-                  <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1.5">
+                <div className="mt-2.5 sm:mt-3">
+                  <div className="mb-1 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 sm:text-xs">
                     <span className="inline-flex items-center gap-1.5">
                       <ShieldCheck className="w-3.5 h-3.5" />
                       {approvalsCount} of {activeGroup!.approvalThreshold} approvals
                     </span>
-                    {rejection && <span className="text-rose-600 font-semibold">Rejected — blocked</span>}
+                    {rejection && <span className="text-violet-600 font-semibold">Rejected — blocked</span>}
                   </div>
-                  <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                  <div className="h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                     <div
-                      className={`h-full rounded-full transition-all ${rejection ? "bg-rose-500" : "bg-gradient-to-r from-brand-500 to-brand-700"}`}
+                      className={`h-full rounded-full transition-all ${rejection ? "bg-violet-500" : "bg-gradient-to-r from-brand-500 to-brand-700"}`}
                       style={{ width: rejection ? "100%" : `${pct}%` }}
                     />
                   </div>
                 </div>
 
                 {/* Actions */}
-                <div className="mt-4 flex flex-wrap items-center gap-2">
+                <div className="mt-2.5 flex flex-wrap items-center gap-1.5 sm:mt-3 sm:gap-2">
                   {e.status === "pending_approval" && (
                     canDecide ? (
                       <>
                         <button
                           onClick={() => handleDecision(e.id, "approve")}
                           disabled={busy}
-                          className="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2.5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition disabled:opacity-60"
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-800 disabled:opacity-60 sm:rounded-xl sm:px-4 sm:py-2.5 sm:text-sm"
                         >
                           <ThumbsUp className="w-4 h-4" /> Approve
                         </button>
                         <button
                           onClick={() => handleDecision(e.id, "reject")}
                           disabled={busy}
-                          className="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 text-rose-600 border border-rose-200 dark:border-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition disabled:opacity-60"
+                          className="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 text-violet-600 border border-violet-200 dark:border-violet-900/50 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition disabled:opacity-60"
                         >
                           <ThumbsDown className="w-4 h-4" /> Reject
                         </button>
@@ -383,14 +383,14 @@ export function ExpensesInner() {
                     <button
                       onClick={() => handleExecute(e.id)}
                       disabled={busy || disputed}
-                      className="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2.5 rounded-xl bg-brand-600 text-white hover:bg-brand-700 transition disabled:opacity-60"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-800 disabled:opacity-60 sm:rounded-xl sm:px-4 sm:py-2.5 sm:text-sm"
                     >
                       <Send className="w-4 h-4" /> Pay out
                     </button>
                   )}
 
                   {e.status === "completed" && (
-                    <p className="inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                    <p className="inline-flex items-center gap-1.5 text-xs text-violet-600 dark:text-violet-400 font-medium">
                       <CheckCircle2 className="w-3.5 h-3.5" /> Paid out · {new Date(e.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
                     </p>
                   )}
@@ -399,7 +399,7 @@ export function ExpensesInner() {
                     <button
                       onClick={() => handleDispute(e.id)}
                       disabled={busy}
-                      className="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 text-rose-600 border border-rose-200 dark:border-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition disabled:opacity-60"
+                      className="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 text-violet-600 border border-violet-200 dark:border-violet-900/50 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition disabled:opacity-60"
                     >
                       <Gavel className="w-4 h-4" /> Dispute this payout
                     </button>

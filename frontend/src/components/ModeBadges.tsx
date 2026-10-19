@@ -49,8 +49,8 @@ function Badge({
   tone: "green" | "amber" | "slate";
 }) {
   const tones = {
-    green: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    amber: "border-amber-200 bg-amber-50 text-amber-700",
+    green: "border-violet-200 bg-violet-50 text-violet-700",
+    amber: "border-violet-200 bg-violet-50 text-violet-700",
     slate: "border-slate-200 bg-slate-50 text-slate-600",
   } as const;
   return (

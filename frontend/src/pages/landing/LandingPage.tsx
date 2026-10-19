@@ -62,7 +62,7 @@ export default function LandingPage() {
           <div className="flex flex-wrap gap-4 mt-8 text-sm text-slate-500 dark:text-slate-400">
             {["Sandbox & synthetic data", "No real money", "Built on B Moni"].map((t) => (
               <span key={t} className="inline-flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" /> {t}
+                <CheckCircle2 className="w-4 h-4 text-violet-500" /> {t}
               </span>
             ))}
           </div>
@@ -81,20 +81,20 @@ export default function LandingPage() {
                 <p className="text-xs font-semibold text-slate-400">200L Mass Comm Dues</p>
                 <p className="font-sora text-2xl font-bold text-slate-900 dark:text-white mt-1">₦67,500.00</p>
               </div>
-              <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-1.5 rounded-full">
+              <span className="text-xs font-semibold text-violet-600 bg-violet-50 dark:bg-violet-500/10 px-3 py-1.5 rounded-full">
                 +₦20,000 today
               </span>
             </div>
             <div className="grid grid-cols-3 gap-2 mb-5">
-              <div className="rounded-2xl bg-sky-50 dark:bg-slate-800 p-3">
+              <div className="rounded-2xl bg-violet-50 dark:bg-slate-800 p-3">
                 <p className="text-[11px] text-slate-400">Collected</p>
                 <p className="font-bold text-slate-900 dark:text-white text-sm">₦47,000</p>
               </div>
-              <div className="rounded-2xl bg-sky-50 dark:bg-slate-800 p-3">
+              <div className="rounded-2xl bg-violet-50 dark:bg-slate-800 p-3">
                 <p className="text-[11px] text-slate-400">Outstanding</p>
                 <p className="font-bold text-slate-900 dark:text-white text-sm">₦13,000</p>
               </div>
-              <div className="rounded-2xl bg-sky-50 dark:bg-slate-800 p-3">
+              <div className="rounded-2xl bg-violet-50 dark:bg-slate-800 p-3">
                 <p className="text-[11px] text-slate-400">Paid</p>
                 <p className="font-bold text-slate-900 dark:text-white text-sm">5/8</p>
               </div>
@@ -106,8 +106,8 @@ export default function LandingPage() {
                 3 members still owing — Chidi (₦5,000), Fatima (₦3,000 partial), Emeka (₦5,000).
               </p>
             </div>
-            <div className="mt-3 rounded-2xl border-2 border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-500/10 p-3 flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
+            <div className="mt-3 rounded-2xl border-2 border-violet-300 dark:border-violet-500/40 bg-violet-50 dark:bg-violet-500/10 p-3 flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-violet-600 shrink-0" />
               <p className="text-xs text-slate-600 dark:text-slate-300">
                 ₦15,000 bus payout — needs 2 of 3 co-signers. <span className="font-semibold">1/2 done.</span>
               </p>
@@ -135,8 +135,8 @@ export default function LandingPage() {
               transition={{ duration: 0.4, delay: i * 0.08 }}
               className="rounded-3xl cp-card p-6"
             >
-              <div className="w-11 h-11 rounded-2xl bg-rose-100 dark:bg-rose-500/15 flex items-center justify-center mb-4">
-                <p.icon className="w-5 h-5 text-rose-600" />
+              <div className="w-11 h-11 rounded-2xl bg-violet-100 dark:bg-violet-500/15 flex items-center justify-center mb-4">
+                <p.icon className="w-5 h-5 text-violet-600" />
               </div>
               <h3 className="font-sora font-bold text-slate-900 dark:text-white mb-1.5">{p.title}</h3>
               <p className="text-sm text-slate-500 dark:text-slate-400">{p.text}</p>

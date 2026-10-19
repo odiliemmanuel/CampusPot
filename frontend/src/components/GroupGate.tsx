@@ -133,7 +133,7 @@ export default function GroupGate({ children }: { children: ReactNode }) {
               />
               <p className="text-xs text-slate-400 mt-1">Payouts above this are flagged high-risk.</p>
             </div>
-            {error && <p className="text-sm text-rose-600">{error}</p>}
+            {error && <p className="text-sm text-violet-600">{error}</p>}
             <button type="submit" disabled={busy} className="cp-btn-primary w-full">
               {busy ? "Creating..." : "Create pot"}
             </button>
@@ -150,7 +150,7 @@ export default function GroupGate({ children }: { children: ReactNode }) {
                 className="cp-input mt-1.5 tracking-widest font-semibold"
               />
             </div>
-            {error && <p className="text-sm text-rose-600">{error}</p>}
+            {error && <p className="text-sm text-violet-600">{error}</p>}
             <div className="flex flex-col gap-2 sm:flex-row">
               <button type="submit" disabled={busy} className="cp-btn-primary flex-1">
                 {busy ? "Joining..." : "Join pot"}

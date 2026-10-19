@@ -19,9 +19,9 @@ const WALLET_GRADIENT = "bg-gradient-to-br from-violet-600 via-violet-700 to-pur
 const WALLET_SOFT = "bg-violet-50 text-violet-700 dark:bg-violet-400/10 dark:text-violet-200";
 
 const stateMeta: Record<PotMembership["state"], { label: string; tint: string }> = {
-  paid: { label: "Paid up", tint: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15" },
-  partial: { label: "Part-paid", tint: "bg-amber-100 text-amber-700 dark:bg-amber-500/15" },
-  unpaid: { label: "Due", tint: "bg-rose-100 text-rose-700 dark:bg-rose-500/15" },
+  paid: { label: "Paid up", tint: "bg-violet-100 text-violet-700 dark:bg-violet-500/15" },
+  partial: { label: "Part-paid", tint: "bg-violet-100 text-violet-700 dark:bg-violet-500/15" },
+  unpaid: { label: "Due", tint: "bg-violet-100 text-violet-700 dark:bg-violet-500/15" },
   none: { label: "No open levy", tint: "bg-slate-100 text-slate-500 dark:bg-white/10" },
 };
 
@@ -66,7 +66,7 @@ function CopyButton({ value, className = "" }: { value: string; className?: stri
   };
   return (
     <button type="button" onClick={copy} aria-label="Copy" className={`shrink-0 rounded-lg p-1.5 transition ${className}`}>
-      {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+      {copied ? <Check className="h-3.5 w-3.5 text-violet-400" /> : <Copy className="h-3.5 w-3.5" />}
     </button>
   );
 }
@@ -167,7 +167,7 @@ function AddMoneySheet({ onClose, onDone }: { onClose: () => void; onDone: () =>
           Money lands in <span className="font-semibold text-brand-600 dark:text-brand-300">your wallet</span>, not a pot.
           You can then send it to anyone or pay your contribution.
         </p>
-        {error && <p className="text-sm text-rose-600">{error}</p>}
+        {error && <p className="text-sm text-violet-600">{error}</p>}
         <SubmitButton busy={busy} label="Add to wallet" />
       </form>
     </Sheet>
@@ -261,7 +261,7 @@ function SendSheet({ balanceKobo, onClose, onDone }: { balanceKobo: number; onCl
         <p className="text-[11px] text-slate-400">
           Wallet balance: {money(balanceKobo)}. Sending to a registered PotKeeper user credits their wallet instantly; a bank send is an external payout.
         </p>
-        {error && <p className="text-sm text-rose-600">{error}</p>}
+        {error && <p className="text-sm text-violet-600">{error}</p>}
         <SubmitButton busy={busy} label="Send money" />
       </form>
     </Sheet>
@@ -324,7 +324,7 @@ function PayPotSheet({ pots, balanceKobo, onClose, onDone }: { pots: PotMembersh
         </div>
         <AmountInput amount={amount} setAmount={setAmount} />
         <p className="text-[11px] text-slate-400">Wallet balance: {money(balanceKobo)}. This credits the pot and marks your contribution paid.</p>
-        {error && <p className="text-sm text-rose-600">{error}</p>}
+        {error && <p className="text-sm text-violet-600">{error}</p>}
         <SubmitButton busy={busy} label="Pay from wallet" />
       </form>
     </Sheet>
@@ -369,11 +369,11 @@ function PotRow({ pot, onPay }: { pot: PotMembership; onPay: (pot: PotMembership
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-wide text-slate-400">You paid</p>
-              <p className="text-sm font-semibold text-emerald-600">{money(pot.paidKobo)}</p>
+              <p className="text-sm font-semibold text-violet-600">{money(pot.paidKobo)}</p>
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-wide text-slate-400">Remaining</p>
-              <p className="text-sm font-semibold text-amber-600">
+              <p className="text-sm font-semibold text-violet-600">
                 {pot.outstandingKobo > 0 ? money(pot.outstandingKobo) : "₦0"}
               </p>
             </div>
@@ -382,7 +382,7 @@ function PotRow({ pot, onPay }: { pot: PotMembership; onPay: (pot: PotMembership
           {pot.levyAmountKobo > 0 && (
             <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
               <div
-                className={`h-full rounded-full ${pot.outstandingKobo > 0 ? "bg-amber-400" : "bg-emerald-500"}`}
+                className={`h-full rounded-full ${pot.outstandingKobo > 0 ? "bg-violet-400" : "bg-violet-500"}`}
                 style={{ width: `${Math.min(100, Math.round((pot.paidKobo / pot.levyAmountKobo) * 100))}%` }}
               />
             </div>
@@ -437,9 +437,9 @@ function txMeta(kind: WalletTransaction["kind"], amount: number) {
   switch (kind) {
     case "deposit":
     case "transfer_in":
-      return { icon: <ArrowDownLeft className="h-4 w-4" />, tint: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15", sign: "+", color: "text-emerald-600" };
+      return { icon: <ArrowDownLeft className="h-4 w-4" />, tint: "bg-violet-100 text-violet-600 dark:bg-violet-500/15", sign: "+", color: "text-violet-600" };
     case "transfer_out":
-      return { icon: <ArrowUpRight className="h-4 w-4" />, tint: "bg-rose-100 text-rose-600 dark:bg-rose-500/15", sign: "-", color: "text-rose-600" };
+      return { icon: <ArrowUpRight className="h-4 w-4" />, tint: "bg-violet-100 text-violet-600 dark:bg-violet-500/15", sign: "-", color: "text-violet-600" };
     default:
       return { icon: <PiggyBank className="h-4 w-4" />, tint: WALLET_SOFT, sign: "-", color: "text-slate-600 dark:text-slate-300" };
   }
@@ -470,7 +470,7 @@ function WalletHome() {
   if (loading) {
     return <div className="flex justify-center py-24"><Loader2 className="h-6 w-6 animate-spin text-brand-600" /></div>;
   }
-  if (error) return <p className="text-sm text-rose-600">{error}</p>;
+  if (error) return <p className="text-sm text-violet-600">{error}</p>;
 
   return (
     <>
@@ -479,18 +479,18 @@ function WalletHome() {
       </h1>
 
       {/* Compact balance strip keeps the wallet actions and pots in view. */}
-      <div className="flex items-center gap-3 rounded-2xl border border-violet-200/70 bg-gradient-to-br from-white to-violet-50/80 px-3 py-3 shadow-sm dark:border-violet-300/10 dark:from-[#171626] dark:to-[#211a35] sm:px-4">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-violet-600 to-purple-800 text-white shadow-sm shadow-violet-900/20"><Wallet className="h-4 w-4" /></span>
+      <div className="flex items-center gap-3 rounded-2xl bg-gradient-to-br from-violet-700 via-violet-700 to-purple-800 px-3.5 py-3.5 text-white shadow-md shadow-violet-950/10 sm:rounded-[1.5rem] sm:px-6 sm:py-4">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/10 text-white ring-1 ring-white/15"><Wallet className="h-4 w-4" /></span>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5"><p className="text-[10px] font-bold uppercase tracking-[.14em] text-violet-700 dark:text-violet-200">Wallet balance</p><span className="text-[10px] font-semibold text-slate-400">NGN</span></div>
-          <p className="mt-0.5 truncate font-sora text-xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-2xl">{money(balance)}</p>
+          <p className="text-[9px] font-bold uppercase tracking-[.18em] text-violet-100/75 sm:text-[10px]">Wallet balance · NGN</p>
+          <p className="mt-0.5 truncate font-sora text-xl font-extrabold tracking-tight text-white sm:text-2xl">{money(balance)}</p>
           <div className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[11px]">
-            <span className="shrink-0 text-slate-400">Wallet number</span>
-            <span className="truncate font-semibold tracking-wide text-slate-700 dark:text-slate-200">{me?.phone || "Add your phone in settings"}</span>
-            {me?.phone && <button type="button" onClick={() => void navigator.clipboard?.writeText(me.phone!)} aria-label="Copy wallet number" className="shrink-0 rounded-md p-1 text-violet-700 hover:bg-violet-100 dark:text-violet-200 dark:hover:bg-white/10"><Copy className="h-3 w-3" /></button>}
+            <span className="shrink-0 text-violet-100/70">Wallet number</span>
+            <span className="truncate font-semibold tracking-wide text-white">{me?.phone || "Add your phone in settings"}</span>
+            {me?.phone && <button type="button" onClick={() => void navigator.clipboard?.writeText(me.phone!)} aria-label="Copy wallet number" className="shrink-0 rounded-md p-1 text-white/80 hover:bg-white/10"><Copy className="h-3 w-3" /></button>}
           </div>
         </div>
-        <span className="hidden items-center gap-1.5 rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-bold text-violet-800 dark:bg-violet-400/10 dark:text-violet-200 sm:inline-flex"><span className="h-1.5 w-1.5 rounded-full bg-violet-500" /> Available</span>
+        <span className="hidden items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold text-violet-50 sm:inline-flex"><span className="h-1.5 w-1.5 rounded-full bg-violet-200" /> Available</span>
       </div>
 
       {/* Secondary actions — consistent tiles */}

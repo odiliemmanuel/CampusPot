@@ -86,7 +86,7 @@ export default function NewPot() {
                 The pot's target is this amount × the number of members who join.
               </p>
             </div>
-            {error && <p className="text-sm text-rose-600">{error}</p>}
+            {error && <p className="text-sm text-violet-600">{error}</p>}
             <button type="submit" disabled={busy} className="cp-btn-primary w-full">
               {busy ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating…</> : "Create pot"}
             </button>

@@ -152,11 +152,11 @@ export default function Settings() {
                 </label>
 
                 {notice && (
-                  <p className="flex items-center gap-1.5 text-sm text-emerald-600">
+                  <p className="flex items-center gap-1.5 text-sm text-violet-600">
                     <CheckCircle2 className="h-4 w-4" /> {notice}
                   </p>
                 )}
-                {error && <p className="text-sm text-rose-600">{error}</p>}
+                {error && <p className="text-sm text-violet-600">{error}</p>}
 
                 <button type="submit" disabled={!dirty || saving} className="cp-btn-primary w-full text-sm sm:w-auto">
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
@@ -213,16 +213,16 @@ export default function Settings() {
             </p>
             <button
               onClick={logout}
-              className="inline-flex items-center gap-2 rounded-xl bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-600 transition hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20"
+              className="inline-flex items-center gap-2 rounded-xl bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-600 transition hover:bg-violet-100 dark:bg-violet-500/10 dark:hover:bg-violet-500/20"
             >
               <LogOut className="h-4 w-4" /> Log out
             </button>
           </section>
 
           {/* Danger zone */}
-          <section className="cp-card rounded-3xl border border-rose-200 p-4 sm:p-6 dark:border-rose-500/30">
+          <section className="cp-card rounded-3xl border border-violet-200 p-4 sm:p-6 dark:border-violet-500/30">
             <div className="mb-3 flex items-center gap-2.5">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-500/15">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-500/15">
                 <Trash2 className="h-4 w-4" />
               </span>
               <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Delete account</p>
@@ -237,7 +237,7 @@ export default function Settings() {
                   type="button"
                   onClick={removeAccount}
                   disabled={deleting}
-                  className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-rose-600 to-rose-700 px-4 py-3 text-sm font-semibold text-white transition hover:shadow-lg disabled:opacity-60"
+                  className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-violet-600 to-violet-700 px-4 py-3 text-sm font-semibold text-white transition hover:shadow-lg disabled:opacity-60"
                 >
                   {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
                   Yes, delete my account
@@ -255,7 +255,7 @@ export default function Settings() {
               <button
                 type="button"
                 onClick={() => setConfirmDelete(true)}
-                className="flex items-center gap-2 rounded-xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 dark:border-rose-500/30 dark:hover:bg-rose-500/10"
+                className="flex items-center gap-2 rounded-xl border border-violet-200 px-4 py-3 text-sm font-semibold text-violet-600 transition hover:bg-violet-50 dark:border-violet-500/30 dark:hover:bg-violet-500/10"
               >
                 <Trash2 className="h-4 w-4" /> Delete account
               </button>

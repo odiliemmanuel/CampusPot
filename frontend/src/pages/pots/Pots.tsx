@@ -23,9 +23,9 @@ function PotCard({
     <button
       type="button"
       onClick={onOpen}
-      className="group flex min-w-0 items-center gap-3 rounded-[1.4rem] border border-slate-200/70 bg-white p-3.5 text-left shadow-[0_8px_24px_-18px_rgba(15,45,69,.45)] transition duration-200 hover:-translate-y-0.5 hover:border-teal-300 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 sm:gap-4 sm:p-4 dark:border-white/10 dark:bg-[#111f30]"
+      className="group flex min-w-0 items-center gap-3 rounded-[1.4rem] border border-slate-200/70 bg-white p-3.5 text-left shadow-[0_8px_24px_-18px_rgba(76,29,149,.25)] transition duration-200 hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 sm:gap-4 sm:p-4 dark:border-white/10 dark:bg-[#171626]"
     >
-      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-teal-400 to-lime-300 text-[#123246] shadow-md shadow-teal-900/10">
+      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 to-purple-800 text-white shadow-md shadow-violet-900/20">
         <PiggyBank className="h-5 w-5" />
       </span>
 
@@ -34,7 +34,7 @@ function PotCard({
         <p className="mt-0.5 truncate text-xs text-slate-400">
           {summary ? `${summary.paidCount}/${summary.members} paid` : "…"}
           {outstanding > 0 && (
-            <span className="text-amber-600"> · {formatNaira(outstanding)} due</span>
+            <span className="text-violet-600"> · {formatNaira(outstanding)} due</span>
           )}
           <span className="hidden text-slate-300 sm:inline"> · </span>
           <span className="hidden tracking-widest sm:inline">{group.joinCode}</span>
@@ -42,13 +42,13 @@ function PotCard({
       </div>
 
       <div className="shrink-0 text-right">
-        <p className="font-sora text-sm font-bold text-teal-800 dark:text-teal-200">
+        <p className="font-sora text-sm font-bold text-violet-800 dark:text-violet-200">
           {summary ? formatNaira(summary.expectedKobo) : "—"}
         </p>
         <p className="text-[10px] uppercase tracking-wide text-slate-400">Expected</p>
       </div>
 
-      <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-teal-600" />
+      <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-violet-600" />
     </button>
   );
 }
@@ -103,12 +103,12 @@ function PotsGrid() {
       />
 
       {groups.length === 0 ? (
-        <div className="mt-4 overflow-hidden rounded-[1.8rem] border border-teal-900/10 bg-gradient-to-br from-[#10283b] via-[#145366] to-[#087f73] p-6 text-center text-white shadow-xl shadow-teal-950/10 sm:p-10">
-          <span className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-[1.2rem] bg-white/10 text-lime-200 ring-1 ring-white/15"><PiggyBank className="h-7 w-7" /></span>
+        <div className="mt-4 overflow-hidden rounded-[1.8rem] border border-violet-900/10 bg-gradient-to-br from-violet-700 via-violet-700 to-purple-900 p-6 text-center text-white shadow-xl shadow-violet-950/10 sm:p-10">
+          <span className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-[1.2rem] bg-white/10 text-violet-100 ring-1 ring-white/15"><PiggyBank className="h-7 w-7" /></span>
           <h2 className="font-sora text-xl font-bold">A shared pot starts here</h2>
-          <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-teal-50/75">Start a trusted space for class dues, trips, and plans—or join a pot with the code your treasurer shared.</p>
+          <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-violet-50/75">Start a trusted space for class dues, trips, and plans—or join a pot with the code your treasurer shared.</p>
           <div className="mt-4 flex justify-center gap-2">
-            <Link to="/pots/new" className="inline-flex items-center gap-2 rounded-xl bg-lime-300 px-4 py-2.5 text-sm font-bold text-[#10283b] shadow-lg shadow-black/10 transition hover:bg-lime-200"><Plus className="h-4 w-4" /> Create a pot</Link>
+            <Link to="/pots/new" className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-violet-800 shadow-lg shadow-black/10 transition hover:bg-violet-50"><Plus className="h-4 w-4" /> Create a pot</Link>
             <Link to="/join" className="inline-flex items-center rounded-xl border border-white/20 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10">Join a pot</Link>
           </div>
         </div>
@@ -126,7 +126,7 @@ function PotsGrid() {
 
         <Link
           to="/pots/new"
-          className="flex min-h-[76px] items-center justify-center gap-2 rounded-[1.4rem] border border-dashed border-teal-800/20 bg-teal-50/50 p-4 text-sm font-bold text-teal-800 transition hover:border-teal-500 hover:bg-teal-50 dark:border-teal-100/15 dark:bg-teal-400/5 dark:text-teal-200 dark:hover:bg-teal-400/10"
+          className="flex min-h-[76px] items-center justify-center gap-2 rounded-[1.4rem] border border-dashed border-violet-800/20 bg-violet-50/50 p-4 text-sm font-bold text-violet-800 transition hover:border-violet-500 hover:bg-violet-50 dark:border-violet-100/15 dark:bg-violet-400/5 dark:text-violet-200 dark:hover:bg-violet-400/10"
         >
           <Plus className="h-4 w-4" /> Create a pot
         </Link>

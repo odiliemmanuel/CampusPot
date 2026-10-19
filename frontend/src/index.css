@@ -6,12 +6,10 @@ body {
   font-family: "Inter", system-ui, sans-serif;
 }
 
-/* Shared card surface used across every page. Light mode: sky-blue tint with
-   a real border so cards separate from the white content panel. Dark mode:
-   deep navy panel with a soft blue glow, matching the app's cosmic-glow look. */
+/* Shared card surface with the app's violet accent. */
 @layer components {
   .cp-card {
-    @apply bg-sky-50 border border-sky-200 transition-colors duration-300;
+    @apply bg-violet-50 border border-violet-200 transition-colors duration-300;
   }
   .dark .cp-card {
     @apply bg-panel-dark border-primary-500/25;

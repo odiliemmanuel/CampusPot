@@ -86,7 +86,7 @@ export default function JoinPot() {
 
           {status === "done" && (
             <div className="flex flex-col items-center gap-3 py-10 text-center">
-              <CheckCircle2 className="h-9 w-9 text-emerald-500" />
+              <CheckCircle2 className="h-9 w-9 text-violet-500" />
               <p className="font-sora text-lg font-bold text-slate-900">You're in!</p>
               <p className="text-sm text-slate-500">
                 Joined <span className="font-semibold text-slate-700">{groupName}</span>. Taking you to your pots…
@@ -129,7 +129,7 @@ export default function JoinPot() {
                 />
 
                 {error && (
-                  <p className="flex items-center gap-1.5 text-sm text-rose-600">
+                  <p className="flex items-center gap-1.5 text-sm text-violet-600">
                     <AlertCircle className="h-4 w-4" /> {error}
                   </p>
                 )}

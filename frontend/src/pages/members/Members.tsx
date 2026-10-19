@@ -17,9 +17,9 @@ import {
 import { formatNaira } from "../../lib/format";
 
 const roleMeta: Record<Role, { label: string; icon: typeof Shield; tint: string }> = {
-  treasurer: { label: "Treasurer", icon: ShieldCheck, tint: "bg-brand-50 text-brand-700" },
+  treasurer: { label: "Treasurer", icon: ShieldCheck, tint: "bg-violet-100 text-violet-800 dark:bg-violet-500/15 dark:text-violet-200" },
   cosigner: { label: "Co-signer", icon: Shield, tint: "bg-violet-50 text-violet-600" },
-  member: { label: "Member", icon: UserIcon, tint: "bg-slate-100 text-slate-600" },
+  member: { label: "Member", icon: UserIcon, tint: "bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-200" },
 };
 
 const roleOptions: Role[] = ["member", "cosigner", "treasurer"];
@@ -67,10 +67,10 @@ export function MembersInner() {
     const o = outstanding.find((x) => x.userId === userId);
     if (o) {
       return o.state === "partial"
-        ? { label: `Paid ${formatNaira(o.paidKobo)} of ${formatNaira(o.amountKobo)}`, tint: "bg-amber-50 text-amber-600 dark:bg-amber-500/10" }
-        : { label: `Owes ${formatNaira(o.amountKobo)}`, tint: "bg-rose-50 text-rose-600 dark:bg-rose-500/10" };
+        ? { label: `Paid ${formatNaira(o.paidKobo)} of ${formatNaira(o.amountKobo)}`, tint: "bg-violet-50 text-violet-600 dark:bg-violet-500/10" }
+        : { label: `Owes ${formatNaira(o.amountKobo)}`, tint: "bg-violet-50 text-violet-600 dark:bg-violet-500/10" };
     }
-    return { label: "Paid in full", tint: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10" };
+    return { label: "Paid in full", tint: "bg-violet-50 text-violet-600 dark:bg-violet-500/10" };
   };
 
   const changeRole = async (userId: string, role: Role) => {
@@ -104,12 +104,12 @@ export function MembersInner() {
         subtitle={`${members.length} in this pot · roles decide who can approve payouts.`}
       />
 
-      {notice && <p className="mb-4 text-sm text-emerald-600">{notice}</p>}
-      {error && <p className="mb-4 text-sm text-rose-600">{error}</p>}
+      {notice && <p className="mb-4 text-sm text-violet-600">{notice}</p>}
+      {error && <p className="mb-4 text-sm text-violet-600">{error}</p>}
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Member list */}
-        <div className="lg:col-span-2 space-y-3">
+        <div className="space-y-2 sm:space-y-3 lg:col-span-2">
           {members.map((m) => {
             const meta = roleMeta[m.role];
             const isMe = m.userId === myId;
@@ -119,10 +119,10 @@ export function MembersInner() {
                 key={m.userId}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="rounded-2xl border border-slate-100 bg-white p-4 flex flex-wrap items-center justify-between gap-3 shadow-sm"
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-100 bg-white p-2.5 shadow-sm dark:border-violet-200/10 dark:bg-panel-dark sm:gap-3 sm:rounded-2xl sm:p-3"
               >
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold shrink-0">
+                <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-800 text-sm font-bold text-white sm:h-10 sm:w-10">
                     {(m.user?.name ?? "?").charAt(0)}
                   </div>
                   <div className="min-w-0">
@@ -130,9 +130,9 @@ export function MembersInner() {
                       {m.user?.name ?? m.userId}
                       {isMe && <span className="ml-1.5 text-xs font-normal text-slate-400">(you)</span>}
                     </p>
-                    <p className="text-xs text-slate-400 truncate">{m.user?.email ?? "—"}</p>
+                    <p className="hidden truncate text-xs text-slate-400 sm:block">{m.user?.email ?? "—"}</p>
                     {status && (canManage || isMe) && (
-                      <span className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${status.tint}`}>
+                      <span className={`mt-0.5 inline-flex max-w-full truncate items-center rounded-full px-2 py-0.5 text-[10px] font-semibold sm:mt-1 sm:text-[11px] ${status.tint}`}>
                         {status.label}
                       </span>
                     )}
@@ -174,9 +174,9 @@ export function MembersInner() {
         </div>
 
         {/* Pot account */}
-        <div className="space-y-6">
+        <div className="space-y-3 sm:space-y-5">
           {activeGroup!.virtualAccountNumber && (
-            <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+            <div className="rounded-2xl border border-violet-100 bg-white p-3 shadow-sm dark:border-violet-200/10 dark:bg-panel-dark sm:rounded-3xl sm:p-5">
               <div className="mb-3 flex items-center gap-2">
                 <Landmark className="w-4 h-4 text-brand-600" />
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Pot account</p>
@@ -203,7 +203,7 @@ export function MembersInner() {
       {/* Floating invite action */}
       <Link
         to={`/pots/${gid}?tab=invite`}
-        className="fixed bottom-24 right-5 z-40 inline-flex items-center gap-2 rounded-full bg-gradient-to-br from-primary-600 to-primary-800 px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-primary-900/30 transition active:scale-95 lg:bottom-8"
+        className="fixed bottom-24 right-5 z-40 inline-flex items-center gap-2 rounded-full bg-gradient-to-br from-violet-600 to-purple-800 px-4 py-3 text-xs font-semibold text-white shadow-lg shadow-violet-900/30 transition active:scale-95 sm:px-5 sm:py-3.5 sm:text-sm lg:bottom-8"
       >
         <QrCode className="h-5 w-5" /> Invite
       </Link>
@@ -251,14 +251,14 @@ export function InviteInner() {
       <div className="mx-auto max-w-md">
         <JoinCard code={activeGroup!.joinCode} />
 
-        <div className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-panel-dark">
+        <div className="mt-3 rounded-2xl border border-violet-100 bg-white p-3 shadow-sm dark:border-violet-200/10 dark:bg-panel-dark sm:mt-4 sm:p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
             Shareable link
           </p>
           <div className="mt-2 flex items-center gap-2">
             <input readOnly value={joinLink} className="cp-input flex-1 text-xs" />
             <button type="button" onClick={copyLink} className="cp-btn-ghost shrink-0">
-              {copied ? <Check className="h-4 w-4 text-emerald-500" /> : "Copy"}
+              {copied ? <Check className="h-4 w-4 text-violet-500" /> : "Copy"}
             </button>
           </div>
         </div>

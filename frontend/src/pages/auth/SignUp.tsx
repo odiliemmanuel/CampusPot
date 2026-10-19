@@ -102,7 +102,7 @@ export default function SignUp() {
           </div>
         </div>
 
-        {error && <p className="text-sm text-rose-600">{error}</p>}
+        {error && <p className="text-sm text-violet-600">{error}</p>}
 
         <button
           type="submit"

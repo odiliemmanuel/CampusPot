@@ -148,7 +148,7 @@ export default function QrScanner({ onResult, onClose }: QrScannerProps) {
 
         <div className="px-5 py-4">
           {error ? (
-            <p className="text-sm text-rose-600">{error}</p>
+            <p className="text-sm text-violet-600">{error}</p>
           ) : (
             <p className="text-center text-xs text-slate-500">
               Point your camera at the pot's QR code.

@@ -9,7 +9,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#F4F6FB] text-slate-900">
+    <div className="min-h-screen overflow-x-hidden bg-[#F7F5FF] text-slate-900">
       <Sidebar mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
 
       <div className="lg:pl-60">

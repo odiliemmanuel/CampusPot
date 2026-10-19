@@ -47,7 +47,7 @@ export default function AuthLayout({
           >
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-semibold text-slate-400">200L Mass Comm · Excursion levy</span>
-              <span className="text-xs font-semibold text-emerald-600">₦13,000 left</span>
+              <span className="text-xs font-semibold text-violet-600">₦13,000 left</span>
             </div>
             <div className="flex items-center gap-2 mb-3">
               <div className="w-7 h-7 rounded-full bg-primary-600 flex items-center justify-center">

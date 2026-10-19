@@ -70,7 +70,7 @@ export function AssistantInner() {
             <div>
               <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">AI Treasurer</p>
               <p className="text-xs text-slate-400 flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-emerald-500" /> Read-only · cannot spend
+                <ShieldCheck className="w-3 h-3 text-violet-500" /> Read-only · cannot spend
               </p>
             </div>
           </div>
@@ -104,7 +104,7 @@ export function AssistantInner() {
             )}
           </div>
 
-          {error && <p className="text-sm text-rose-600 mb-3">{error}</p>}
+          {error && <p className="text-sm text-violet-600 mb-3">{error}</p>}
 
           {/* Suggestions */}
           <div className="flex flex-wrap gap-2 mb-3">
@@ -156,7 +156,7 @@ export function AssistantInner() {
                     <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{r.channel}</span>
                     <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
                       r.status === "sent"
-                        ? "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600"
+                        ? "bg-violet-100 dark:bg-violet-500/15 text-violet-600"
                         : "bg-slate-100 dark:bg-slate-700 text-slate-500"
                     }`}>
                       {r.status}

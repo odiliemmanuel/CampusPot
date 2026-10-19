@@ -1,7 +1,7 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
-  Loader2, Bell, CheckCircle2, Landmark, ArrowDownLeft, RefreshCw, Plus,
+  Loader2, Bell, CheckCircle2, ArrowDownLeft, RefreshCw,
 } from "lucide-react";
 
 import AppShell from "../../layouts/AppShell";
@@ -9,7 +9,7 @@ import GroupGate from "../../components/GroupGate";
 import PageHeader from "../../components/PageHeader";
 import { useGroup } from "../../providers/GroupProvider";
 import {
-  listPayments, listMembers, simulateDeposit, recordManualPayment,
+  listPayments, listMembers,
   draftReminder, sendReminder, walletPayPot, getStoredUser, getContributions,
   type Payment, type Membership, type ContributionsResponse, type ContributionRow,
 } from "../../lib/api";
@@ -18,11 +18,11 @@ import { formatNaira, nairaToKobo } from "../../lib/format";
 function statusBadge(row: ContributionRow) {
   switch (row.state) {
     case "paid":
-      return { label: "Paid in full", tint: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10" };
+      return { label: "Paid in full", tint: "bg-violet-50 text-violet-600 dark:bg-violet-500/10" };
     case "partial":
-      return { label: "Partial", tint: "bg-amber-50 text-amber-600 dark:bg-amber-500/10" };
+      return { label: "Partial", tint: "bg-violet-50 text-violet-600 dark:bg-violet-500/10" };
     case "unpaid":
-      return { label: "Not paid", tint: "bg-rose-50 text-rose-600 dark:bg-rose-500/10" };
+      return { label: "Not paid", tint: "bg-violet-50 text-violet-600 dark:bg-violet-500/10" };
     default:
       return { label: "—", tint: "bg-slate-100 text-slate-500 dark:bg-white/5" };
   }
@@ -37,19 +37,13 @@ export function ContributionsInner() {
   const [contrib, setContrib] = useState<ContributionsResponse | null>(null);
   const [members, setMembers] = useState<Membership[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
   const [reminded, setReminded] = useState<Record<string, boolean>>({});
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
-  // Deposit simulator form state
-  const [depAmount, setDepAmount] = useState("");
-  const [depRef, setDepRef] = useState("");
-  const [depPayer, setDepPayer] = useState("");
-  const [showDeposit, setShowDeposit] = useState(false);
-
   const [payAmount, setPayAmount] = useState("");
   const [payBusy, setPayBusy] = useState(false);
+  const [showAllRows, setShowAllRows] = useState(false);
 
   const load = async () => {
     const [p, c, m] = await Promise.all([
@@ -70,32 +64,6 @@ export function ContributionsInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeGroup?.id]);
 
-  const handleSimulate = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(""); setNotice(""); setBusy(true);
-    try {
-      await simulateDeposit(gid, nairaToKobo(depAmount), depRef, depPayer);
-      setNotice("Deposit reconciled.");
-      setDepAmount(""); setDepRef(""); setDepPayer(""); setShowDeposit(false);
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't record the deposit.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleManual = async (userId: string, amountNaira: string) => {
-    setError(""); setNotice("");
-    try {
-      await recordManualPayment(gid, userId, nairaToKobo(amountNaira));
-      setNotice("Payment recorded.");
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't record the payment.");
-    }
-  };
-
   const handleRemind = async (userId: string) => {
     setError("");
     try {
@@ -115,6 +83,7 @@ export function ContributionsInner() {
   const canManage = myRole === "treasurer";
 
   const rows = contrib?.rows ?? [];
+  const shownRows = showAllRows ? rows : rows.slice(0, 5);
   const mine = rows.find((r) => r.isMe);
   const myOwed = mine && mine.state !== "paid" && mine.state !== "none"
     ? Math.max(0, mine.amountKobo - mine.paidKobo)
@@ -140,65 +109,32 @@ export function ContributionsInner() {
 
   return (
     <>
-      <PageHeader
-        title="Contributions"
-        subtitle="What each member is asked to contribute, how much they've paid, and who is still owing."
-        action={canManage ? (
-          <button onClick={() => setShowDeposit((v) => !v)} className="cp-btn-primary">
-            <Landmark className="w-4 h-4" /> Simulate deposit
-          </button>
-        ) : undefined}
-      />
+      <PageHeader title="Contributions" subtitle="Track what each member has paid and what's still due." />
 
       {notice && (
-        <div className="mb-4 flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl px-4 py-3">
+        <div className="mb-4 flex items-center gap-2 text-sm text-violet-700 dark:text-violet-400 bg-violet-50 dark:bg-violet-500/10 rounded-xl px-4 py-3">
           <CheckCircle2 className="w-4 h-4" /> {notice}
         </div>
       )}
-      {error && <p className="mb-4 text-sm text-rose-600">{error}</p>}
+      {error && <p className="mb-4 text-sm text-violet-600">{error}</p>}
 
-      {canManage && showDeposit && (
-        <motion.form
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
-          onSubmit={handleSimulate}
-          className="cp-card rounded-3xl p-5 mb-6 grid sm:grid-cols-4 gap-3 items-end"
-        >
-          <div className="sm:col-span-1">
-            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Amount (₦)</label>
-            <input required value={depAmount} onChange={(e) => setDepAmount(e.target.value)} placeholder="5000" className="cp-input mt-1" />
-          </div>
-          <div className="sm:col-span-1">
-            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Reference</label>
-            <input value={depRef} onChange={(e) => setDepRef(e.target.value)} placeholder="member ref code" className="cp-input mt-1" />
-          </div>
-          <div className="sm:col-span-1">
-            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Payer name</label>
-            <input value={depPayer} onChange={(e) => setDepPayer(e.target.value)} placeholder="e.g. FATIMA B" className="cp-input mt-1" />
-          </div>
-          <button type="submit" disabled={busy} className="cp-btn-primary">
-            {busy ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ArrowDownLeft className="w-4 h-4" />} Record
-          </button>
-        </motion.form>
-      )}
-
-      <div className="grid lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 cp-card rounded-3xl p-6">
-          <div className="mb-4 flex items-center justify-between gap-2">
+      <div className="grid gap-3 sm:gap-5 lg:grid-cols-3">
+        <div className="cp-card rounded-2xl p-3 sm:rounded-3xl sm:p-5 lg:col-span-2">
+          <div className="mb-3 flex items-center justify-between gap-2 sm:mb-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
               Who has paid
             </p>
           </div>
 
           {contrib && (
-            <div className="mb-5 grid grid-cols-2 gap-3">
-              <div className="rounded-2xl bg-emerald-50 p-4 dark:bg-emerald-500/10">
-                <p className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">Collected</p>
-                <p className="mt-0.5 font-sora text-lg font-bold text-emerald-700 dark:text-emerald-300">
+            <div className="mb-3 grid grid-cols-2 gap-2 sm:mb-4 sm:gap-3">
+              <div className="rounded-xl bg-violet-100 p-3 dark:bg-violet-500/10 sm:rounded-2xl sm:p-4">
+                <p className="text-[11px] font-medium text-violet-700 dark:text-violet-300">Collected</p>
+                <p className="mt-0.5 truncate font-sora text-base font-bold text-violet-800 dark:text-violet-200 sm:text-lg">
                   {formatNaira(contrib.collectedKobo)}
                 </p>
               </div>
-              <div className="rounded-2xl bg-brand-50 p-4 dark:bg-brand-500/10">
+              <div className="rounded-xl bg-violet-100 p-3 dark:bg-violet-500/10 sm:rounded-2xl sm:p-4">
                 <p className="text-[11px] font-medium text-brand-700 dark:text-brand-300">Target</p>
                 <p className="mt-0.5 font-sora text-lg font-bold text-brand-700 dark:text-brand-300">
                   {formatNaira(contrib.expectedKobo)}
@@ -216,12 +152,12 @@ export function ContributionsInner() {
             <p className="text-sm text-slate-400">No members yet.</p>
           ) : (
             <div className="space-y-2">
-              {rows.map((r) => {
+              {shownRows.map((r) => {
                 const badge = statusBadge(r);
                 return (
-                  <div key={r.userId} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-white dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold shrink-0">
+                  <div key={r.userId} className="flex items-center justify-between gap-2 rounded-xl border border-violet-100 bg-white px-2.5 py-2 dark:border-violet-300/10 dark:bg-slate-800/60 sm:gap-3 sm:p-3">
+                    <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-purple-800 text-sm font-bold text-white sm:h-9 sm:w-9">
                         {(r.name || "?").charAt(0).toUpperCase()}
                       </div>
                       <div className="min-w-0">
@@ -249,7 +185,7 @@ export function ContributionsInner() {
                       {canManage && r.state !== "paid" && (
                         <button
                           onClick={() => handleRemind(r.userId)}
-                          className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-primary-50 text-primary-700 dark:bg-primary-500/15 dark:text-primary-300"
+                          className="inline-flex items-center gap-1 rounded-lg bg-violet-100 px-2 py-1.5 text-[10px] font-semibold text-violet-800 dark:bg-violet-500/15 dark:text-violet-200 sm:px-2.5 sm:text-[11px]"
                         >
                           {reminded[r.userId] ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Bell className="w-3.5 h-3.5" />}
                           {reminded[r.userId] ? "Sent" : "Remind"}
@@ -262,20 +198,18 @@ export function ContributionsInner() {
             </div>
           )}
 
-          {canManage && members.length > 0 && (
-            <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-3">
-                Record a cash payment
-              </p>
-              <ManualPayRow members={members} onSubmit={handleManual} />
-            </div>
+          {rows.length > 5 && (
+            <button type="button" onClick={() => setShowAllRows((shown) => !shown)} className="mt-3 w-full rounded-xl border border-violet-200 px-3 py-2 text-xs font-semibold text-violet-700 transition hover:bg-violet-50 dark:border-violet-300/15 dark:text-violet-200 dark:hover:bg-white/5 sm:w-auto">
+              {showAllRows ? "Show fewer" : `Show all ${rows.length} members`}
+            </button>
           )}
+
         </div>
 
         {/* Right column */}
         <div className="space-y-6">
           {mine && mine.state !== "none" && (
-            <div className="cp-card rounded-3xl p-6">
+            <div className="cp-card rounded-2xl p-3 sm:rounded-3xl sm:p-5">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-3">
                 Your dues
               </p>
@@ -292,7 +226,7 @@ export function ContributionsInner() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500 dark:text-slate-400">Paid so far</span>
-                  <span className="font-medium text-emerald-600 dark:text-emerald-400">{formatNaira(mine.paidKobo)}</span>
+                  <span className="font-medium text-violet-600 dark:text-violet-400">{formatNaira(mine.paidKobo)}</span>
                 </div>
               </div>
               {myOwed > 0 && (
@@ -318,24 +252,24 @@ export function ContributionsInner() {
           )}
 
           {canManage ? (
-            <div className="cp-card rounded-3xl p-6">
+            <div className="cp-card rounded-2xl p-3 sm:rounded-3xl sm:p-5">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-4">
                 Recent payments
               </p>
               {payments.length === 0 ? (
                 <p className="text-sm text-slate-400">No payments yet.</p>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {payments.slice(0, 8).map((p) => (
                     <div key={p.id} className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/15 flex items-center justify-center shrink-0">
-                        <ArrowDownLeft className="w-4 h-4 text-emerald-600" />
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-500/15">
+                        <ArrowDownLeft className="h-4 w-4 text-violet-700 dark:text-violet-300" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm text-slate-700 dark:text-slate-200 truncate">{p.payerName || p.quotedReference || "Deposit"}</p>
                         <p className="text-xs text-slate-400">{new Date(p.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}</p>
                       </div>
-                      <span className="text-sm font-semibold text-emerald-600 shrink-0">{formatNaira(p.amountKobo)}</span>
+                      <span className="shrink-0 text-sm font-semibold text-violet-700 dark:text-violet-300">{formatNaira(p.amountKobo)}</span>
                     </div>
                   ))}
                 </div>
@@ -347,7 +281,7 @@ export function ContributionsInner() {
                 Still to pay ({unpaid.length})
               </p>
               {unpaid.length === 0 ? (
-                <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400">
+                <div className="flex items-center gap-2 text-sm text-violet-600 dark:text-violet-400">
                   <CheckCircle2 className="w-4 h-4" /> Everyone is paid up.
                 </div>
               ) : (
@@ -364,39 +298,6 @@ export function ContributionsInner() {
         </div>
       </div>
     </>
-  );
-}
-
-function ManualPayRow({
-  members,
-  onSubmit,
-}: {
-  members: Membership[];
-  onSubmit: (userId: string, amount: string) => void;
-}) {
-  const [userId, setUserId] = useState(members[0]?.userId ?? "");
-  const [amount, setAmount] = useState("");
-
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!userId || !amount) return;
-        onSubmit(userId, amount);
-        setAmount("");
-      }}
-      className="flex flex-wrap gap-2 items-end"
-    >
-      <select value={userId} onChange={(e) => setUserId(e.target.value)} className="cp-input flex-1 min-w-[140px]">
-        {members.map((m) => (
-          <option key={m.userId} value={m.userId}>
-            {(m.user?.name ?? m.userId) + (m.user?.email ? ` (${m.user.email})` : "")}
-          </option>
-        ))}
-      </select>
-      <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Amount ₦" className="cp-input w-32" />
-      <button type="submit" className="cp-btn-ghost"><Plus className="w-4 h-4" /> Record</button>
-    </form>
   );
 }
 

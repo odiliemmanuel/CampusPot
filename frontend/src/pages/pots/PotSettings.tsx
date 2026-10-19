@@ -99,11 +99,11 @@ export default function PotSettings() {
       />
 
       {notice && (
-        <div className="mb-4 flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
+        <div className="mb-4 flex items-center gap-2 rounded-xl bg-violet-50 px-4 py-3 text-sm text-violet-700 dark:bg-violet-500/10 dark:text-violet-400">
           <CheckCircle2 className="h-4 w-4" /> {notice}
         </div>
       )}
-      {error && <p className="mb-4 text-sm text-rose-600">{error}</p>}
+      {error && <p className="mb-4 text-sm text-violet-600">{error}</p>}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <form onSubmit={save} className="space-y-5 rounded-3xl border border-slate-100 bg-white p-6 shadow-sm lg:col-span-2">
@@ -177,7 +177,7 @@ export default function PotSettings() {
           {canManage && (
             <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
               <div className="mb-2 flex items-center gap-2">
-                <ShieldAlert className="h-4 w-4 text-amber-500" />
+                <ShieldAlert className="h-4 w-4 text-violet-500" />
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Join code</p>
               </div>
               <p className="text-sm text-slate-500">
@@ -194,9 +194,9 @@ export default function PotSettings() {
             </div>
           )}
 
-          <div className="rounded-3xl border border-rose-100 bg-white p-6 shadow-sm dark:border-rose-500/20">
+          <div className="rounded-3xl border border-violet-100 bg-white p-6 shadow-sm dark:border-violet-500/20">
             <div className="mb-2 flex items-center gap-2">
-              <LogOut className="h-4 w-4 text-rose-500" />
+              <LogOut className="h-4 w-4 text-violet-500" />
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Leave pot</p>
             </div>
             <p className="text-sm text-slate-500">
@@ -206,7 +206,7 @@ export default function PotSettings() {
               type="button"
               onClick={leave}
               disabled={busy}
-              className="cp-btn-ghost mt-3 text-rose-600"
+              className="cp-btn-ghost mt-3 text-violet-600"
             >
               <LogOut className="h-4 w-4" /> Leave this pot
             </button>

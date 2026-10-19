@@ -30,7 +30,7 @@ export default function DataTable<T>({
     <div className="overflow-x-auto">
       <table className="w-full min-w-[760px] border-collapse text-left">
         <thead>
-          <tr className="bg-[#E8EEFC]">
+          <tr className="bg-violet-100">
             {columns.map((col) => (
               <th
                 key={col.key}

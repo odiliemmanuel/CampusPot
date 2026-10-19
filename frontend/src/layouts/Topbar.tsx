@@ -114,7 +114,7 @@ export default function Topbar({ onMenu }: { onMenu: () => void }) {
           className="relative flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
         >
           <Bell className="h-5 w-5" />
-          <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
+          <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-violet-500 ring-2 ring-white" />
         </button>
 
         {/* Avatar + menu */}
@@ -159,7 +159,7 @@ export default function Topbar({ onMenu }: { onMenu: () => void }) {
                   type="button"
                   role="menuitem"
                   onClick={logout}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 transition hover:bg-red-50"
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-violet-600 transition hover:bg-violet-50"
                 >
                   <LogOut className="h-4 w-4" /> Log out
                 </button>
