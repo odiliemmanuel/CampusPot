@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Loader2, MessageSquare, Send, X } from "lucide-react";
+import { ArrowLeft, Loader2, MessageSquare, Mic, Paperclip, Send, Square, X } from "lucide-react";
 
 import { useGroup } from "../../providers/GroupProvider";
 import {
-  ApiError, getStoredUser, listChat, listChatParticipants, markChatRead, postChat,
+  ApiError, chatWebSocketProtocols, chatWebSocketUrl, getChatAttachment, getStoredUser, listChat, listChatParticipants, markChatRead, postChat, uploadChatAttachment,
   type ChatMessage, type Membership,
 } from "../../lib/api";
 
@@ -23,6 +23,20 @@ function timeLabel(iso: string) {
   });
 }
 
+function ChatAttachment({ message }: { message: ChatMessage }) {
+  const [url, setUrl] = useState("");
+  useEffect(() => {
+    if (!message.attachmentUrl) return;
+    let objectUrl = "";
+    getChatAttachment(message.attachmentUrl).then((blob) => { objectUrl = URL.createObjectURL(blob); setUrl(objectUrl); }).catch(() => {});
+    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [message.attachmentUrl]);
+  if (!url) return <span className="my-1 block text-xs opacity-70">Loading attachment…</span>;
+  if (message.attachmentType?.startsWith("audio/")) return <audio className="my-2 max-w-full" controls src={url} />;
+  if (message.attachmentType?.startsWith("image/")) return <a href={url} target="_blank" rel="noreferrer"><img className="my-2 max-h-64 rounded-lg" src={url} alt={message.attachmentName || "Chat image"} /></a>;
+  return <a className="my-1 flex items-center gap-2 underline" href={url} download={message.attachmentName}><Paperclip className="h-4 w-4" />{message.attachmentName || "Download file"}</a>;
+}
+
 // A standalone, WhatsApp-style group chat for one pot. Reached from the pot
 // header rather than embedded as a tab, so it gets the full screen.
 function ChatRoom({ groupId, groupName }: { groupId: string; groupName: string }) {
@@ -36,7 +50,12 @@ function ChatRoom({ groupId, groupName }: { groupId: string; groupName: string }
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [recording, setRecording] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const mediaRecorder = useRef<MediaRecorder | null>(null);
+  const recordedChunks = useRef<Blob[]>([]);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   const nameById = (uid: string) =>
     participants.find((p) => p.userId === uid)?.user?.name ??
@@ -74,6 +93,29 @@ function ChatRoom({ groupId, groupName }: { groupId: string; groupName: string }
   }, [groupId]);
 
   useEffect(() => {
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let socket: WebSocket | undefined;
+    let stopped = false;
+    const connect = () => {
+      if (stopped) return;
+      socket = new WebSocket(chatWebSocketUrl(groupId), chatWebSocketProtocols());
+      socket.onopen = () => { void load().catch(() => {}); };
+      socket.onmessage = (event) => {
+        try {
+          const envelope = JSON.parse(event.data) as { type?: string; data?: ChatMessage };
+          if (envelope.type === "message" && envelope.data) {
+            setMessages((old) => old.some((m) => m.id === envelope.data!.id) ? old : [...old, envelope.data!]);
+          }
+        } catch { /* Ignore malformed socket events. */ }
+      };
+      socket.onclose = () => { if (!stopped) retry = setTimeout(connect, 2500); };
+      socket.onerror = () => socket?.close();
+    };
+    connect();
+    return () => { stopped = true; if (retry) clearTimeout(retry); socket?.close(); };
+  }, [groupId]);
+
+  useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
@@ -83,7 +125,8 @@ function ChatRoom({ groupId, groupName }: { groupId: string; groupName: string }
     setSending(true);
     setError("");
     try {
-      await postChat(groupId, text, replyTo?.id);
+      const created = await postChat(groupId, text, replyTo?.id);
+      setMessages((old) => old.some((m) => m.id === created.id) ? old : [...old, created]);
       setBody("");
       setReplyTo(null);
       const msgs = await load();
@@ -95,6 +138,35 @@ function ChatRoom({ groupId, groupName }: { groupId: string; groupName: string }
       setSending(false);
     }
   };
+
+  const upload = async (file?: File) => {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { setError("Files must be 10 MB or smaller."); return; }
+    setUploading(true); setError("");
+    try {
+      const created = await uploadChatAttachment(groupId, file);
+      setMessages((old) => old.some((m) => m.id === created.id) ? old : [...old, created]);
+      await markChatRead(groupId, created.id).catch(() => {});
+    } catch (err) { setError(describeError(err, "Couldn't upload the file.")); }
+    finally { setUploading(false); }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      recordedChunks.current = [];
+      recorder.ondataavailable = (event) => { if (event.data.size) recordedChunks.current.push(event.data); };
+      recorder.onstop = () => {
+        const blob = new Blob(recordedChunks.current, { type: recorder.mimeType || "audio/webm" });
+        stream.getTracks().forEach((track) => track.stop());
+        const ext = blob.type.includes("mp4") ? "m4a" : "webm";
+        void upload(new File([blob], `voice-note-${Date.now()}.${ext}`, { type: blob.type }));
+      };
+      mediaRecorder.current = recorder; recorder.start(); setRecording(true);
+    } catch { setError("Microphone access is unavailable. Allow microphone access and try again."); }
+  };
+  const stopRecording = () => { mediaRecorder.current?.stop(); setRecording(false); };
 
   return (
     <div className="fixed inset-x-0 bottom-16 top-[3.75rem] z-20 flex flex-col overflow-hidden border-slate-100 bg-white lg:bottom-0 lg:left-60 dark:border-white/10 dark:bg-panel-dark">
@@ -161,6 +233,7 @@ function ChatRoom({ groupId, groupName }: { groupId: string; groupName: string }
                     </div>
                   )}
                   <p className="whitespace-pre-wrap break-words text-sm">{m.body}</p>
+                  {m.attachmentUrl && <ChatAttachment message={m} />}
                   <div
                     className={[
                       "mt-1 flex items-center justify-end gap-1.5 text-[10px]",
@@ -214,6 +287,13 @@ function ChatRoom({ groupId, groupName }: { groupId: string; groupName: string }
       {error && <p className="px-3 py-1.5 text-xs text-rose-600">{error}</p>}
 
       <div className="flex items-end gap-2 border-t border-slate-100 p-2.5 dark:border-white/10">
+        <input ref={fileInput} type="file" className="hidden" onChange={(e) => { void upload(e.target.files?.[0]); e.currentTarget.value = ""; }} />
+        <button type="button" onClick={() => fileInput.current?.click()} disabled={uploading} className="rounded-full p-2.5 text-slate-500 hover:bg-slate-100 disabled:opacity-50 dark:hover:bg-white/10" aria-label="Attach file">
+          {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Paperclip className="h-5 w-5" />}
+        </button>
+        <button type="button" onClick={recording ? stopRecording : startRecording} className={`rounded-full p-2.5 ${recording ? "text-rose-600" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10"}`} aria-label={recording ? "Stop voice note" : "Record voice note"}>
+          {recording ? <Square className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+        </button>
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
@@ -224,7 +304,7 @@ function ChatRoom({ groupId, groupName }: { groupId: string; groupName: string }
             }
           }}
           rows={1}
-          placeholder="Message the pot"
+          placeholder={recording ? "Recording voice note…" : "Message the pot"}
           className="cp-input max-h-32 flex-1 resize-none py-2.5"
         />
         <button

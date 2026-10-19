@@ -285,7 +285,10 @@ type ChatMessage struct {
 	UserID  uuid.UUID `gorm:"type:uuid;index;not null" json:"userId"`
 	Body    string    `gorm:"not null" json:"body"`
 	// ReplyToID links a message to the one it answers, for threaded replies.
-	ReplyToID *uuid.UUID `gorm:"type:uuid" json:"replyToId,omitempty"`
+	ReplyToID      *uuid.UUID `gorm:"type:uuid" json:"replyToId,omitempty"`
+	AttachmentName string     `json:"attachmentName,omitempty"`
+	AttachmentType string     `json:"attachmentType,omitempty"`
+	AttachmentData []byte     `gorm:"type:bytea" json:"-"`
 }
 
 // ChatReadReceipt records that a member has seen a message. The unique index

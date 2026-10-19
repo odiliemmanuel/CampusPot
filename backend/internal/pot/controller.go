@@ -2,7 +2,9 @@ package pot
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -37,6 +39,8 @@ func (ct *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 	// are tracked per message.
 	g.GET("/:id/chat", ct.listChat)
 	g.POST("/:id/chat", ct.postChat)
+	g.POST("/:id/chat/attachments", ct.uploadChatAttachment)
+	g.GET("/:id/chat/:messageId/attachment", ct.getChatAttachment)
 	g.POST("/:id/chat/read", ct.markChatRead)
 	g.GET("/:id/chat/participants", ct.chatParticipants)
 	g.DELETE("/:id/chat/members/:userId", ct.removeChatMember)
@@ -590,6 +594,47 @@ func (ct *Controller) postChat(c *gin.Context) {
 		return
 	}
 	response.Created(c, msg)
+	chatBroadcast.publish(groupID, msg)
+}
+
+func (ct *Controller) uploadChatAttachment(c *gin.Context) {
+	groupID, ok := pathID(c, "id")
+	if !ok {
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, (10<<20)+(1<<20))
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "INVALID_FILE", "Choose a file to upload.")
+		return
+	}
+	defer file.Close()
+	msg, err := ct.svc.UploadChatAttachment(c.Request.Context(), groupID, auth.MustUserID(c), filepath.Base(header.Filename), header.Header.Get("Content-Type"), file)
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	chatBroadcast.publish(groupID, msg)
+	response.Created(c, msg)
+}
+
+func (ct *Controller) getChatAttachment(c *gin.Context) {
+	groupID, ok := pathID(c, "id")
+	if !ok {
+		return
+	}
+	messageID, ok := pathID(c, "messageId")
+	if !ok {
+		return
+	}
+	name, contentType, data, err := ct.svc.ChatAttachment(c.Request.Context(), groupID, auth.MustUserID(c), messageID)
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	c.Header("Content-Disposition", fmt.Sprintf("inline; filename=%q", name))
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.Data(http.StatusOK, contentType, data)
 }
 
 func (ct *Controller) markChatRead(c *gin.Context) {

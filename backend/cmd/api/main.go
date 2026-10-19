@@ -100,7 +100,9 @@ func main() {
 	// Authenticated feature routes.
 	authed := api.Group("")
 	authed.Use(authSvc.RequireAuth())
-	pot.NewController(potSvc).RegisterRoutes(authed)
+	potController := pot.NewController(potSvc)
+	potController.RegisterRoutes(authed)
+	potController.RegisterChatWebSocket(api, authSvc)
 	ai.NewController(aiSvc).RegisterRoutes(authed)
 
 	runServer(cfg, router)

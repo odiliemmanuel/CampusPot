@@ -255,6 +255,9 @@ export interface ChatMessage {
   replyToId?: string;
   createdAt: string;
   readBy: string[];
+  attachmentName?: string;
+  attachmentType?: string;
+  attachmentUrl?: string;
 }
 
 export type DisputeStatus = "open" | "resolved";
@@ -443,6 +446,26 @@ export const postChat = (groupId: string, body: string, replyToId?: string) =>
     method: "POST",
     body: JSON.stringify({ body, replyToId }),
   });
+export const uploadChatAttachment = async (groupId: string, file: File) => {
+  const form = new FormData();
+  form.append("file", file);
+  const response = await fetch(`${API_URL}/groups/${groupId}/chat/attachments`, {
+    method: "POST", headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {}, body: form,
+  });
+  const envelope = await response.json().catch(() => ({}));
+  if (!response.ok || envelope.success === false) throw new ApiError(envelope.error?.message || "Upload failed.", response.status);
+  return envelope.data as ChatMessage;
+};
+export const getChatAttachment = async (url: string) => {
+  const response = await fetch(`${apiOrigin}${url}`, { headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {} });
+  if (!response.ok) throw new ApiError("Could not load this attachment.", response.status);
+  return response.blob();
+};
+export const chatWebSocketUrl = (groupId: string) => {
+  const wsOrigin = apiOrigin.replace(/^http:/, "ws:").replace(/^https:/, "wss:");
+  return `${wsOrigin}/api/v1/groups/${groupId}/chat/ws`;
+};
+export const chatWebSocketProtocols = () => ["campuspot", `auth.${getToken() ?? ""}`];
 export const markChatRead = (groupId: string, messageId: string) =>
   request<{ status: string }>(`/groups/${groupId}/chat/read`, {
     method: "POST",

@@ -1,8 +1,10 @@
 package pot
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -15,13 +17,16 @@ import (
 // ids of the members who have read it. Chat is open to every active member of
 // the pot — there is no separate chat membership to manage.
 type ChatMessageView struct {
-	ID        uuid.UUID   `json:"id"`
-	UserID    uuid.UUID   `json:"userId"`
-	Author    string      `json:"author"`
-	Body      string      `json:"body"`
-	ReplyToID *uuid.UUID  `json:"replyToId,omitempty"`
-	CreatedAt time.Time   `json:"createdAt"`
-	ReadBy    []uuid.UUID `json:"readBy"`
+	ID             uuid.UUID   `json:"id"`
+	UserID         uuid.UUID   `json:"userId"`
+	Author         string      `json:"author"`
+	Body           string      `json:"body"`
+	ReplyToID      *uuid.UUID  `json:"replyToId,omitempty"`
+	CreatedAt      time.Time   `json:"createdAt"`
+	ReadBy         []uuid.UUID `json:"readBy"`
+	AttachmentName string      `json:"attachmentName,omitempty"`
+	AttachmentType string      `json:"attachmentType,omitempty"`
+	AttachmentURL  string      `json:"attachmentUrl,omitempty"`
 }
 
 // ChatParticipants returns the active members who can see the pot chat. Chat
@@ -45,7 +50,7 @@ func (s *Service) ListChat(_ context.Context, groupID, actorID uuid.UUID) ([]Cha
 	}
 
 	var msgs []models.ChatMessage
-	if err := s.db.Where("group_id = ?", groupID).Order("created_at ASC").Find(&msgs).Error; err != nil {
+	if err := s.db.Omit("AttachmentData").Where("group_id = ?", groupID).Order("created_at ASC").Find(&msgs).Error; err != nil {
 		return nil, err
 	}
 
@@ -70,16 +75,76 @@ func (s *Service) ListChat(_ context.Context, groupID, actorID uuid.UUID) ([]Cha
 			readers = []uuid.UUID{}
 		}
 		out = append(out, ChatMessageView{
-			ID:        m.ID,
-			UserID:    m.UserID,
-			Author:    names[m.UserID],
-			Body:      m.Body,
-			ReplyToID: m.ReplyToID,
-			CreatedAt: m.CreatedAt,
-			ReadBy:    readers,
+			ID:             m.ID,
+			UserID:         m.UserID,
+			Author:         names[m.UserID],
+			Body:           m.Body,
+			ReplyToID:      m.ReplyToID,
+			CreatedAt:      m.CreatedAt,
+			ReadBy:         readers,
+			AttachmentName: m.AttachmentName,
+			AttachmentType: m.AttachmentType,
+			AttachmentURL:  chatAttachmentURL(groupID, m.ID, m.AttachmentName),
 		})
 	}
 	return out, nil
+}
+
+func chatAttachmentURL(groupID, messageID uuid.UUID, name string) string {
+	if name == "" {
+		return ""
+	}
+	return fmt.Sprintf("/api/v1/groups/%s/chat/%s/attachment", groupID, messageID)
+}
+
+// UploadChatAttachment stores a small chat file or voice note in the database
+// so it remains available across API restarts and instances.
+func (s *Service) UploadChatAttachment(ctx context.Context, groupID, actorID uuid.UUID, name, contentType string, file io.Reader) (*ChatMessageView, error) {
+	if _, err := s.requireMember(groupID, actorID); err != nil {
+		return nil, err
+	}
+	const maxSize = 10 << 20
+	data, err := io.ReadAll(io.LimitReader(file, maxSize+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(data) == 0 || len(data) > maxSize {
+		return nil, fmt.Errorf("%w: attachment must be between 1 byte and 10 MB", ErrInvalid)
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = "attachment"
+	}
+	if len(name) > 180 {
+		name = name[:180]
+	}
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	if len(contentType) > 120 {
+		return nil, fmt.Errorf("%w: unsupported content type", ErrInvalid)
+	}
+	msg := &models.ChatMessage{GroupID: groupID, UserID: actorID, Body: "", AttachmentName: name, AttachmentType: contentType, AttachmentData: data}
+	if err := s.db.Create(msg).Error; err != nil {
+		return nil, err
+	}
+	_ = s.db.Create(&models.ChatReadReceipt{GroupID: groupID, MessageID: msg.ID, UserID: actorID}).Error
+	names, _ := s.loadMemberNames(groupID)
+	return &ChatMessageView{ID: msg.ID, UserID: msg.UserID, Author: names[actorID], CreatedAt: msg.CreatedAt, ReadBy: []uuid.UUID{actorID}, AttachmentName: name, AttachmentType: contentType, AttachmentURL: chatAttachmentURL(groupID, msg.ID, name)}, nil
+}
+
+func (s *Service) ChatAttachment(ctx context.Context, groupID, actorID, messageID uuid.UUID) (string, string, []byte, error) {
+	if _, err := s.requireMember(groupID, actorID); err != nil {
+		return "", "", nil, err
+	}
+	var msg models.ChatMessage
+	if err := s.db.WithContext(ctx).First(&msg, "id = ? AND group_id = ?", messageID, groupID).Error; err != nil {
+		return "", "", nil, ErrNotFound
+	}
+	if len(msg.AttachmentData) == 0 {
+		return "", "", nil, ErrNotFound
+	}
+	return msg.AttachmentName, msg.AttachmentType, bytes.Clone(msg.AttachmentData), nil
 }
 
 // PostChatRequest is the body for sending a chat message.
