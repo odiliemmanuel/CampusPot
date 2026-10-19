@@ -105,12 +105,8 @@ export default function PotSettings() {
       )}
       {error && <p className="mb-4 text-sm text-violet-600">{error}</p>}
 
-      <div className="grid gap-3 lg:grid-cols-3">
-        <form onSubmit={save} className="cp-card space-y-3 rounded-2xl p-3 sm:p-4 lg:col-span-2">
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-violet-50 px-3 py-2 dark:bg-violet-500/10">
-            <div><p className="text-[10px] font-bold uppercase tracking-wide text-violet-700 dark:text-violet-300">Contribution plan</p><p className="mt-0.5 text-xs font-medium text-slate-700 dark:text-slate-200">{activeGroup!.potType === "rotating" ? `Recurring · ${activeGroup!.contributionFrequency} · ${formatNaira(activeGroup!.contributionAmountKobo)} per member` : `Goal pot · one-time · ${formatNaira(activeGroup!.contributionAmountKobo)} per member`}</p></div>
-            {activeGroup!.contributionDueDate && <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-violet-700 dark:bg-white/10 dark:text-violet-200">Due {new Date(activeGroup!.contributionDueDate).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</span>}
-          </div>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <form onSubmit={save} className="space-y-5 rounded-3xl border border-slate-100 bg-white p-6 shadow-sm lg:col-span-2">
           <div>
             <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Pot name</label>
             <input
@@ -121,7 +117,7 @@ export default function PotSettings() {
             />
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-5 sm:grid-cols-2">
             <div>
               <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Approvals required</label>
               <input
@@ -179,12 +175,12 @@ export default function PotSettings() {
           <JoinCard code={activeGroup!.joinCode} />
 
           {canManage && (
-            <div className="cp-card rounded-2xl p-3 sm:p-4">
+            <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
               <div className="mb-2 flex items-center gap-2">
                 <ShieldAlert className="h-4 w-4 text-violet-500" />
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Join code</p>
               </div>
-              <p className="text-xs leading-relaxed text-slate-500">
+              <p className="text-sm text-slate-500">
                 Rotate the code if it leaks. Anyone with a code can join as a member.
               </p>
               <button
@@ -198,12 +194,12 @@ export default function PotSettings() {
             </div>
           )}
 
-          <div className="cp-card rounded-2xl p-3 sm:p-4">
+          <div className="rounded-3xl border border-violet-100 bg-white p-6 shadow-sm dark:border-violet-500/20">
             <div className="mb-2 flex items-center gap-2">
               <LogOut className="h-4 w-4 text-violet-500" />
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Leave pot</p>
             </div>
-            <p className="text-xs leading-relaxed text-slate-500">
+            <p className="text-sm text-slate-500">
               Leaving removes you from the pot and its chat. A pot always keeps at least one treasurer.
             </p>
             <button

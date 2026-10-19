@@ -53,8 +53,8 @@ export default function NewPot() {
       />
 
       <div className="mx-auto mt-2 max-w-xl">
-        <div className="rounded-2xl cp-card p-3 sm:rounded-3xl sm:p-6">
-          <div className="mb-4 flex items-center gap-3 sm:mb-5">
+        <div className="rounded-3xl cp-card p-6 sm:p-8">
+          <div className="flex items-center gap-3 mb-6">
             <div className="w-11 h-11 rounded-2xl bg-primary-600 flex items-center justify-center">
               <HandCoins className="w-5 h-5 text-white" />
             </div>
@@ -79,12 +79,12 @@ export default function NewPot() {
             </div>
             <fieldset>
               <legend className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Pot type</legend>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <button type="button" role="radio" aria-checked={potType === "goal"} onClick={() => setPotType("goal")} className={`flex min-h-12 items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition ${potType === "goal" ? "border-violet-500 bg-violet-50 text-violet-800 dark:bg-violet-500/10 dark:text-violet-200" : "border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"}`}>
-                  <span><span className="block text-sm font-semibold">Goal pot</span><span className="mt-0.5 block text-[11px] opacity-75">One payment toward a target</span></span><span className={`h-4 w-4 shrink-0 rounded-full border-2 ${potType === "goal" ? "border-violet-600 bg-violet-600 shadow-[inset_0_0_0_3px_white]" : "border-slate-300"}`} />
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => setPotType("goal")} className={`rounded-xl border p-3 text-left transition ${potType === "goal" ? "border-violet-500 bg-violet-50 text-violet-800 dark:bg-violet-500/10 dark:text-violet-200" : "border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"}`}>
+                  <span className="block text-sm font-semibold">Goal pot</span><span className="mt-0.5 block text-[11px] opacity-75">One-time contributions</span>
                 </button>
-                <button type="button" role="radio" aria-checked={potType === "rotating"} onClick={() => setPotType("rotating")} className={`flex min-h-12 items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition ${potType === "rotating" ? "border-violet-500 bg-violet-50 text-violet-800 dark:bg-violet-500/10 dark:text-violet-200" : "border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"}`}>
-                  <span><span className="block text-sm font-semibold">Recurring pot</span><span className="mt-0.5 block text-[11px] opacity-75">Same amount on a schedule</span></span><span className={`h-4 w-4 shrink-0 rounded-full border-2 ${potType === "rotating" ? "border-violet-600 bg-violet-600 shadow-[inset_0_0_0_3px_white]" : "border-slate-300"}`} />
+                <button type="button" onClick={() => setPotType("rotating")} className={`rounded-xl border p-3 text-left transition ${potType === "rotating" ? "border-violet-500 bg-violet-50 text-violet-800 dark:bg-violet-500/10 dark:text-violet-200" : "border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"}`}>
+                  <span className="block text-sm font-semibold">Rotating pot</span><span className="mt-0.5 block text-[11px] opacity-75">Recurring contributions</span>
                 </button>
               </div>
             </fieldset>
@@ -110,7 +110,7 @@ export default function NewPot() {
                   </select>
                 </label>
               ) : <p className="mt-1 text-xs text-slate-400">The target is this amount × the number of members.</p>}
-              {potType === "rotating" && <p className="mt-1 text-xs text-slate-400">Members owe this amount each {frequency === "daily" ? "day" : frequency === "weekly" ? "week" : frequency === "monthly" ? "month" : "quarter"}. The next cycle opens after everyone pays; payouts stay manual and follow this pot’s approval rules.</p>}
+              {potType === "rotating" && <p className="mt-1 text-xs text-slate-400">When everyone has contributed, the next cycle opens automatically. Payouts stay manual and follow this pot’s approval rules.</p>}
             </div>
             <div>
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Contributions due by</label>

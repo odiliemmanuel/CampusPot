@@ -78,7 +78,7 @@ export default function GroupGate({ children }: { children: ReactNode }) {
 
   return (
     <div className="max-w-xl mx-auto mt-6">
-      <div className="rounded-2xl cp-card p-3 sm:rounded-3xl sm:p-6">
+      <div className="rounded-3xl cp-card p-6 sm:p-8">
         <div className="flex items-center gap-3 mb-2">
           <div className="w-11 h-11 rounded-2xl bg-primary-600 flex items-center justify-center">
             <HandCoins className="w-5 h-5 text-white" />
@@ -95,7 +95,7 @@ export default function GroupGate({ children }: { children: ReactNode }) {
           </div>
         </div>
 
-        <div className="my-4 flex gap-2">
+        <div className="flex gap-2 my-5">
           <button
             type="button"
             onClick={() => setMode("create")}
@@ -130,9 +130,9 @@ export default function GroupGate({ children }: { children: ReactNode }) {
             </div>
             <div>
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Pot type</label>
-              <div className="mt-1.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <button type="button" role="radio" aria-checked={potType === "goal"} onClick={() => setPotType("goal")} className={`min-h-11 rounded-xl border px-3 py-2.5 text-left text-xs font-semibold ${potType === "goal" ? "border-violet-500 bg-violet-50 text-violet-800 dark:bg-violet-500/10 dark:text-violet-200" : "border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"}`}>Goal pot · one-time contribution</button>
-                <button type="button" role="radio" aria-checked={potType === "rotating"} onClick={() => setPotType("rotating")} className={`min-h-11 rounded-xl border px-3 py-2.5 text-left text-xs font-semibold ${potType === "rotating" ? "border-violet-500 bg-violet-50 text-violet-800 dark:bg-violet-500/10 dark:text-violet-200" : "border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"}`}>Recurring pot · scheduled contributions</button>
+              <div className="mt-1.5 grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => setPotType("goal")} className={`rounded-xl border p-2.5 text-left text-xs font-semibold ${potType === "goal" ? "border-violet-500 bg-violet-50 text-violet-800 dark:bg-violet-500/10 dark:text-violet-200" : "border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"}`}>Goal · one-time</button>
+                <button type="button" onClick={() => setPotType("rotating")} className={`rounded-xl border p-2.5 text-left text-xs font-semibold ${potType === "rotating" ? "border-violet-500 bg-violet-50 text-violet-800 dark:bg-violet-500/10 dark:text-violet-200" : "border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"}`}>Rotating · recurring</button>
               </div>
             </div>
             {potType === "rotating" && <div>

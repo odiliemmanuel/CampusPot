@@ -92,7 +92,7 @@ export default function PotPage() {
 
   return (
     <>
-      <section className="mb-3 rounded-2xl border border-violet-200/70 bg-gradient-to-br from-violet-700 to-purple-800 px-3.5 py-3 text-white shadow-md shadow-violet-950/10 sm:mb-4 sm:rounded-[1.5rem] sm:px-5 sm:py-3.5">
+      <section className="mb-3 rounded-2xl border border-violet-200/70 bg-gradient-to-br from-violet-700 via-violet-700 to-purple-800 px-4 py-3.5 text-white shadow-md shadow-violet-950/10 sm:mb-4 sm:rounded-[1.5rem] sm:px-6 sm:py-4">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0"><p className="text-[9px] font-bold uppercase tracking-[.18em] text-violet-100/75 sm:text-[10px]">Pot balance</p><h1 className="mt-0.5 truncate font-sora text-xl font-extrabold leading-tight sm:text-2xl">{formatNaira(summary?.balanceKobo ?? 0)}</h1><p className="mt-1 truncate text-xs text-violet-100/80">{activeGroup?.name ?? "Your group pot"}</p></div>
           <div className="flex shrink-0 flex-col items-end gap-2"><span className="rounded-full bg-white/10 px-2.5 py-1 text-[9px] font-bold text-violet-50 sm:text-[10px]">Shared ledger</span><span className="hidden rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-right sm:block"><span className="block text-[8px] font-bold uppercase tracking-wider text-violet-100/70">Join code</span><span className="font-mono text-xs font-bold tracking-[.16em]">{activeGroup?.joinCode}</span></span></div>
@@ -101,17 +101,18 @@ export default function PotPage() {
 
       {/* Money cards — always visible while sections swap underneath. "Expected"
           is what the pot should hold (members × per-person), not a fixed sum. */}
-      <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile icon={<Wallet className="h-4 w-4" />} label="Expected" value={formatNaira(summary?.expectedKobo ?? 0)} tone="brand" />
         <StatTile icon={<TrendingUp className="h-4 w-4" />} label="Collected" value={formatNaira(summary?.collectedKobo ?? 0)} tone="green" />
         <StatTile icon={<Users className="h-4 w-4" />} label="Outstanding" value={formatNaira(summary?.outstandingKobo ?? 0)} tone="amber" />
         <StatTile icon={<ArrowUpRight className="h-4 w-4" />} label="Spent" value={formatNaira(summary?.spentKobo ?? 0)} tone="rose" />
       </div>
 
-      <p className="mb-2 mt-4 text-[10px] font-bold uppercase tracking-[.2em] text-slate-400">Pot overview</p>
+      <p className="mb-3 mt-6 text-[10px] font-bold uppercase tracking-[.2em] text-slate-400">Pot overview</p>
 
-      {/* Compact tab grid keeps every section visible on narrow screens. */}
-      <div className="mb-3 grid grid-cols-4 gap-1.5 sm:mb-4 sm:gap-2">
+      {/* Inline tab bar — only the section below changes. Chat opens as its
+          own full-screen page from the header button. */}
+      <div className="mb-4 mt-3 -mx-1 flex gap-1 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mb-5 sm:mt-4">
         {TABS.map((t) => {
           const active = t.key === tab;
           return (
@@ -120,7 +121,7 @@ export default function PotPage() {
               type="button"
               onClick={() => select(t.key)}
               className={[
-                "relative inline-flex min-h-9 items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-[9px] font-semibold transition-colors sm:min-h-10 sm:gap-1.5 sm:rounded-xl sm:px-2.5 sm:text-xs",
+                "relative inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition-colors sm:gap-2 sm:rounded-xl sm:px-3.5 sm:py-2 sm:text-sm",
                 active
                   ? "text-white"
                   : "text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-100",
