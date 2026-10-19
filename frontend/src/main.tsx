@@ -1,7 +1,12 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { startKeepAlive } from "./lib/keepAlive";
 import "./index.css";
+
+// Warm the API as soon as the app loads so the first sign-in doesn't pay the
+// backend's cold-start cost.
+startKeepAlive();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

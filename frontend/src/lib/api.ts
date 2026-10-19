@@ -18,6 +18,10 @@ function resolveApiUrl(): string {
 
 const API_URL = resolveApiUrl();
 
+// The API origin without the "/api/v1" suffix. Used to hit /health for the
+// warm-up ping that keeps the (free-tier) backend from scaling to zero.
+export const apiOrigin = API_URL.replace(/\/api\/v1\/?$/, "");
+
 const TOKEN_KEY = "campuspot_token";
 const USER_KEY = "campuspot_user";
 
