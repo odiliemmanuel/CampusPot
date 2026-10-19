@@ -478,21 +478,14 @@ function WalletHome() {
         Hi{(me?.name ?? "").trim() ? `, ${me!.name.split(" ")[0]}` : ""} 👋
       </h1>
 
-      {/* Wallet balance card */}
-      <div className={`relative isolate overflow-hidden rounded-[1.8rem] border border-white/10 p-5 text-white shadow-xl shadow-teal-950/15 sm:p-7 ${WALLET_GRADIENT}`}>
-        <div className="pointer-events-none absolute -right-10 -top-16 -z-10 h-56 w-56 rounded-full border-[30px] border-white/5" />
-        <div className="pointer-events-none absolute -bottom-24 left-1/3 -z-10 h-56 w-56 rounded-full bg-emerald-300/15 blur-3xl" />
-        <div className="relative">
-          <div className="flex items-center justify-between">
-            <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[.18em] text-teal-50/80"><Wallet className="h-4 w-4" /> Personal wallet</p>
-            <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-teal-50/90">NGN · available</span>
-          </div>
-          <p className="mt-5 font-sora text-[2rem] font-extrabold tracking-tight sm:text-4xl">{money(balance)}</p>
-          <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/15 pt-3">
-            <p className="text-xs text-white/70">Your money, ready for group life.</p>
-            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-lime-200"><span className="h-1.5 w-1.5 rounded-full bg-lime-300" /> Protected</span>
-          </div>
+      {/* Compact balance strip keeps the wallet actions and pots in view. */}
+      <div className="flex items-center gap-3 rounded-2xl border border-teal-900/10 bg-white px-3.5 py-3 shadow-sm dark:border-white/10 dark:bg-[#111f30] sm:px-4">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-teal-500 to-emerald-400 text-white shadow-sm shadow-teal-900/15"><Wallet className="h-4 w-4" /></span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Wallet balance · NGN</p>
+          <p className="mt-0.5 truncate font-sora text-xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-2xl">{money(balance)}</p>
         </div>
+        <span className="hidden items-center gap-1.5 rounded-full bg-teal-50 px-2.5 py-1 text-[10px] font-bold text-teal-800 dark:bg-teal-400/10 dark:text-teal-200 sm:inline-flex"><span className="h-1.5 w-1.5 rounded-full bg-teal-500" /> Available</span>
       </div>
 
       {/* Secondary actions — consistent tiles */}
