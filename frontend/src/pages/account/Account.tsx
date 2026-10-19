@@ -25,8 +25,10 @@ const stateMeta: Record<PotMembership["state"], { label: string; tint: string }>
   none: { label: "No open levy", tint: "bg-slate-100 text-slate-500 dark:bg-white/10" },
 };
 
+// Amounts are stored in kobo (1 naira = 100 kobo), so convert to naira first —
+// otherwise ₦5,000 (500000 kobo) would render as ₦500,000.
 const money = (kobo: number) =>
-  kobo.toLocaleString("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 });
+  (kobo / 100).toLocaleString("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 });
 
 const BANKS = ["B Moni", "GTBank", "Opay", "Access Bank", "Zenith Bank", "UBA", "Kuda", "Moniepoint"];
 
