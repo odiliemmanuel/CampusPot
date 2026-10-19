@@ -14,9 +14,9 @@ import {
 } from "../../lib/api";
 import { formatNaira, nairaToKobo } from "../../lib/format";
 
-// B Moni's brand gradient (magenta → violet) used across the wallet surfaces.
-const WALLET_GRADIENT = "bg-gradient-to-br from-[#11263b] via-[#165264] to-[#087f73]";
-const WALLET_SOFT = "bg-teal-50 text-teal-700 dark:bg-teal-400/10 dark:text-teal-200";
+// One violet palette across wallet surfaces.
+const WALLET_GRADIENT = "bg-gradient-to-br from-violet-600 via-violet-700 to-purple-800";
+const WALLET_SOFT = "bg-violet-50 text-violet-700 dark:bg-violet-400/10 dark:text-violet-200";
 
 const stateMeta: Record<PotMembership["state"], { label: string; tint: string }> = {
   paid: { label: "Paid up", tint: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15" },
@@ -479,13 +479,18 @@ function WalletHome() {
       </h1>
 
       {/* Compact balance strip keeps the wallet actions and pots in view. */}
-      <div className="flex items-center gap-3 rounded-2xl border border-teal-900/10 bg-white px-3.5 py-3 shadow-sm dark:border-white/10 dark:bg-[#111f30] sm:px-4">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-teal-500 to-emerald-400 text-white shadow-sm shadow-teal-900/15"><Wallet className="h-4 w-4" /></span>
+      <div className="flex items-center gap-3 rounded-2xl border border-violet-200/70 bg-gradient-to-br from-white to-violet-50/80 px-3 py-3 shadow-sm dark:border-violet-300/10 dark:from-[#171626] dark:to-[#211a35] sm:px-4">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-violet-600 to-purple-800 text-white shadow-sm shadow-violet-900/20"><Wallet className="h-4 w-4" /></span>
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Wallet balance · NGN</p>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5"><p className="text-[10px] font-bold uppercase tracking-[.14em] text-violet-700 dark:text-violet-200">Wallet balance</p><span className="text-[10px] font-semibold text-slate-400">NGN</span></div>
           <p className="mt-0.5 truncate font-sora text-xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-2xl">{money(balance)}</p>
+          <div className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[11px]">
+            <span className="shrink-0 text-slate-400">Wallet number</span>
+            <span className="truncate font-semibold tracking-wide text-slate-700 dark:text-slate-200">{me?.phone || "Add your phone in settings"}</span>
+            {me?.phone && <button type="button" onClick={() => void navigator.clipboard?.writeText(me.phone!)} aria-label="Copy wallet number" className="shrink-0 rounded-md p-1 text-violet-700 hover:bg-violet-100 dark:text-violet-200 dark:hover:bg-white/10"><Copy className="h-3 w-3" /></button>}
+          </div>
         </div>
-        <span className="hidden items-center gap-1.5 rounded-full bg-teal-50 px-2.5 py-1 text-[10px] font-bold text-teal-800 dark:bg-teal-400/10 dark:text-teal-200 sm:inline-flex"><span className="h-1.5 w-1.5 rounded-full bg-teal-500" /> Available</span>
+        <span className="hidden items-center gap-1.5 rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-bold text-violet-800 dark:bg-violet-400/10 dark:text-violet-200 sm:inline-flex"><span className="h-1.5 w-1.5 rounded-full bg-violet-500" /> Available</span>
       </div>
 
       {/* Secondary actions — consistent tiles */}
@@ -497,9 +502,9 @@ function WalletHome() {
       </div>
 
       {/* Pots — compact, expand for detail */}
-      <div className="mt-8 flex items-end justify-between">
-        <div><p className="text-[10px] font-bold uppercase tracking-[.2em] text-teal-700 dark:text-teal-300">Together</p><h2 className="mt-1 font-sora text-lg font-bold text-slate-900 dark:text-white">Your pots</h2></div>
-        <Link to="/pots" className="rounded-full border border-teal-700/15 px-3 py-1.5 text-xs font-bold text-teal-800 transition hover:bg-teal-50 dark:border-teal-200/15 dark:text-teal-200 dark:hover:bg-white/5">See all</Link>
+        <div className="mt-8 flex items-end justify-between">
+        <div><p className="text-[10px] font-bold uppercase tracking-[.2em] text-violet-700 dark:text-violet-300">Together</p><h2 className="mt-1 font-sora text-lg font-bold text-slate-900 dark:text-white">Your pots</h2></div>
+        <Link to="/pots" className="rounded-full border border-violet-700/15 px-3 py-1.5 text-xs font-bold text-violet-800 transition hover:bg-violet-50 dark:border-violet-200/15 dark:text-violet-200 dark:hover:bg-white/5">See all</Link>
       </div>
       {pots.length === 0 ? (
         <div className="mt-3 rounded-3xl border border-slate-100 bg-white p-8 text-center dark:border-white/10 dark:bg-panel-dark">

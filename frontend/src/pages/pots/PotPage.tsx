@@ -43,20 +43,20 @@ function StatTile({
   tone: "brand" | "green" | "amber" | "rose";
 }) {
   const tones = {
-    brand: "bg-teal-50 text-teal-700 dark:bg-teal-400/10 dark:text-teal-200",
-    green: "bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200",
-    amber: "bg-amber-50 text-amber-700 dark:bg-amber-400/10 dark:text-amber-200",
-    rose: "bg-rose-50 text-rose-700 dark:bg-rose-400/10 dark:text-rose-200",
+    brand: "bg-violet-50 text-violet-700 dark:bg-violet-400/10 dark:text-violet-200",
+    green: "bg-violet-50 text-violet-700 dark:bg-violet-400/10 dark:text-violet-200",
+    amber: "bg-violet-50 text-violet-700 dark:bg-violet-400/10 dark:text-violet-200",
+    rose: "bg-violet-50 text-violet-700 dark:bg-violet-400/10 dark:text-violet-200",
   } as const;
   return (
-    <div className="rounded-[1.35rem] border border-slate-200/70 bg-white p-3 shadow-[0_8px_24px_-18px_rgba(15,45,69,.4)] sm:p-4 dark:border-white/10 dark:bg-[#111f30]">
+    <div className="rounded-2xl border border-violet-100 bg-white p-2.5 shadow-[0_8px_24px_-18px_rgba(76,29,149,.25)] sm:rounded-[1.35rem] sm:p-4 dark:border-violet-200/10 dark:bg-[#171626]">
       <div className="flex items-center gap-2">
         <span className={`flex h-7 w-7 items-center justify-center rounded-lg sm:h-8 sm:w-8 ${tones[tone]}`}>
           {icon}
         </span>
         <span className="text-[11px] font-medium text-slate-500 sm:text-xs dark:text-slate-400">{label}</span>
       </div>
-      <p className="mt-1.5 truncate font-sora text-base font-bold text-slate-900 sm:mt-2 sm:text-xl dark:text-white">
+      <p className="mt-1 truncate font-sora text-sm font-bold text-slate-900 sm:mt-2 sm:text-xl dark:text-white">
         {value}
       </p>
     </div>
@@ -92,16 +92,10 @@ export default function PotPage() {
 
   return (
     <>
-      <section className="relative isolate mb-4 overflow-hidden rounded-[1.8rem] bg-gradient-to-br from-[#10283b] via-[#145366] to-[#087f73] p-5 text-white shadow-xl shadow-teal-950/10 sm:p-7">
-        <div className="pointer-events-none absolute -right-10 -top-16 -z-10 h-56 w-56 rounded-full border-[30px] border-white/5" />
-        <p className="text-[10px] font-bold uppercase tracking-[.22em] text-teal-100/70">Your group pot</p>
-        <div className="mt-2 flex items-start justify-between gap-3">
-          <div className="min-w-0"><h1 className="break-words font-sora text-2xl font-extrabold leading-tight sm:text-3xl">{activeGroup?.name ?? "Pot"}</h1><p className="mt-2 text-xs text-teal-50/70">A shared space for money, plans, and trust.</p></div>
-          <span className="hidden shrink-0 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-center sm:block"><span className="block text-[9px] font-bold uppercase tracking-wider text-teal-100/60">Join code</span><span className="font-mono text-sm font-bold tracking-[.2em]">{activeGroup?.joinCode}</span></span>
-        </div>
-        <div className="mt-5 flex items-end justify-between border-t border-white/15 pt-4">
-          <div><p className="text-[10px] font-bold uppercase tracking-[.18em] text-teal-100/65">Collected so far</p><p className="mt-1 font-sora text-2xl font-extrabold tracking-tight sm:text-3xl">{formatNaira(summary?.collectedKobo ?? 0)}</p></div>
-          <span className="flex items-center gap-1.5 rounded-full bg-lime-300/15 px-3 py-1.5 text-[10px] font-bold text-lime-100"><span className="h-1.5 w-1.5 rounded-full bg-lime-300" /> Shared ledger</span>
+      <section className="mb-3 rounded-2xl border border-violet-200/70 bg-gradient-to-br from-violet-700 via-violet-700 to-purple-800 px-4 py-3.5 text-white shadow-md shadow-violet-950/10 sm:mb-4 sm:rounded-[1.5rem] sm:px-6 sm:py-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0"><p className="text-[9px] font-bold uppercase tracking-[.18em] text-violet-100/75 sm:text-[10px]">Pot balance</p><h1 className="mt-0.5 truncate font-sora text-xl font-extrabold leading-tight sm:text-2xl">{formatNaira(summary?.balanceKobo ?? 0)}</h1><p className="mt-1 truncate text-xs text-violet-100/80">{activeGroup?.name ?? "Your group pot"}</p></div>
+          <div className="flex shrink-0 flex-col items-end gap-2"><span className="rounded-full bg-white/10 px-2.5 py-1 text-[9px] font-bold text-violet-50 sm:text-[10px]">Shared ledger</span><span className="hidden rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-right sm:block"><span className="block text-[8px] font-bold uppercase tracking-wider text-violet-100/70">Join code</span><span className="font-mono text-xs font-bold tracking-[.16em]">{activeGroup?.joinCode}</span></span></div>
         </div>
       </section>
 
@@ -137,7 +131,7 @@ export default function PotPage() {
               {active && (
                 <motion.span
                   layoutId="pot-tab-pill"
-                  className="absolute inset-0 rounded-xl bg-gradient-to-r from-teal-700 to-emerald-500 shadow-sm shadow-teal-900/15"
+                  className="absolute inset-0 rounded-xl bg-gradient-to-r from-violet-700 to-purple-600 shadow-sm shadow-violet-900/15"
                   transition={{ type: "spring", stiffness: 420, damping: 34 }}
                 />
               )}

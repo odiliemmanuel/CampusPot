@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { motion } from "framer-motion";
-import { HandCoins, ShieldCheck, Sparkles, Eye, Users } from "lucide-react";
+import { HandCoins, ShieldCheck, Sparkles, Eye, Users, ArrowLeft } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const perks = [
   { icon: Eye, text: "Everyone sees the pot" },
@@ -24,12 +25,12 @@ export default function AuthLayout({
         <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-white/10 blur-3xl" />
         <div className="absolute -bottom-24 -left-24 w-96 h-96 rounded-full bg-white/10 blur-3xl" />
 
-        <div className="relative flex items-center gap-2">
+        <Link to="/" className="relative flex items-center gap-2" aria-label="PotKeeper home">
           <div className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center">
             <HandCoins className="w-5 h-5 text-white" />
           </div>
           <span className="font-sora text-xl font-bold text-white">PotKeeper</span>
-        </div>
+        </Link>
 
         <div className="relative">
           <h2 className="font-sora text-3xl font-bold text-white leading-tight mb-8">
@@ -77,22 +78,25 @@ export default function AuthLayout({
       </div>
 
       {/* Right form panel */}
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-12">
+      <div className="flex-1 flex items-center justify-center p-3 sm:p-8 lg:p-12">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="w-full max-w-md bg-white/80 dark:bg-panel-dark/80 backdrop-blur-xl border border-white/60 dark:border-slate-800 rounded-3xl shadow-xl shadow-slate-900/5 p-8 sm:p-10"
+          className="w-full max-w-md bg-white/80 dark:bg-panel-dark/80 backdrop-blur-xl border border-white/60 dark:border-slate-800 rounded-2xl sm:rounded-3xl shadow-xl shadow-slate-900/5 p-5 sm:p-8 lg:p-10"
         >
-          <div className="lg:hidden flex items-center gap-2 mb-6">
+          <div className="flex items-center justify-between gap-3 mb-5 sm:mb-6">
+          <Link to="/" className="flex items-center gap-2" aria-label="PotKeeper home">
             <div className="w-9 h-9 rounded-xl bg-primary-600 flex items-center justify-center">
               <HandCoins className="w-5 h-5 text-white" />
             </div>
             <span className="font-sora font-bold text-lg text-slate-900 dark:text-white">PotKeeper</span>
+          </Link>
+          <Link to="/" className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-primary-700 hover:bg-primary-50 dark:text-primary-200 dark:hover:bg-white/5 sm:text-sm"><ArrowLeft className="h-3.5 w-3.5" /> Home</Link>
           </div>
-          <h1 className="font-sora text-2xl font-bold text-slate-900 dark:text-white">{title}</h1>
+          <h1 className="font-sora text-xl font-bold text-slate-900 dark:text-white sm:text-2xl">{title}</h1>
           <p className="mt-1.5 text-slate-500 dark:text-slate-400 text-sm">{subtitle}</p>
-          <div className="mt-8">{children}</div>
+          <div className="mt-5 sm:mt-7">{children}</div>
         </motion.div>
       </div>
     </div>
