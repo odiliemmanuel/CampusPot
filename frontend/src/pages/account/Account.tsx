@@ -15,8 +15,8 @@ import {
 import { formatNaira, nairaToKobo } from "../../lib/format";
 
 // B Moni's brand gradient (magenta → violet) used across the wallet surfaces.
-const WALLET_GRADIENT = "bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900";
-const WALLET_SOFT = "bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-300";
+const WALLET_GRADIENT = "bg-gradient-to-br from-[#11263b] via-[#165264] to-[#087f73]";
+const WALLET_SOFT = "bg-teal-50 text-teal-700 dark:bg-teal-400/10 dark:text-teal-200";
 
 const stateMeta: Record<PotMembership["state"], { label: string; tint: string }> = {
   paid: { label: "Paid up", tint: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15" },
@@ -77,7 +77,7 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
       <motion.div
         initial={{ y: 40, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="w-full rounded-t-3xl bg-white p-5 shadow-2xl sm:max-w-md sm:rounded-3xl dark:bg-panel-dark"
+        className="max-h-[92dvh] w-full overflow-y-auto rounded-t-3xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl sm:max-w-md sm:rounded-3xl dark:bg-panel-dark"
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-sora text-lg font-bold text-slate-900 dark:text-white">{title}</h2>
@@ -479,13 +479,19 @@ function WalletHome() {
       </h1>
 
       {/* Wallet balance card */}
-      <div className={`relative overflow-hidden rounded-3xl p-5 text-white shadow-lg shadow-brand-900/20 ${WALLET_GRADIENT}`}>
-        <div className="pointer-events-none absolute -right-8 -top-8 h-36 w-36 rounded-full bg-white/15 blur-2xl" />
+      <div className={`relative isolate overflow-hidden rounded-[1.8rem] border border-white/10 p-5 text-white shadow-xl shadow-teal-950/15 sm:p-7 ${WALLET_GRADIENT}`}>
+        <div className="pointer-events-none absolute -right-10 -top-16 -z-10 h-56 w-56 rounded-full border-[30px] border-white/5" />
+        <div className="pointer-events-none absolute -bottom-24 left-1/3 -z-10 h-56 w-56 rounded-full bg-emerald-300/15 blur-3xl" />
         <div className="relative">
-          <p className="flex items-center gap-1.5 text-xs font-medium text-white/90">
-            <Wallet className="h-3.5 w-3.5" /> Wallet balance
-          </p>
-          <p className="mt-1 font-sora text-3xl font-extrabold tracking-tight">{money(balance)}</p>
+          <div className="flex items-center justify-between">
+            <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[.18em] text-teal-50/80"><Wallet className="h-4 w-4" /> Personal wallet</p>
+            <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-teal-50/90">NGN · available</span>
+          </div>
+          <p className="mt-5 font-sora text-[2rem] font-extrabold tracking-tight sm:text-4xl">{money(balance)}</p>
+          <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/15 pt-3">
+            <p className="text-xs text-white/70">Your money, ready for group life.</p>
+            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-lime-200"><span className="h-1.5 w-1.5 rounded-full bg-lime-300" /> Protected</span>
+          </div>
         </div>
       </div>
 
@@ -498,9 +504,9 @@ function WalletHome() {
       </div>
 
       {/* Pots — compact, expand for detail */}
-      <div className="mt-6 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Your pots</h2>
-        <Link to="/pots" className="text-xs font-semibold text-brand-600 dark:text-brand-300">See all</Link>
+      <div className="mt-8 flex items-end justify-between">
+        <div><p className="text-[10px] font-bold uppercase tracking-[.2em] text-teal-700 dark:text-teal-300">Together</p><h2 className="mt-1 font-sora text-lg font-bold text-slate-900 dark:text-white">Your pots</h2></div>
+        <Link to="/pots" className="rounded-full border border-teal-700/15 px-3 py-1.5 text-xs font-bold text-teal-800 transition hover:bg-teal-50 dark:border-teal-200/15 dark:text-teal-200 dark:hover:bg-white/5">See all</Link>
       </div>
       {pots.length === 0 ? (
         <div className="mt-3 rounded-3xl border border-slate-100 bg-white p-8 text-center dark:border-white/10 dark:bg-panel-dark">
@@ -519,7 +525,7 @@ function WalletHome() {
       )}
 
       {/* Wallet activity */}
-      <h2 className="mb-3 mt-6 text-sm font-semibold text-slate-700 dark:text-slate-200">Activity</h2>
+      <div className="mb-3 mt-8 flex items-end justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[.2em] text-slate-400">Ledger</p><h2 className="mt-1 font-sora text-lg font-bold text-slate-900 dark:text-white">Recent activity</h2></div></div>
       <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm dark:border-white/10 dark:bg-panel-dark">
         {txs.length === 0 ? (
           <p className="p-5 text-sm text-slate-400">

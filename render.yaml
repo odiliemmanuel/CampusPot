@@ -17,7 +17,9 @@ services:
     plan: free
     region: frankfurt
     healthCheckPath: /health
-    autoDeployTrigger: commit
+    # GitHub Actions calls this service's deploy hook for every push to main.
+    # Turning off Render's native trigger avoids two builds for the same push.
+    autoDeployTrigger: 'off'
     envVars:
       - key: APP_ENV
         value: production

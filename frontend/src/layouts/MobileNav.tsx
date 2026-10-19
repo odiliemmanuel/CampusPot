@@ -6,7 +6,7 @@ import { LayoutGrid, Plus, Settings, Wallet } from "lucide-react";
 function itemClass(active: boolean) {
   return [
     "flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors",
-    active ? "text-brand-600" : "text-slate-400",
+    active ? "text-teal-700 dark:text-teal-200" : "text-slate-400",
   ].join(" ");
 }
 
@@ -39,7 +39,7 @@ export default function MobileNav() {
           type="button"
           onClick={() => navigate("/pots/new")}
           aria-label="Create a pot"
-          className="mx-auto -mt-5 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-lg shadow-brand-600/40 transition active:scale-95"
+          className="mx-auto -mt-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-lime-300 text-[#10283b] shadow-lg shadow-teal-900/25 transition active:scale-95"
         >
           <Plus className="h-6 w-6" />
         </button>
