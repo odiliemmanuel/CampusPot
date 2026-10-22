@@ -14,6 +14,7 @@ import Settings from "./pages/settings/Settings";
 import JoinPot from "./pages/join/JoinPot";
 import NewPot from "./pages/pots/NewPot";
 import Chat from "./pages/chat/Chat";
+import Notifications from "./pages/notifications/Notifications";
 import ConnectBank from "./pages/banks/ConnectBank";
 import Members from "./pages/members/Members";
 import { ExpensesInner } from "./pages/expenses/Expenses";
@@ -56,6 +57,7 @@ export default function App() {
             <Route path="/account" element={<ProtectedRoute><Account /></ProtectedRoute>} />
             <Route path="/banks" element={<ProtectedRoute><ConnectBank /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
 
             {/* The old flat routes now open from within a pot */}
             <Route path="/dashboard" element={<Navigate to="/pots" replace />} />

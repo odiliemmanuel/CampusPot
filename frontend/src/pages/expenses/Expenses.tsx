@@ -271,7 +271,7 @@ export function ExpensesInner() {
           <p className="text-slate-500 dark:text-slate-400">No payouts yet.</p>
         </div>
       ) : (
-        <div className="divide-y divide-slate-200/80 dark:divide-white/10">
+        <div className="space-y-2">
           {expenses.map((e) => {
             const approvalsFor = approvals[e.id] ?? [];
             const approvalsCount = approvalsFor.filter((a) => a.decision === "approve").length;
@@ -287,7 +287,7 @@ export function ExpensesInner() {
               ["pending_approval", "approved", "executing", "completed"].includes(e.status);
 
             return (
-              <motion.div key={e.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="py-2 first:pt-0 sm:py-2.5">
+              <motion.div key={e.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-slate-200/80 bg-white/80 p-2.5 shadow-sm dark:border-white/10 dark:bg-[#171626]/70 sm:p-3">
                 <div className="flex flex-wrap items-start justify-between gap-1.5">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
