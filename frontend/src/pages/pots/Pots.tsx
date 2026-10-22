@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ChevronRight, Loader2, PiggyBank, Plus } from "lucide-react";
 
@@ -7,6 +7,8 @@ import PageHeader from "../../components/PageHeader";
 import { useGroup } from "../../providers/GroupProvider";
 import { getSummary, type Group, type GroupSummary } from "../../lib/api";
 import { formatNaira } from "../../lib/format";
+
+const PotPortfolioCharts = lazy(() => import("./PotPortfolioCharts"));
 
 // One compact row per pot. Clicking it opens that pot's own dashboard.
 function PotCard({
@@ -57,13 +59,19 @@ function PotsGrid() {
   const { groups, loading } = useGroup();
   const navigate = useNavigate();
   const [summaries, setSummaries] = useState<Record<string, GroupSummary>>({});
+  const [summariesLoading, setSummariesLoading] = useState(false);
 
   const ids = groups.map((g) => g.id).join(",");
 
   // Balances come from each pot's own summary endpoint.
   useEffect(() => {
-    if (!ids) return;
+    if (!ids) {
+      setSummaries({});
+      setSummariesLoading(false);
+      return;
+    }
     let alive = true;
+    setSummariesLoading(true);
     Promise.all(
       groups.map((g) =>
         getSummary(g.id)
@@ -75,12 +83,27 @@ function PotsGrid() {
       const next: Record<string, GroupSummary> = {};
       for (const r of results) if (r) next[r[0]] = r[1];
       setSummaries(next);
+      setSummariesLoading(false);
     });
     return () => {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ids]);
+
+  const chartRows = useMemo(() => groups.flatMap((group) => {
+    const summary = summaries[group.id];
+    return summary ? [{
+      name: group.name,
+      collected: summary.collectedKobo,
+      spent: summary.spentKobo,
+      balance: summary.balanceKobo,
+      outstanding: summary.outstandingKobo,
+      paid: summary.paidCount,
+      partial: summary.partialCount,
+      unpaid: summary.outstandingCount,
+    }] : [];
+  }), [groups, summaries]);
 
   if (loading) {
     return (
@@ -114,6 +137,15 @@ function PotsGrid() {
         </div>
       ) : (
 
+      <>
+      {chartRows.length > 0 && (
+        <Suspense fallback={<div className="my-4 flex items-center gap-2 text-xs text-slate-400"><Loader2 className="h-4 w-4 animate-spin" />Loading pot charts…</div>}>
+          <PotPortfolioCharts rows={chartRows} totalPots={groups.length} />
+        </Suspense>
+      )}
+      {summariesLoading && chartRows.length === 0 && <div className="my-4 flex items-center gap-2 text-xs text-slate-400"><Loader2 className="h-4 w-4 animate-spin" />Loading pot overview…</div>}
+      {chartRows.length === 0 && !summariesLoading && <p className="my-3 rounded-xl border border-dashed border-slate-200 px-3 py-2 text-xs text-slate-500 dark:border-white/10 dark:text-slate-400">Pot overview charts are unavailable right now.</p>}
+
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {groups.map((group) => (
           <PotCard
@@ -131,6 +163,7 @@ function PotsGrid() {
           <Plus className="h-4 w-4" /> Create a pot
         </Link>
       </div>
+      </>
       )}
     </>
   );
