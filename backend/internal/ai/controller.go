@@ -3,6 +3,7 @@ package ai
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -62,7 +63,12 @@ func (ct *Controller) draftReminder(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "INVALID_BODY", err.Error())
 		return
 	}
-	reminder, err := ct.svc.DraftReminder(c.Request.Context(), groupID, auth.MustUserID(c), req.UserID, req.Tone)
+	idempotencyKey := strings.TrimSpace(c.GetHeader("Idempotency-Key"))
+	if len(idempotencyKey) > 128 {
+		response.Error(c, http.StatusBadRequest, "INVALID_IDEMPOTENCY_KEY", "idempotency key must be 128 characters or fewer")
+		return
+	}
+	reminder, err := ct.svc.DraftReminder(c.Request.Context(), groupID, auth.MustUserID(c), req.UserID, req.Tone, idempotencyKey)
 	if err != nil {
 		respondErr(c, err)
 		return

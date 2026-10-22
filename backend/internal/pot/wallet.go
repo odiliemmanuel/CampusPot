@@ -61,7 +61,10 @@ func (s *Service) WalletDeposit(_ context.Context, userID uuid.UUID, req WalletD
 			Counterparty: firstNonEmpty(strings.TrimSpace(req.Note), "Bank transfer"),
 			Reference:    req.Reference,
 			Note:         req.Note,
-		}).Error
+		}).Error; err != nil {
+			return err
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -227,7 +230,7 @@ func (s *Service) WalletPayPot(_ context.Context, userID uuid.UUID, req WalletPa
 		if err := tx.Create(&payment).Error; err != nil {
 			return err
 		}
-		return tx.Create(&models.WalletTransaction{
+		if err := tx.Create(&models.WalletTransaction{
 			UserID:       userID,
 			Kind:         models.WalletPotPayment,
 			AmountKobo:   req.AmountKobo,
@@ -235,7 +238,9 @@ func (s *Service) WalletPayPot(_ context.Context, userID uuid.UUID, req WalletPa
 			GroupID:      &req.GroupID,
 			LevyID:       levyID,
 			Note:         levy.Title,
-		}).Error; err != nil { return err }
+		}).Error; err != nil {
+			return err
+		}
 		return s.advanceRecurringContributionTx(tx, req.GroupID, levy.ID)
 	})
 	if err != nil {

@@ -5,6 +5,7 @@ import { Bell, CalendarDays, ChevronDown, LogOut, Menu, Search, Settings } from 
 import { clearSession, getStoredUser, listMembers, type AuthUser, type Role } from "../lib/api";
 import { useGroup } from "../providers/GroupProvider";
 import ModeBadges from "../components/ModeBadges";
+import ThemeToggle from "../components/ThemeToggle";
 import { loadPotNotifications, notificationReadKey, readNotificationIds as loadReadNotificationIds } from "../lib/notifications";
 
 const roleLabel = (role: Role | null) =>
@@ -107,7 +108,7 @@ export default function Topbar({ onMenu }: { onMenu: () => void }) {
   });
 
   return (
-    <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-100 bg-white px-4 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:px-6">
+    <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-100 bg-white px-4 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:border-slate-800 dark:bg-slate-950 sm:px-6">
       <button
         type="button"
         onClick={onMenu}
@@ -134,11 +135,12 @@ export default function Topbar({ onMenu }: { onMenu: () => void }) {
 
       <div className="ml-auto flex items-center gap-2 sm:gap-3">
         <ModeBadges />
+        <ThemeToggle />
 
         {/* Date chip */}
         <button
           type="button"
-          className="hidden items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 md:inline-flex"
+          className="hidden items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 md:inline-flex"
         >
           <CalendarDays className="h-4 w-4 text-slate-400" />
           {today}
@@ -149,10 +151,10 @@ export default function Topbar({ onMenu }: { onMenu: () => void }) {
           type="button"
           aria-label={unreadCount ? `Open notifications, ${unreadCount} unread` : "Open notifications"}
           onClick={() => navigate("/notifications", { state: { from: `${location.pathname}${location.search}` } })}
-          className="relative flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+          className="relative flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-slate-300 dark:hover:bg-slate-800"
         >
           <Bell className="h-5 w-5" />
-          {unreadCount > 0 && <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-violet-600 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white">{unreadCount > 9 ? "9+" : unreadCount}</span>}
+          {unreadCount > 0 && <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-violet-600 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white dark:ring-slate-950">{unreadCount > 9 ? "9+" : unreadCount}</span>}
         </button>
 
         {/* Avatar + menu */}
@@ -162,13 +164,13 @@ export default function Topbar({ onMenu }: { onMenu: () => void }) {
             onClick={() => setMenuOpen((o) => !o)}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
-            className="flex items-center gap-2 rounded-xl px-1.5 py-1.5 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+            className="flex items-center gap-2 rounded-xl px-1.5 py-1.5 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:hover:bg-slate-800"
           >
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-sm font-semibold text-white">
               {user?.name?.charAt(0) ?? "?"}
             </span>
             <span className="hidden text-left leading-tight sm:block">
-              <span className="block max-w-[9rem] truncate text-sm font-semibold text-slate-800">
+              <span className="block max-w-[9rem] truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
                 {user?.name ?? "Guest"}
               </span>
               <span className="block text-xs text-slate-400">{roleLabel(role)}</span>
@@ -183,13 +185,13 @@ export default function Topbar({ onMenu }: { onMenu: () => void }) {
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
-                className="absolute right-0 mt-2 w-48 rounded-xl border border-slate-100 bg-white p-1.5 shadow-lg"
+                className="absolute right-0 mt-2 w-48 rounded-xl border border-slate-100 bg-white p-1.5 shadow-lg dark:border-slate-700 dark:bg-slate-900"
               >
                 <Link
                   to="/settings"
                   role="menuitem"
                   onClick={() => setMenuOpen(false)}
-                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
+                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
                 >
                   <Settings className="h-4 w-4" /> Settings
                 </Link>
@@ -197,7 +199,7 @@ export default function Topbar({ onMenu }: { onMenu: () => void }) {
                   type="button"
                   role="menuitem"
                   onClick={logout}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-violet-600 transition hover:bg-violet-50"
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-violet-600 transition hover:bg-violet-50 dark:hover:bg-violet-950/40"
                 >
                   <LogOut className="h-4 w-4" /> Log out
                 </button>

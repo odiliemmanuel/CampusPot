@@ -60,30 +60,66 @@ func (c *llmClient) chat(ctx context.Context, system, user string) (string, erro
 		},
 		Temperature: 0.4,
 	})
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/chat/completions", bytes.NewReader(body))
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	var lastErr error
+	for attempt := 0; attempt < 2; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/chat/completions", bytes.NewReader(body))
+		if err != nil {
+			return "", err
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
 
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return "", err
+		resp, err := c.http.Do(req)
+		if err != nil {
+			lastErr = err
+			if attempt == 0 && ctx.Err() == nil {
+				if err := waitRetry(ctx, 200*time.Millisecond); err != nil {
+					return "", err
+				}
+				continue
+			}
+			return "", err
+		}
+		raw, readErr := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		resp.Body.Close()
+		if readErr != nil {
+			return "", readErr
+		}
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			lastErr = fmt.Errorf("ai: llm returned %d: %s", resp.StatusCode, string(raw))
+			if attempt == 0 && retryableAIStatus(resp.StatusCode) {
+				if err := waitRetry(ctx, 200*time.Millisecond); err != nil {
+					return "", err
+				}
+				continue
+			}
+			return "", lastErr
+		}
+		var out chatResponse
+		if err := json.Unmarshal(raw, &out); err != nil {
+			return "", err
+		}
+		if len(out.Choices) == 0 {
+			return "", fmt.Errorf("ai: empty completion")
+		}
+		return out.Choices[0].Message.Content, nil
 	}
-	defer resp.Body.Close()
-	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("ai: llm returned %d: %s", resp.StatusCode, string(raw))
+	return "", lastErr
+}
+
+func retryableAIStatus(status int) bool {
+	return status == http.StatusTooManyRequests || status == http.StatusBadGateway || status == http.StatusServiceUnavailable || status == http.StatusGatewayTimeout || status == http.StatusInternalServerError
+}
+
+func waitRetry(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
 	}
-	var out chatResponse
-	if err := json.Unmarshal(raw, &out); err != nil {
-		return "", err
-	}
-	if len(out.Choices) == 0 {
-		return "", fmt.Errorf("ai: empty completion")
-	}
-	return out.Choices[0].Message.Content, nil
 }
 
 // DraftReminder asks the LLM for a short, tone-appropriate nudge. The facts
@@ -116,6 +152,7 @@ func (c *llmClient) AnswerPotQuestion(ctx context.Context, question string, sum 
 		Category   string `json:"category,omitempty"`
 		Status     string `json:"status"`
 		Risk       string `json:"risk"`
+		Date       string `json:"date"`
 	}
 	contextData := map[string]interface{}{
 		"groupName": sum.GroupName, "currency": sum.Currency,
@@ -139,14 +176,14 @@ func (c *llmClient) AnswerPotQuestion(ctx context.Context, question string, sum 
 		if i >= 8 {
 			break
 		}
-		latest = append(latest, payoutFact{AmountKobo: e.AmountKobo, Category: e.Category, Status: e.Status, Risk: e.RiskLevel})
+		latest = append(latest, payoutFact{AmountKobo: e.AmountKobo, Category: e.Category, Status: e.Status, Risk: e.RiskLevel, Date: payoutDate(e).Format("2006-01-02")})
 	}
 	contextData["recentPayouts"] = latest
 	encoded, err := json.Marshal(contextData)
 	if err != nil {
 		return "", err
 	}
-	system := "You are PotKeeper's AI treasurer for a Nigerian student group. Answer the user's question conversationally and specifically using only the supplied current-pot snapshot. The snapshot amounts are integer kobo (100 kobo = ₦1); format them as naira. You may explain balances, contributions, member arrears, payout status, spending and disputes. If a fact is absent, say you cannot see it. Never invent details, claim to have sent messages, approve or initiate payouts, or imply you can move money. Politely redirect questions unrelated to this pot toward the pot's money and group activity. Keep answers concise and friendly."
+	system := "You are PotKeeper's AI treasurer for a Nigerian student group. Answer the user's actual question conversationally and specifically using only the supplied current-pot snapshot; give a general summary only when asked for one. The snapshot amounts are integer kobo (100 kobo = ₦1); format them as naira. You may explain balances, contributions, member arrears, payout status, spending trends, possible recurring categories and disputes. If a fact is absent, say you cannot see it. Treat repeated categories as hints, not proof of a subscription. Never invent details, claim to have sent messages, approve or initiate payouts, or imply you can move money. Politely redirect questions unrelated to this pot toward the pot's money and group activity. Keep answers concise and friendly."
 	user := "Current pot snapshot (JSON):\n" + string(encoded) + "\n\nMember question: " + strings.TrimSpace(question)
 	return c.chat(ctx, system, user)
 }

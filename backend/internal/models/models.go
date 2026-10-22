@@ -272,13 +272,14 @@ type WebhookEvent struct {
 // Reminder is an AI-drafted nudge for a member who has not paid.
 type Reminder struct {
 	Base
-	GroupID uuid.UUID  `gorm:"type:uuid;index;not null" json:"groupId"`
-	LevyID  *uuid.UUID `gorm:"type:uuid" json:"levyId,omitempty"`
-	UserID  *uuid.UUID `gorm:"type:uuid" json:"userId,omitempty"`
-	Channel string     `gorm:"default:whatsapp" json:"channel"`
-	Message string     `json:"message"`
-	Status  string     `gorm:"default:draft" json:"status"`
-	SentAt  *time.Time `json:"sentAt,omitempty"`
+	GroupID        uuid.UUID  `gorm:"type:uuid;index;uniqueIndex:idx_reminder_idempotency,priority:1;not null" json:"groupId"`
+	LevyID         *uuid.UUID `gorm:"type:uuid" json:"levyId,omitempty"`
+	UserID         *uuid.UUID `gorm:"type:uuid" json:"userId,omitempty"`
+	Channel        string     `gorm:"default:whatsapp" json:"channel"`
+	Message        string     `json:"message"`
+	Status         string     `gorm:"default:draft" json:"status"`
+	SentAt         *time.Time `json:"sentAt,omitempty"`
+	IdempotencyKey *string    `gorm:"uniqueIndex:idx_reminder_idempotency,priority:2" json:"-"`
 }
 
 // ChatMessage is one message in a pot's group chat. Membership is implied by

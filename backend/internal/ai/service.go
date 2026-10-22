@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -52,68 +53,65 @@ func (s *Service) Answer(ctx context.Context, groupID, actorID uuid.UUID, questi
 	if err != nil {
 		return nil, err
 	}
+	intent := intentOf(question)
+	sum, err := s.pots.Summary(ctx, groupID, nil)
+	if err != nil {
+		return nil, err
+	}
+	outstanding, levy, levyErr := s.pots.WhoHasntPaid(ctx, groupID, nil)
+	if errors.Is(levyErr, pot.ErrNotFound) {
+		outstanding = nil
+		levy = nil
+	} else if levyErr != nil {
+		return nil, levyErr
+	}
+	expenses, err := s.pots.ListExpenses(ctx, groupID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	payments, err := s.pots.ListPayments(ctx, groupID, actorID)
+	if err != nil {
+		return nil, err
+	}
 
-	switch intentOf(question) {
+	switch intent {
 	case intentOutstanding:
-		outstanding, levy, err := s.pots.WhoHasntPaid(ctx, groupID, nil)
-		if err != nil {
-			if errors.Is(err, pot.ErrNotFound) {
-				return &AnswerResponse{
-					Answer: "There's no open levy in this pot right now, so there's nothing outstanding to track. Create a levy and I'll start keeping score.",
-					Intent: "outstanding",
-					Data:   []pot.OutstandingMember{},
-				}, nil
-			}
-			return nil, err
-		}
-		answer := s.renderOutstanding(ctx, group, outstanding, levy)
-		return &AnswerResponse{Answer: answer, Intent: "outstanding", Data: outstanding}, nil
-
+		return &AnswerResponse{Answer: s.renderOutstanding(ctx, group, outstanding, levy), Intent: intent, Data: outstanding}, nil
 	case intentRemind:
-		outstanding, levy, err := s.pots.WhoHasntPaid(ctx, groupID, nil)
-		if err != nil {
-			if errors.Is(err, pot.ErrNotFound) {
-				return &AnswerResponse{
-					Answer: "No open levy, so there's nobody to remind yet. Set up a levy first and I'll draft the nudges.",
-					Intent: "remind",
-					Data:   []pot.OutstandingMember{},
-				}, nil
-			}
-			return nil, err
-		}
 		var b strings.Builder
 		b.WriteString(s.renderOutstanding(ctx, group, outstanding, levy))
 		if len(outstanding) > 0 {
-			b.WriteString("\n\nDrafts you can send:\n")
-			for i, o := range outstanding {
+			b.WriteString("\n\nReminder drafts (not sent):\n")
+			for i, member := range outstanding {
 				if i >= 3 {
 					break
 				}
-				b.WriteString(fmt.Sprintf("• %s: \"%s\"\n", o.Name, draftFor(o, "friendly")))
+				b.WriteString(fmt.Sprintf("• %s: %s\n", nonEmpty(member.Name, "Member"), draftFor(member, "friendly")))
 			}
 		}
-		return &AnswerResponse{Answer: b.String(), Intent: "remind", Data: outstanding}, nil
-
-	default:
-		sum, err := s.pots.Summary(ctx, groupID, nil)
-		if err != nil {
-			return nil, err
-		}
-		if s.llm != nil {
-			outstanding, levy, _ := s.pots.WhoHasntPaid(ctx, groupID, nil)
-			expenses, _ := s.pots.ListExpenses(ctx, groupID, actorID)
-			if answer, err := s.llm.AnswerPotQuestion(ctx, question, sum, outstanding, levy, expenses); err == nil && answer != "" {
-				return &AnswerResponse{Answer: answer, Intent: "pot_question", Data: sum}, nil
-			}
-		}
-		answer := s.renderSummary(ctx, sum)
-		extra := "I can answer questions about this pot's balance, contributions, members owing, spending, and payout approvals. Ask about a specific part of the pot and I'll look it up."
-		return &AnswerResponse{
-			Answer: answer + "\n\n" + extra,
-			Intent: "summary",
-			Data:   sum,
-		}, nil
+		return &AnswerResponse{Answer: b.String(), Intent: intent, Data: outstanding}, nil
+	case intentDeadline:
+		return &AnswerResponse{Answer: answerDeadline(group, sum, timeNow()), Intent: intent, Data: sum.Levy}, nil
+	case intentRecurring:
+		return &AnswerResponse{Answer: answerRecurring(expenses), Intent: intent}, nil
+	case intentSpending:
+		return &AnswerResponse{Answer: answerSpending(sum, expenses, payments, timeNow()), Intent: intent, Data: sum}, nil
+	case intentPayouts:
+		return &AnswerResponse{Answer: answerPayouts(sum, expenses), Intent: intent}, nil
+	case intentAffordability:
+		return &AnswerResponse{Answer: answerAffordability(question, sum.BalanceKobo), Intent: intent, Data: map[string]int64{"balanceKobo": sum.BalanceKobo}}, nil
 	}
+
+	if s.llm != nil {
+		if answer, err := s.llm.AnswerPotQuestion(ctx, question, sum, outstanding, levy, expenses); err == nil && answer != "" {
+			return &AnswerResponse{Answer: answer, Intent: "pot_question", Data: sum}, nil
+		}
+	}
+	return &AnswerResponse{
+		Answer: answerSnapshot(sum) + "\n\nI can also compare recent spending, spot regular payout patterns, check the contribution deadline, assess whether a payout fits the balance, list pending approvals, or draft reminder text. What would you like to check?",
+		Intent: "pot_question",
+		Data:   sum,
+	}, nil
 }
 
 // renderOutstanding formats the unpaid list, optionally via the LLM.
@@ -150,7 +148,7 @@ func (s *Service) renderOutstanding(_ context.Context, group *models.Group, outs
 // renderSummary formats the pot summary.
 func (s *Service) renderSummary(_ context.Context, sum *pot.GroupSummary) string {
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("%s — weekly summary\n", sum.GroupName))
+	b.WriteString(fmt.Sprintf("%s — current pot snapshot\n", sum.GroupName))
 	b.WriteString(fmt.Sprintf("Collected: %s\n", money.Kobo(sum.CollectedKobo).Format()))
 	b.WriteString(fmt.Sprintf("Spent: %s\n", money.Kobo(sum.SpentKobo).Format()))
 	b.WriteString(fmt.Sprintf("Balance: %s\n", money.Kobo(sum.BalanceKobo).Format()))
@@ -166,9 +164,18 @@ func (s *Service) renderSummary(_ context.Context, sum *pot.GroupSummary) string
 
 // DraftReminder creates a draft reminder for one member and stores it. The
 // treasurer must confirm sending — the AI never messages anyone directly.
-func (s *Service) DraftReminder(ctx context.Context, groupID, actorID, memberID uuid.UUID, tone string) (*models.Reminder, error) {
+func (s *Service) DraftReminder(ctx context.Context, groupID, actorID, memberID uuid.UUID, tone, idempotencyKey string) (*models.Reminder, error) {
 	if _, err := s.pots.GetGroup(ctx, groupID, actorID); err != nil {
 		return nil, err
+	}
+	idempotencyKey = strings.TrimSpace(idempotencyKey)
+	if idempotencyKey != "" {
+		var existing models.Reminder
+		if err := s.db.Where("group_id = ? AND idempotency_key = ?", groupID, idempotencyKey).First(&existing).Error; err == nil {
+			return &existing, nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
 	}
 	outstanding, levy, err := s.pots.WhoHasntPaid(ctx, groupID, nil)
 	if err != nil {
@@ -202,10 +209,19 @@ func (s *Service) DraftReminder(ctx context.Context, groupID, actorID, memberID 
 		Message: message,
 		Status:  "draft",
 	}
+	if idempotencyKey != "" {
+		reminder.IdempotencyKey = &idempotencyKey
+	}
 	if levy != nil {
 		reminder.LevyID = &levy.ID
 	}
 	if err := s.db.Create(reminder).Error; err != nil {
+		if idempotencyKey != "" {
+			var existing models.Reminder
+			if findErr := s.db.Where("group_id = ? AND idempotency_key = ?", groupID, idempotencyKey).First(&existing).Error; findErr == nil {
+				return &existing, nil
+			}
+		}
 		return nil, err
 	}
 	return reminder, nil
@@ -270,25 +286,52 @@ func draftFor(o pot.OutstandingMember, tone string) string {
 func intentOf(q string) string {
 	l := strings.ToLower(q)
 	switch {
-	case containsAny(l, "hasn't paid", "hasnt paid", "not paid", "outstanding", "who has not", "owing", "who owes", "debt", "unpaid"):
-		return intentOutstanding
+	case containsAny(l, "deadline", "due date", "due soon", "due", "by when", "how many days left"):
+		return intentDeadline
+	case containsAny(l, "recurring", "repeat", "regular spend", "subscription", "weekly spend", "monthly spend"):
+		return intentRecurring
+	case containsAny(l, "can this pot cover", "can the pot cover", "can we afford", "can the pot afford", "afford", "enough for", "pay for"):
+		return intentAffordability
+	case containsAny(l, "trend", "spending", "spent", "expenses", "cash flow", "budget", "last 30", "last month", "progress"):
+		return intentSpending
+	case containsAny(l, "payout", "approval", "withdrawal", "pending expense", "what is waiting"):
+		return intentPayouts
 	case containsAny(l, "remind", "reminder", "chase", "nudge", "draft"):
 		return intentRemind
+	case containsAny(l, "hasn't paid", "hasnt paid", "not paid", "outstanding", "who has not", "owing", "who owes", "debt", "unpaid", "my dues", "my contribution") || containsWord(l, "owe", "owes"):
+		return intentOutstanding
 	default:
 		return intentSummary
 	}
 }
 
 const (
-	intentOutstanding = "outstanding"
-	intentRemind      = "remind"
-	intentSummary     = "summary"
+	intentOutstanding   = "outstanding"
+	intentRemind        = "remind"
+	intentSummary       = "summary"
+	intentDeadline      = "deadline"
+	intentRecurring     = "recurring"
+	intentSpending      = "spending"
+	intentPayouts       = "payouts"
+	intentAffordability = "affordability"
 )
 
 func containsAny(s string, subs ...string) bool {
 	for _, sub := range subs {
 		if strings.Contains(s, sub) {
 			return true
+		}
+	}
+	return false
+}
+
+func containsWord(s string, words ...string) bool {
+	fields := strings.FieldsFunc(s, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })
+	for _, field := range fields {
+		for _, word := range words {
+			if field == word {
+				return true
+			}
 		}
 	}
 	return false

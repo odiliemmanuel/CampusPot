@@ -374,7 +374,7 @@ export interface WalletOverview {
 
 export interface AnswerResponse {
   answer: string;
-  intent: "outstanding" | "remind" | "summary";
+  intent: string;
   data?: unknown;
 }
 
@@ -564,16 +564,40 @@ export const executeExpense = (groupId: string, expenseId: string) =>
 
 // ---------- AI treasurer ----------
 
-export const askAssistant = (groupId: string, question: string) =>
-  request<AnswerResponse>(`/groups/${groupId}/assistant`, {
-    method: "POST",
-    body: JSON.stringify({ question }),
-  });
-export const draftReminder = (groupId: string, userId: string, tone = "friendly") =>
-  request<Reminder>(`/groups/${groupId}/reminders`, {
-    method: "POST",
-    body: JSON.stringify({ userId, tone }),
-  });
+export const askAssistant = async (groupId: string, question: string) => {
+  // Assistant questions are read-only, so a single retry after a transient
+  // transport/server failure cannot duplicate a payment or other action.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await request<AnswerResponse>(`/groups/${groupId}/assistant`, {
+        method: "POST",
+        body: JSON.stringify({ question }),
+      });
+    } catch (error) {
+      const retryable = error instanceof ApiError &&
+        (error.status === 0 || error.status === 429 || error.status >= 500);
+      if (attempt >= 1 || !retryable) throw error;
+      await new Promise((resolve) => window.setTimeout(resolve, 300));
+    }
+  }
+};
+export const draftReminder = async (groupId: string, userId: string, tone = "friendly", idempotencyKey = crypto.randomUUID()) => {
+  // Reuse the same key for the retry so a lost response cannot create a second draft.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await request<Reminder>(`/groups/${groupId}/reminders`, {
+        method: "POST",
+        headers: { "Idempotency-Key": idempotencyKey },
+        body: JSON.stringify({ userId, tone }),
+      });
+    } catch (error) {
+      const retryable = error instanceof ApiError &&
+        (error.status === 0 || error.status === 429 || error.status >= 500);
+      if (attempt >= 1 || !retryable) throw error;
+      await new Promise((resolve) => window.setTimeout(resolve, 300));
+    }
+  }
+};
 export const listReminders = (groupId: string) => request<Reminder[] | null>(`/groups/${groupId}/reminders`).then((r) => r ?? []);
 export const sendReminder = (groupId: string, reminderId: string) =>
   request<Reminder>(`/groups/${groupId}/reminders/${reminderId}/send`, { method: "POST" });
