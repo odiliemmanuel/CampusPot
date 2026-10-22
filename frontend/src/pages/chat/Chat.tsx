@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowDownToLine, ArrowLeft, File as FileIcon, Loader2, MessageSquare, Mic, Paperclip, Send, Square, X } from "lucide-react";
+import { ArrowDownToLine, ArrowLeft, File as FileIcon, FileText, Loader2, MessageSquare, Mic, Pause, Paperclip, Play, Send, Square, X } from "lucide-react";
 
 import { useGroup } from "../../providers/GroupProvider";
 import {
@@ -23,9 +23,62 @@ function timeLabel(iso: string) {
   });
 }
 
+function formatAudioTime(seconds: number) {
+  if (!Number.isFinite(seconds)) return "0:00";
+  return `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
+}
+
+function AudioAttachment({ src }: { src: string }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const progress = duration ? currentTime / duration : 0;
+  const bars = Array.from({ length: 36 }, (_, i) => 5 + ((i * 17 + i * i * 7) % 16));
+
+  const toggle = async () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.paused) {
+      try { await audio.play(); } catch { setPlaying(false); }
+    } else audio.pause();
+  };
+
+  return (
+    <div className="my-1 flex w-[min(17rem,72vw)] max-w-full items-center gap-2.5 rounded-2xl bg-slate-900/[0.06] px-2.5 py-2 dark:bg-black/20">
+      <audio
+        ref={audioRef}
+        src={src}
+        preload="metadata"
+        className="hidden"
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)}
+        onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+        onEnded={() => { setPlaying(false); setCurrentTime(0); }}
+      />
+      <button type="button" onClick={() => void toggle()} aria-label={playing ? "Pause voice note" : "Play voice note"} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-violet-700 text-white shadow-sm transition hover:bg-violet-600">
+        {playing ? <Pause className="h-4 w-4 fill-current" /> : <Play className="ml-0.5 h-4 w-4 fill-current" />}
+      </button>
+      <div className="min-w-0 flex-1">
+        <div className="flex h-7 items-center gap-[2px]" aria-label="Voice note waveform">
+          {bars.map((height, i) => (
+            <span key={i} className={`min-w-[2px] flex-1 rounded-full ${i / bars.length <= progress ? "bg-violet-600 dark:bg-violet-300" : "bg-slate-400/60 dark:bg-slate-400/50"}`} style={{ height: `${height}px` }} />
+          ))}
+        </div>
+        <div className="mt-0.5 flex items-center justify-between text-[10px] tabular-nums opacity-70">
+          <span>{formatAudioTime(playing || currentTime > 0 ? currentTime : duration)}</span>
+          <span className="inline-flex items-center gap-1"><Mic className="h-3 w-3" />Voice note</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ChatAttachment({ message }: { message: ChatMessage }) {
   const [url, setUrl] = useState("");
   const [showDownload, setShowDownload] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [attachmentError, setAttachmentError] = useState(false);
   useEffect(() => {
     if (!message.attachmentUrl) return;
@@ -39,14 +92,26 @@ function ChatAttachment({ message }: { message: ChatMessage }) {
   }, [message.attachmentUrl]);
   if (!url) return <span className="my-1 block text-xs opacity-70">{attachmentError ? "Attachment could not be loaded." : "Loading attachment…"}</span>;
   const isAudio = message.attachmentType?.startsWith("audio/");
+  const isImage = message.attachmentType?.startsWith("image/");
+  const isPdf = message.attachmentType === "application/pdf" || message.attachmentName?.toLowerCase().endsWith(".pdf");
+  if (isAudio) return <AudioAttachment src={url} />;
   return <>
-    {isAudio && <audio className="my-2 max-w-full" controls src={url} />}
-    {message.attachmentType?.startsWith("image/") && <img className="my-2 max-h-64 rounded-xl border border-white/15" src={url} alt={message.attachmentName || "Chat image"} />}
-    <button type="button" onClick={() => setShowDownload(true)} className="mt-2 flex w-full items-center gap-3 rounded-xl border border-current/10 bg-slate-900/5 p-3 text-left transition hover:bg-slate-900/10 dark:bg-black/15 dark:hover:bg-black/25">
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-500/10 text-brand-600 dark:text-brand-300"><FileIcon className="h-4 w-4" /></span>
-      <span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold">{message.attachmentName || "Shared file"}</span><span className="block text-[10px] opacity-60">Tap to download</span></span>
-      <ArrowDownToLine className="h-4 w-4 shrink-0 opacity-70" />
-    </button>
+    <div className="mt-2 w-[min(18rem,74vw)] max-w-full overflow-hidden rounded-xl border border-current/10 bg-slate-900/[0.04] dark:bg-black/15">
+      <div className="flex items-center gap-2.5 p-2.5">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-600/10 text-violet-700 dark:text-violet-300">{isImage ? <FileIcon className="h-5 w-5" /> : <FileText className="h-5 w-5" />}</span>
+        <span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold">{message.attachmentName || "Shared file"}</span><span className="block text-[10px] opacity-60">{isImage ? "Image" : isPdf ? "PDF document" : "File attachment"}</span></span>
+        <button type="button" onClick={() => setShowDownload(true)} className="grid h-8 w-8 shrink-0 place-items-center rounded-full transition hover:bg-slate-900/10 dark:hover:bg-white/10" aria-label="Download attachment"><ArrowDownToLine className="h-4 w-4 opacity-80" /></button>
+      </div>
+      <div className="flex border-t border-current/10">
+        <button type="button" onClick={() => setShowPreview((visible) => !visible)} aria-expanded={showPreview} className="flex min-h-9 flex-1 items-center justify-center gap-1.5 text-[11px] font-semibold text-violet-700 transition hover:bg-violet-500/10 dark:text-violet-300">
+          {showPreview ? "Hide file" : "View file"}
+        </button>
+        <button type="button" onClick={() => setShowDownload(true)} className="border-l border-current/10 px-3 text-[11px] font-semibold opacity-70 transition hover:bg-slate-900/5 dark:hover:bg-white/5">Download</button>
+      </div>
+      {showPreview && <div className="border-t border-current/10 p-2">
+        {isImage ? <img className="max-h-64 w-full rounded-lg object-contain" src={url} alt={message.attachmentName || "Shared image"} /> : isPdf ? <iframe title={message.attachmentName || "PDF preview"} src={url} className="h-64 w-full rounded-lg bg-white" /> : <p className="px-2 py-4 text-center text-[11px] opacity-70">Preview isn’t available for this file type. Download it to open.</p>}
+      </div>}
+    </div>
     {showDownload && <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/65 p-3 backdrop-blur-sm sm:items-center" onClick={() => setShowDownload(false)}>
       <div role="dialog" aria-modal="true" aria-labelledby="download-title" onClick={(event) => event.stopPropagation()} className="w-full max-w-sm rounded-[1.75rem] border border-white/10 bg-white p-5 shadow-2xl dark:bg-[#101a2b] sm:p-6">
         <div className="mb-4 flex items-start justify-between"><span className="grid h-12 w-12 place-items-center rounded-2xl bg-violet-50 text-violet-700 dark:bg-violet-400/10 dark:text-violet-200"><FileIcon className="h-5 w-5" /></span><button type="button" onClick={() => setShowDownload(false)} aria-label="Close" className="rounded-full p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10"><X className="h-4 w-4" /></button></div>
