@@ -8,6 +8,7 @@ import (
 
 	"github.com/glebarez/sqlite"
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
@@ -44,11 +45,28 @@ func newTestService(t *testing.T) (*Service, *gorm.DB) {
 
 func newUser(t *testing.T, db *gorm.DB, name, email string) *models.User {
 	t.Helper()
-	u := &models.User{Name: name, Email: email, PasswordHash: "x", BMoniUserID: "bmoni_" + email[:3]}
+	// A real bcrypt hash so password-confirmed flows (first-time PIN setup)
+	// work against the literal password "x" used throughout the tests.
+	hash, err := bcrypt.GenerateFromPassword([]byte("x"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+	u := &models.User{Name: name, Email: email, PasswordHash: string(hash), BMoniUserID: "bmoni_" + email[:3]}
 	if err := db.Create(u).Error; err != nil {
 		t.Fatalf("create user: %v", err)
 	}
 	return u
+}
+
+// testPin is the transaction PIN used by wallet tests.
+const testPin = "1234"
+
+// setTestPin gives a user a transaction PIN so their wallet can spend.
+func setTestPin(t *testing.T, svc *Service, userID uuid.UUID) {
+	t.Helper()
+	if err := svc.SetTransactionPin(context.Background(), userID, SetPinRequest{Pin: testPin, Password: "x"}); err != nil {
+		t.Fatalf("SetTransactionPin: %v", err)
+	}
 }
 
 func addTestMember(t *testing.T, svc *Service, group *models.Group, treasurerID uuid.UUID, u *models.User, role models.Role) {

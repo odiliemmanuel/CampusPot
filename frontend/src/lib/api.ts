@@ -368,6 +368,8 @@ export interface WalletTransaction {
 export interface WalletOverview {
   balanceKobo: number;
   bmoniUserId?: string;
+  /** True once the user has set the PIN that authorises sends. */
+  pinSet: boolean;
   transactions: WalletTransaction[];
   /** False when this deployment predates the wallet endpoints (404 fallback). */
   ready?: boolean;
@@ -613,7 +615,7 @@ export const getWallet = async (): Promise<WalletOverview> => {
     // hard-fail the Balance page — show an empty wallet and let the rest of
     // the page work until the backend is redeployed.
     if (err instanceof ApiError && err.status === 404) {
-      return { balanceKobo: 0, transactions: [], ready: false };
+      return { balanceKobo: 0, pinSet: false, transactions: [], ready: false };
     }
     throw err;
   }
@@ -625,10 +627,10 @@ export const walletDeposit = (amountKobo: number, reference = "", note = "") =>
     body: JSON.stringify({ amountKobo, reference, note }),
   });
 
-export const walletTransfer = (amountKobo: number, recipient: string, note = "", bankName = "", bankCode = "") =>
+export const walletTransfer = (amountKobo: number, recipient: string, note = "", bankName = "", bankCode = "", pin = "") =>
   request<WalletOverview>("/wallet/transfer", {
     method: "POST",
-    body: JSON.stringify({ amountKobo, recipient, note, bankName, bankCode }),
+    body: JSON.stringify({ amountKobo, recipient, note, bankName, bankCode, pin }),
   });
 
 // ---------- Name enquiry (confirm who you're paying) ----------
@@ -670,10 +672,20 @@ export const verifyBankAccount = (accountNumber: string, bankName = "", bankCode
 export const lookupUser = (recipient: string) =>
   request<LookedUpUser>(`/users/lookup?recipient=${encodeURIComponent(recipient)}`);
 
-export const walletPayPot = (groupId: string, amountKobo: number, levyId?: string) =>
+export const walletPayPot = (groupId: string, amountKobo: number, pin = "", levyId?: string) =>
   request<Payment>("/wallet/pay", {
     method: "POST",
-    body: JSON.stringify({ groupId, amountKobo, levyId }),
+    body: JSON.stringify({ groupId, amountKobo, levyId, pin }),
+  });
+
+/**
+ * Set (or change) the transaction PIN that authorises sends. First-time setup
+ * is confirmed with `password`; a change is confirmed with `currentPin`.
+ */
+export const setWalletPin = (pin: string, currentPin = "", password = "") =>
+  request<{ pinSet: boolean }>("/wallet/pin", {
+    method: "POST",
+    body: JSON.stringify({ pin, currentPin, password }),
   });
 
 // ---------- Account ----------

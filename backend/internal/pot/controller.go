@@ -79,6 +79,7 @@ func (ct *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.POST("/wallet/deposit", ct.walletDeposit)
 	rg.POST("/wallet/transfer", ct.walletTransfer)
 	rg.POST("/wallet/pay", ct.walletPayPot)
+	rg.POST("/wallet/pin", ct.setWalletPin)
 
 	// Name enquiry — confirm WHO an account belongs to before sending money.
 	rg.GET("/banks", ct.listBanks)
@@ -247,6 +248,20 @@ func (ct *Controller) walletPayPot(c *gin.Context) {
 		return
 	}
 	response.Created(c, payment)
+}
+
+// setWalletPin sets or changes the transaction PIN that authorises sends.
+func (ct *Controller) setWalletPin(c *gin.Context) {
+	var req SetPinRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "INVALID_BODY", err.Error())
+		return
+	}
+	if err := ct.svc.SetTransactionPin(c.Request.Context(), auth.MustUserID(c), req); err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, gin.H{"pinSet": true})
 }
 
 func (ct *Controller) joinGroup(c *gin.Context) {
@@ -789,6 +804,10 @@ func respondErr(c *gin.Context, err error) {
 		response.Error(c, http.StatusNotFound, "NOT_FOUND", err.Error())
 	case errors.Is(err, ErrAccountNotFound):
 		response.Error(c, http.StatusNotFound, "ACCOUNT_NOT_FOUND", err.Error())
+	case errors.Is(err, ErrPinRequired):
+		response.Error(c, http.StatusPreconditionRequired, "PIN_REQUIRED", err.Error())
+	case errors.Is(err, ErrInvalidPin):
+		response.Error(c, http.StatusUnauthorized, "INVALID_PIN", err.Error())
 	case errors.Is(err, ErrForbidden):
 		response.Error(c, http.StatusForbidden, "FORBIDDEN", "you do not have access to this action")
 	case errors.Is(err, ErrConflict):

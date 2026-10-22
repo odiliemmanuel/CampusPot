@@ -67,14 +67,15 @@ func TestWalletBankSendRequiresExistingAccount(t *testing.T) {
 	svc, db := newTestService(t)
 	ada := newUser(t, db, "Ada", "ada@x.ng")
 
-	// Fund the wallet.
+	// Fund the wallet and give it a PIN so it can spend.
 	if _, err := svc.WalletDeposit(ctx, ada.ID, WalletDepositRequest{AmountKobo: int64(money.FromNaira(10_000))}); err != nil {
 		t.Fatalf("WalletDeposit: %v", err)
 	}
+	setTestPin(t, svc, ada.ID)
 
 	// A send to an account that does not exist is refused before any debit.
 	_, err := svc.WalletTransfer(ctx, ada.ID, WalletTransferRequest{
-		AmountKobo: int64(money.FromNaira(1_000)), Recipient: "0001234567", BankName: "GTBank",
+		AmountKobo: int64(money.FromNaira(1_000)), Recipient: "0001234567", BankName: "GTBank", Pin: testPin,
 	})
 	if !errors.Is(err, ErrAccountNotFound) {
 		t.Fatalf("expected ErrAccountNotFound, got %v", err)
@@ -89,7 +90,7 @@ func TestWalletBankSendRequiresExistingAccount(t *testing.T) {
 
 	// A verified send records the resolved holder name on the transaction.
 	w, err = svc.WalletTransfer(ctx, ada.ID, WalletTransferRequest{
-		AmountKobo: int64(money.FromNaira(1_000)), Recipient: "0123456789", BankName: "GTBank",
+		AmountKobo: int64(money.FromNaira(1_000)), Recipient: "0123456789", BankName: "GTBank", Pin: testPin,
 	})
 	if err != nil {
 		t.Fatalf("WalletTransfer: %v", err)
@@ -103,15 +104,102 @@ func TestWalletTransferLowBalanceAlert(t *testing.T) {
 	ctx := context.Background()
 	svc, db := newTestService(t)
 	ada := newUser(t, db, "Ada", "ada@x.ng")
+	setTestPin(t, svc, ada.ID)
 
 	_, err := svc.WalletTransfer(ctx, ada.ID, WalletTransferRequest{
-		AmountKobo: int64(money.FromNaira(5_000)), Recipient: "0123456789", BankName: "GTBank",
+		AmountKobo: int64(money.FromNaira(5_000)), Recipient: "0123456789", BankName: "GTBank", Pin: testPin,
 	})
 	if !errors.Is(err, ErrConflict) {
 		t.Fatalf("expected ErrConflict for low balance, got %v", err)
 	}
 	if !strings.Contains(err.Error(), "low balance") || !strings.Contains(err.Error(), "₦5,000.00") {
 		t.Fatalf("expected the alert to name the shortfall, got %q", err.Error())
+	}
+}
+
+// A wallet that matches neither a user nor a bank is refused, so money can
+// never be sent into the void as a faceless payout.
+func TestWalletTransferRefusesUnknownRecipient(t *testing.T) {
+	ctx := context.Background()
+	svc, db := newTestService(t)
+	ada := newUser(t, db, "Ada", "ada@x.ng")
+	setTestPin(t, svc, ada.ID)
+
+	_, err := svc.WalletTransfer(ctx, ada.ID, WalletTransferRequest{
+		AmountKobo: int64(money.FromNaira(500)), Recipient: "nobody@x.ng", Pin: testPin,
+	})
+	if !errors.Is(err, ErrAccountNotFound) {
+		t.Fatalf("expected ErrAccountNotFound for an unmatched recipient, got %v", err)
+	}
+}
+
+// Every wallet debit requires the owner's transaction PIN.
+func TestWalletRequiresPinForSending(t *testing.T) {
+	ctx := context.Background()
+	svc, db := newTestService(t)
+	ada := newUser(t, db, "Ada", "ada@x.ng")
+
+	if _, err := svc.WalletDeposit(ctx, ada.ID, WalletDepositRequest{AmountKobo: int64(money.FromNaira(5_000))}); err != nil {
+		t.Fatalf("WalletDeposit: %v", err)
+	}
+
+	// With no PIN set, the wallet cannot spend at all.
+	_, err := svc.WalletTransfer(ctx, ada.ID, WalletTransferRequest{
+		AmountKobo: int64(money.FromNaira(500)), Recipient: "0123456789", BankName: "GTBank",
+	})
+	if !errors.Is(err, ErrPinRequired) {
+		t.Fatalf("expected ErrPinRequired before a PIN is set, got %v", err)
+	}
+
+	// A wrong PIN is refused.
+	setTestPin(t, svc, ada.ID)
+	_, err = svc.WalletTransfer(ctx, ada.ID, WalletTransferRequest{
+		AmountKobo: int64(money.FromNaira(500)), Recipient: "0123456789", BankName: "GTBank", Pin: "9999",
+	})
+	if !errors.Is(err, ErrInvalidPin) {
+		t.Fatalf("expected ErrInvalidPin for a wrong PIN, got %v", err)
+	}
+
+	// Paying a pot from the wallet needs the PIN too.
+	group, err := svc.CreateGroup(ctx, ada.ID, CreateGroupRequest{Name: "G", PerMemberKobo: int64(money.FromNaira(1_000)), ContributionDueDate: dueSoon()})
+	if err != nil {
+		t.Fatalf("CreateGroup: %v", err)
+	}
+	_, err = svc.WalletPayPot(ctx, ada.ID, WalletPayRequest{GroupID: group.ID, AmountKobo: int64(money.FromNaira(500))})
+	if !errors.Is(err, ErrInvalidPin) {
+		t.Fatalf("expected ErrInvalidPin on WalletPayPot with a blank PIN, got %v", err)
+	}
+	// The correct PIN authorises the pot payment.
+	if _, err := svc.WalletPayPot(ctx, ada.ID, WalletPayRequest{GroupID: group.ID, AmountKobo: int64(money.FromNaira(500)), Pin: testPin}); err != nil {
+		t.Fatalf("expected WalletPayPot to succeed with the right PIN, got %v", err)
+	}
+}
+
+// Changing a PIN requires the current one; a hijacked session cannot swap it.
+func TestSetTransactionPin(t *testing.T) {
+	ctx := context.Background()
+	svc, db := newTestService(t)
+	ada := newUser(t, db, "Ada", "ada@x.ng")
+
+	// First-time setup is confirmed with the password.
+	if err := svc.SetTransactionPin(ctx, ada.ID, SetPinRequest{Pin: "1234", Password: "x"}); err != nil {
+		t.Fatalf("first SetTransactionPin: %v", err)
+	}
+	// Changing it needs the current PIN.
+	if err := svc.SetTransactionPin(ctx, ada.ID, SetPinRequest{Pin: "5678", CurrentPin: "0000"}); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("expected ErrInvalid for a wrong current PIN, got %v", err)
+	}
+	if err := svc.SetTransactionPin(ctx, ada.ID, SetPinRequest{Pin: "5678", CurrentPin: "1234"}); err != nil {
+		t.Fatalf("change SetTransactionPin: %v", err)
+	}
+	// The new PIN now works for spending.
+	if _, err := svc.WalletDeposit(ctx, ada.ID, WalletDepositRequest{AmountKobo: int64(money.FromNaira(1_000))}); err != nil {
+		t.Fatalf("WalletDeposit: %v", err)
+	}
+	if _, err := svc.WalletTransfer(ctx, ada.ID, WalletTransferRequest{
+		AmountKobo: int64(money.FromNaira(100)), Recipient: "0123456789", BankName: "GTBank", Pin: "5678",
+	}); err != nil {
+		t.Fatalf("expected the new PIN to authorise a send, got %v", err)
 	}
 }
 

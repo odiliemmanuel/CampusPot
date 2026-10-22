@@ -34,6 +34,12 @@ var (
 	// the dedicated ACCOUNT_NOT_FOUND code to raise a red alert instead of a
 	// generic error.
 	ErrAccountNotFound = errors.New("account not found")
+	// ErrPinRequired means the account has no transaction PIN yet, so it
+	// cannot spend. The UI uses PIN_REQUIRED to prompt setup inline.
+	ErrPinRequired = errors.New("transaction PIN required")
+	// ErrInvalidPin means the supplied transaction PIN did not match. The UI
+	// uses INVALID_PIN to flag the field rather than show a generic failure.
+	ErrInvalidPin = errors.New("invalid transaction PIN")
 )
 
 // sandboxBVN is a synthetic BVN for sandbox onboarding only. It is never a

@@ -17,6 +17,9 @@ import (
 type WalletOverview struct {
 	BalanceKobo  int64                      `json:"balanceKobo"`
 	BMoniUserID  string                     `json:"bmoniUserId,omitempty"`
+	// PinSet tells the UI whether to ask for a transaction PIN or prompt the
+	// user to create one before their first send.
+	PinSet       bool                       `json:"pinSet"`
 	Transactions []models.WalletTransaction `json:"transactions"`
 }
 
@@ -34,6 +37,7 @@ func (s *Service) Wallet(_ context.Context, userID uuid.UUID) (*WalletOverview, 
 	return &WalletOverview{
 		BalanceKobo:  user.WalletBalanceKobo,
 		BMoniUserID:  user.BMoniUserID,
+		PinSet:       user.TransactionPinHash != "",
 		Transactions: txs,
 	}, nil
 }
@@ -81,16 +85,23 @@ type WalletTransferRequest struct {
 	// rather than a transfer to another PotKeeper user.
 	BankName string `json:"bankName"`
 	BankCode string `json:"bankCode"`
-	Note     string `json:"note"`
+	// Pin authorises the debit. Every send requires the owner's transaction
+	// PIN, whether the money goes to a member or an external bank account.
+	Pin string `json:"pin"`
+	Note string `json:"note"`
 }
 
-// WalletTransfer moves money to another PotKeeper user when the recipient
-// matches a registered email/phone, otherwise it records an external payout
-// (e.g. to a bank account outside PotKeeper).
+// WalletTransfer moves money to another PotKeeper user or out to a bank
+// account. Both paths resolve the recipient before any debit:
 //
-// Bank payouts are name-enquiry first: the account is verified against B Moni
-// and the resolved account holder's name is recorded, so money never leaves
-// for an account that does not exist.
+//   - a bank payout runs name enquiry against B Moni and records the resolved
+//     account holder's name, so money never leaves for an account that does
+//     not exist;
+//   - a PotKeeper send must match a registered user by email or phone. A
+//     recipient that matches neither a user nor a verified bank account is
+//     refused rather than silently recorded as a faceless payout.
+//
+// Every send also requires the owner's transaction PIN.
 func (s *Service) WalletTransfer(ctx context.Context, userID uuid.UUID, req WalletTransferRequest) (*WalletOverview, error) {
 	if req.AmountKobo <= 0 {
 		return nil, fmt.Errorf("%w: amount must be positive", ErrInvalid)
@@ -98,6 +109,9 @@ func (s *Service) WalletTransfer(ctx context.Context, userID uuid.UUID, req Wall
 	recipient := strings.TrimSpace(req.Recipient)
 	if recipient == "" {
 		return nil, fmt.Errorf("%w: a recipient is required", ErrInvalid)
+	}
+	if err := s.requireTransactionPin(userID, req.Pin); err != nil {
+		return nil, err
 	}
 
 	var to *models.User
@@ -114,11 +128,14 @@ func (s *Service) WalletTransfer(ctx context.Context, userID uuid.UUID, req Wall
 		var match models.User
 		err := s.db.Where("LOWER(email) = ?", strings.ToLower(recipient)).
 			Or("phone = ?", recipient).First(&match).Error
-		if err == nil {
-			to = &match
-		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				// No user and no bank: refuse rather than send into the void.
+				return nil, fmt.Errorf("%w: no PotKeeper account matches %s — check the email or phone, or send to a bank account", ErrAccountNotFound, recipient)
+			}
 			return nil, err
 		}
+		to = &match
 	}
 	if to != nil && to.ID == userID {
 		return nil, fmt.Errorf("%w: you cannot send money to yourself", ErrInvalid)
@@ -151,12 +168,10 @@ func (s *Service) WalletTransfer(ctx context.Context, userID uuid.UUID, req Wall
 			}).Error; err != nil {
 				return err
 			}
-		} else if verified != nil {
+		} else {
 			// Record the verified account holder's name, not just the number,
 			// so the wallet history shows exactly who was paid.
 			out.Counterparty = fmt.Sprintf("%s · %s · %s", verified.BankName, verified.AccountNumber, verified.AccountHolderName)
-		} else {
-			out.Counterparty = recipient
 		}
 		return tx.Create(out).Error
 	})
@@ -171,6 +186,9 @@ type WalletPayRequest struct {
 	GroupID    uuid.UUID  `json:"groupId" binding:"required"`
 	LevyID     *uuid.UUID `json:"levyId"`
 	AmountKobo int64      `json:"amountKobo" binding:"required,gt=0"`
+	// Pin authorises the debit, just like a send: money leaving the wallet
+	// always requires the owner's transaction PIN.
+	Pin string `json:"pin"`
 }
 
 // WalletPayPot debits the caller's wallet and credits a pot, reconciling the
@@ -179,6 +197,9 @@ type WalletPayRequest struct {
 func (s *Service) WalletPayPot(_ context.Context, userID uuid.UUID, req WalletPayRequest) (*models.Payment, error) {
 	if req.AmountKobo <= 0 {
 		return nil, fmt.Errorf("%w: amount must be positive", ErrInvalid)
+	}
+	if err := s.requireTransactionPin(userID, req.Pin); err != nil {
+		return nil, err
 	}
 	m, err := s.requireMember(req.GroupID, userID)
 	if err != nil {

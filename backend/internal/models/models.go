@@ -55,6 +55,10 @@ type User struct {
 	Email        string `gorm:"uniqueIndex;not null" json:"email"`
 	Phone        string `json:"phone,omitempty"`
 	PasswordHash string `gorm:"not null" json:"-"`
+	// TransactionPinHash is the bcrypt hash of the 4–6 digit PIN that authorises
+	// wallet debits (sends and pot payments). Empty until the user sets one, and
+	// never serialised — only the boolean PinSet reaches the client.
+	TransactionPinHash string `gorm:"column:transaction_pin_hash" json:"-"`
 	// BMoniUserID is the id returned by POST /v1/users. Persisted so we never
 	// create a duplicate B Moni user for the same person.
 	BMoniUserID string `gorm:"index" json:"bmoniUserId,omitempty"`

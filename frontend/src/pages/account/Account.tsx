@@ -7,8 +7,9 @@ import {
 } from "lucide-react";
 
 import AppShell from "../../layouts/AppShell";
+import PinField from "../../components/PinField";
 import {
-  getAccountOverview, getStoredUser, getWallet, listBanks, lookupUser, verifyBankAccount,
+  getAccountOverview, getStoredUser, getWallet, listBanks, lookupUser, setWalletPin, verifyBankAccount,
   walletDeposit, walletTransfer,
   walletPayPot, type AccountOverview, type BankOption, type LookedUpUser, type PotMembership,
   type VerifiedAccount, type WalletOverview, type WalletTransaction,
@@ -209,10 +210,13 @@ function RecipientConfirm({ label, detail }: { label: string; detail: string }) 
   );
 }
 
-function SendSheet({ balanceKobo, onClose, onDone }: { balanceKobo: number; onClose: () => void; onDone: () => void }) {
+function SendSheet({ balanceKobo, pinSet, onClose, onDone }: { balanceKobo: number; pinSet: boolean; onClose: () => void; onDone: () => void }) {
   const [mode, setMode] = useState<"member" | "bank">("member");
   const [amount, setAmount] = useState("");
   const [recipient, setRecipient] = useState("");
+  // Transaction PIN authorises the debit; first-time users create it inline.
+  const [pin, setPin] = useState("");
+  const [password, setPassword] = useState("");
   const [banks, setBanks] = useState<BankOption[]>(FALLBACK_BANKS);
   const [bank, setBank] = useState(FALLBACK_BANKS[0].name);
   const [note, setNote] = useState("");
@@ -267,7 +271,10 @@ function SendSheet({ balanceKobo, onClose, onDone }: { balanceKobo: number; onCl
   const amountKobo = nairaToKobo(amount);
   const overBalance = amountKobo > balanceKobo;
   const confirmed = mode === "member" ? !!lookedUp : !!verified;
-  const canSend = confirmed && !checking && amountKobo > 0 && !overBalance;
+  // The PIN authorises the debit; first-time senders also type their password
+  // once so the PIN can be created as part of this same send.
+  const pinOk = pinSet ? pin.length >= 4 : pin.length >= 4 && password.length > 0;
+  const canSend = confirmed && !checking && amountKobo > 0 && !overBalance && pinOk;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -282,13 +289,16 @@ function SendSheet({ balanceKobo, onClose, onDone }: { balanceKobo: number; onCl
       setError(mode === "member" ? "Confirm the recipient's PotKeeper account first." : "Confirm the bank account holder's name first.");
       return;
     }
+    if (pin.length < 4) { setError("Enter your 4–6 digit transaction PIN."); return; }
     setError(""); setBusy(true);
     try {
+      // First-time senders create the PIN here, then spend with it.
+      if (!pinSet) await setWalletPin(pin, "", password);
       if (mode === "member") {
-        await walletTransfer(kobo, recipient.trim(), note || `Sent to ${lookedUp!.name}`);
+        await walletTransfer(kobo, recipient.trim(), note || `Sent to ${lookedUp!.name}`, "", "", pin);
       } else {
         const chosen = banks.find((b) => b.name === bank);
-        await walletTransfer(kobo, recipient.trim(), note || `Sent to ${verified!.accountHolderName}`, verified!.bankName, chosen?.code ?? verified!.bankCode);
+        await walletTransfer(kobo, recipient.trim(), note || `Sent to ${verified!.accountHolderName}`, verified!.bankName, chosen?.code ?? verified!.bankCode, pin);
       }
       onDone();
     } catch (err) {
@@ -376,32 +386,60 @@ function SendSheet({ balanceKobo, onClose, onDone }: { balanceKobo: number; onCl
           <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Note (optional)</span>
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="What's it for?" className="cp-input mt-1" />
         </label>
+
+        {/* Transaction PIN — every send is authorised by the wallet owner. */}
+        <PinField
+          value={pin}
+          onChange={setPin}
+          label={pinSet ? "Transaction PIN" : "Create a transaction PIN"}
+          hint={pinSet ? "Enter your PIN to authorise this send." : "New 4–6 digit PIN — you'll use it for every send. Confirmed with your password once."}
+        />
+        {!pinSet && (
+          <label className="block">
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Confirm with your password</span>
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Your account password"
+              className="cp-input mt-1"
+            />
+          </label>
+        )}
+
         <p className="text-[11px] text-slate-400">
           Wallet balance: {money(balanceKobo)}. We check the recipient's name before any money leaves your wallet.
         </p>
         {error && <p className="text-sm text-violet-600">{error}</p>}
-        <SubmitButton busy={busy} disabled={!canSend} label={canSend ? "Send money" : checking ? "Checking…" : "Confirm recipient to send"} />
+        <SubmitButton busy={busy} disabled={!canSend} label={canSend ? "Send money" : checking ? "Checking…" : confirmed && !pinOk ? "Enter PIN to send" : "Confirm recipient to send"} />
       </form>
     </Sheet>
   );
 }
 
-function PayPotSheet({ pots, balanceKobo, onClose, onDone }: { pots: PotMembership[]; balanceKobo: number; onClose: () => void; onDone: () => void }) {
+function PayPotSheet({ pots, balanceKobo, pinSet, onClose, onDone }: { pots: PotMembership[]; balanceKobo: number; pinSet: boolean; onClose: () => void; onDone: () => void }) {
   const owing = pots.filter((p) => p.outstandingKobo > 0);
   const [groupId, setGroupId] = useState(owing[0]?.groupId ?? pots[0]?.groupId ?? "");
   const [amount, setAmount] = useState("");
+  const [pin, setPin] = useState("");
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   const selected = pots.find((p) => p.groupId === groupId);
+  const pinOk = pinSet ? pin.length >= 4 : pin.length >= 4 && password.length > 0;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const kobo = nairaToKobo(amount);
     if (kobo <= 0) { setError("Enter an amount to pay."); return; }
+    if (pin.length < 4) { setError("Enter your 4–6 digit transaction PIN."); return; }
     setError(""); setBusy(true);
     try {
-      await walletPayPot(groupId, kobo);
+      // First-time payers create the PIN here, then spend with it.
+      if (!pinSet) await setWalletPin(pin, "", password);
+      await walletPayPot(groupId, kobo, pin);
       onDone();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't pay the pot.");
@@ -441,9 +479,28 @@ function PayPotSheet({ pots, balanceKobo, onClose, onDone }: { pots: PotMembersh
           )}
         </div>
         <AmountInput amount={amount} setAmount={setAmount} />
+        <PinField
+          value={pin}
+          onChange={setPin}
+          label={pinSet ? "Transaction PIN" : "Create a transaction PIN"}
+          hint={pinSet ? "Enter your PIN to authorise this payment." : "New 4–6 digit PIN — confirmed with your password once."}
+        />
+        {!pinSet && (
+          <label className="block">
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Confirm with your password</span>
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Your account password"
+              className="cp-input mt-1"
+            />
+          </label>
+        )}
         <p className="text-[11px] text-slate-400">Wallet balance: {money(balanceKobo)}. This credits the pot and marks your contribution paid.</p>
         {error && <p className="text-sm text-violet-600">{error}</p>}
-        <SubmitButton busy={busy} label="Pay from wallet" />
+        <SubmitButton busy={busy} disabled={!pinOk} label={pinOk ? "Pay from wallet" : "Enter PIN to pay"} />
       </form>
     </Sheet>
   );
@@ -688,12 +745,13 @@ function WalletHome() {
         <AddMoneySheet onClose={() => setSheet(null)} onDone={() => { setSheet(null); setReloadKey((k) => k + 1); }} />
       )}
       {sheet === "send" && (
-        <SendSheet balanceKobo={balance} onClose={() => setSheet(null)} onDone={() => { setSheet(null); setReloadKey((k) => k + 1); }} />
+        <SendSheet balanceKobo={balance} pinSet={wallet?.pinSet ?? false} onClose={() => setSheet(null)} onDone={() => { setSheet(null); setReloadKey((k) => k + 1); }} />
       )}
       {sheet === "pay" && (
         <PayPotSheet
           pots={pots}
           balanceKobo={balance}
+          pinSet={wallet?.pinSet ?? false}
           onClose={() => { setSheet(null); }}
           onDone={() => { setSheet(null); setReloadKey((k) => k + 1); }}
         />

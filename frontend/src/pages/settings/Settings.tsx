@@ -4,9 +4,10 @@ import { CheckCircle2, Loader2, LogOut, PiggyBank, Save, ShieldCheck, Trash2, Us
 
 import AppShell from "../../layouts/AppShell";
 import PageHeader from "../../components/PageHeader";
+import PinField from "../../components/PinField";
 import { useGroup } from "../../providers/GroupProvider";
 import {
-  clearSession, deleteAccount, getMe, getStoredUser, getToken, setSession, updateProfile,
+  clearSession, deleteAccount, getMe, getStoredUser, getWallet, getToken, setSession, setWalletPin, updateProfile,
   type AuthUser,
 } from "../../lib/api";
 
@@ -22,6 +23,21 @@ export default function Settings() {
   const [error, setError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Transaction PIN — whether one exists, and the fields to set or change it.
+  const [pinSet, setPinSet] = useState<boolean | null>(null);
+  const [newPin, setNewPin] = useState("");
+  const [currentPin, setCurrentPin] = useState("");
+  const [pinPassword, setPinPassword] = useState("");
+  const [pinBusy, setPinBusy] = useState(false);
+  const [pinNotice, setPinNotice] = useState("");
+  const [pinError, setPinError] = useState("");
+
+  useEffect(() => {
+    getWallet()
+      .then((w) => setPinSet(w.pinSet))
+      .catch(() => setPinSet(false));
+  }, []);
 
   useEffect(() => {
     getMe()
@@ -66,6 +82,28 @@ export default function Settings() {
   const logout = () => {
     clearSession();
     window.location.href = "/login";
+  };
+
+  const savePin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPin.length < 4) { setPinError("Your PIN must be 4 to 6 digits."); return; }
+    setPinError("");
+    setPinNotice("");
+    setPinBusy(true);
+    try {
+      // First-time setup is confirmed with the password; a change with the
+      // current PIN — so a hijacked session can't silently swap the PIN.
+      await setWalletPin(newPin, pinSet ? currentPin : "", pinSet ? "" : pinPassword);
+      setPinSet(true);
+      setNewPin("");
+      setCurrentPin("");
+      setPinPassword("");
+      setPinNotice(pinSet ? "Your transaction PIN has been changed." : "Transaction PIN created — you'll use it for every send.");
+    } catch (err) {
+      setPinError(err instanceof Error ? err.message : "Couldn't save your PIN.");
+    } finally {
+      setPinBusy(false);
+    }
   };
 
   const removeAccount = async () => {
@@ -205,6 +243,68 @@ export default function Settings() {
               </Link>
             </section>
           )}
+
+          {/* Transaction PIN — authorises every send out of the wallet */}
+          <section className="cp-card rounded-3xl p-4 sm:p-6">
+            <div className="mb-4 flex items-center gap-2.5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-500/15">
+                <ShieldCheck className="h-4 w-4" />
+              </span>
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Transaction PIN</p>
+            </div>
+
+            {pinSet === null ? (
+              <Loader2 className="h-5 w-5 animate-spin text-primary-600" />
+            ) : (
+              <form onSubmit={savePin} className="space-y-3">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {pinSet
+                    ? "Every send from your wallet is authorised with your 4–6 digit PIN. Change it below."
+                    : "Create a 4–6 digit PIN — no money can leave your wallet until you do."}
+                </p>
+                <PinField
+                  value={newPin}
+                  onChange={setNewPin}
+                  label={pinSet ? "New PIN" : "Create a transaction PIN"}
+                  autoFocus={false}
+                />
+                {pinSet ? (
+                  <PinField
+                    value={currentPin}
+                    onChange={setCurrentPin}
+                    label="Current PIN"
+                    placeholder="••••"
+                  />
+                ) : (
+                  <label className="block">
+                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      Confirm with your password
+                    </span>
+                    <input
+                      type="password"
+                      autoComplete="current-password"
+                      value={pinPassword}
+                      onChange={(e) => setPinPassword(e.target.value)}
+                      placeholder="Your account password"
+                      className="cp-input mt-1"
+                    />
+                  </label>
+                )}
+
+                {pinNotice && (
+                  <p className="flex items-center gap-1.5 text-sm text-violet-600">
+                    <CheckCircle2 className="h-4 w-4" /> {pinNotice}
+                  </p>
+                )}
+                {pinError && <p className="text-sm text-violet-600">{pinError}</p>}
+
+                <button type="submit" disabled={pinBusy} className="cp-btn-primary w-full text-sm sm:w-auto">
+                  {pinBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                  {pinSet ? "Change PIN" : "Create PIN"}
+                </button>
+              </form>
+            )}
+          </section>
 
           {/* Session */}
           <section className="cp-card rounded-3xl p-4 sm:p-6">

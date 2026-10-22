@@ -8,10 +8,11 @@ import {
 import AppShell from "../../layouts/AppShell";
 import GroupGate from "../../components/GroupGate";
 import PageHeader from "../../components/PageHeader";
+import PinField from "../../components/PinField";
 import { useGroup } from "../../providers/GroupProvider";
 import {
   listPayments, listMembers,
-  walletPayPot, getStoredUser, getContributions,
+  walletPayPot, getStoredUser, getContributions, getWallet, setWalletPin,
   type Payment, type Membership, type ContributionsResponse, type ContributionRow,
 } from "../../lib/api";
 import { formatNaira, nairaToKobo } from "../../lib/format";
@@ -43,16 +44,22 @@ export function ContributionsInner() {
 
   const [payAmount, setPayAmount] = useState("");
   const [payBusy, setPayBusy] = useState(false);
+  // Transaction PIN authorises the wallet debit; first-time payers set it here.
+  const [pinSet, setPinSet] = useState<boolean | null>(null);
+  const [pin, setPin] = useState("");
+  const [pinPassword, setPinPassword] = useState("");
 
   const load = async () => {
-    const [p, c, m] = await Promise.all([
+    const [p, c, m, w] = await Promise.all([
       listPayments(gid).catch(() => [] as Payment[]),
       getContributions(gid).catch(() => null),
       listMembers(gid),
+      getWallet().catch(() => null),
     ]);
     setPayments(p);
     setContrib(c);
     setMembers(m);
+    if (w) setPinSet(w.pinSet);
   };
 
   useEffect(() => {
@@ -81,11 +88,16 @@ export function ContributionsInner() {
     setError(""); setNotice("");
     const target = full ? myOwed : nairaToKobo(payAmount);
     if (target <= 0) { setError("Enter an amount to pay."); return; }
+    if (pin.length < 4) { setError("Enter your 4–6 digit transaction PIN."); return; }
     setPayBusy(true);
     try {
-      await walletPayPot(gid, target);
+      // First-time payers create the PIN here, then spend with it.
+      if (pinSet === false) await setWalletPin(pin, "", pinPassword);
+      await walletPayPot(gid, target, pin);
       setNotice("Paid from your wallet — your contribution is updated.");
       setPayAmount("");
+      setPin("");
+      setPinPassword("");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't pay from your wallet.");
@@ -154,6 +166,23 @@ export function ContributionsInner() {
                   <button onClick={() => handlePayFromWallet(true)} disabled={payBusy} className="w-full text-left text-[10px] font-semibold text-violet-700 hover:underline disabled:opacity-50 dark:text-violet-300">
                     Pay full balance · {formatNaira(myOwed)}
                   </button>
+                  {/* Every wallet debit is authorised by the transaction PIN. */}
+                  <PinField
+                    value={pin}
+                    onChange={setPin}
+                    label={pinSet === false ? "Create a transaction PIN" : "Transaction PIN"}
+                    hint={pinSet === false ? "New 4–6 digit PIN — confirmed with your password once." : undefined}
+                  />
+                  {pinSet === false && (
+                    <input
+                      type="password"
+                      autoComplete="current-password"
+                      value={pinPassword}
+                      onChange={(e) => setPinPassword(e.target.value)}
+                      placeholder="Confirm with your password"
+                      className="cp-input px-2.5 py-2 text-xs"
+                    />
+                  )}
                 </div>
               )}
             </div>
