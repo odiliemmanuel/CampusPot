@@ -251,7 +251,7 @@ export default function PotDashboard() {
         </section>
       )}
 
-      {id && <Suspense fallback={<div className="mb-4 h-40 animate-pulse rounded-xl bg-slate-100 dark:bg-white/5" />}><PotSpendingInsights expenses={expenses} groupId={id} /></Suspense>}
+      {id && <Suspense fallback={<div className="mb-4 h-40 animate-pulse rounded-xl bg-slate-100 dark:bg-white/5" />}><PotSpendingInsights expenses={expenses} payments={payments} groupId={id} /></Suspense>}
 
       {/* Member disputes */}
       <section className="mb-4 rounded-xl border border-slate-100 bg-white p-2.5 shadow-sm sm:p-3 dark:border-white/10 dark:bg-panel-dark">

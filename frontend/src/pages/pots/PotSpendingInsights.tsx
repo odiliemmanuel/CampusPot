@@ -5,11 +5,12 @@ import {
   Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 
-import type { ExpenseRequest } from "../../lib/api";
+import type { ExpenseRequest, Payment } from "../../lib/api";
 import { formatNaira } from "../../lib/format";
 
 interface Props {
   expenses: ExpenseRequest[];
+  payments: Payment[];
   groupId: string;
 }
 
@@ -22,7 +23,7 @@ function categoryKey(expense: ExpenseRequest) {
   return expense.category?.trim().toLocaleLowerCase() || "";
 }
 
-export default function PotSpendingInsights({ expenses, groupId }: Props) {
+export default function PotSpendingInsights({ expenses, payments, groupId }: Props) {
   const completed = useMemo(
     () => expenses.filter((expense) => expense.status === "completed" && completedAt(expense)),
     [expenses],
@@ -33,19 +34,26 @@ export default function PotSpendingInsights({ expenses, groupId }: Props) {
     return Array.from({ length: 6 }, (_, index) => {
       const date = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1);
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-      return { key, month: date.toLocaleDateString("en-NG", { month: "short" }), amount: 0 };
+      return { key, month: date.toLocaleDateString("en-NG", { month: "short" }), amount: 0, contributions: 0 };
     });
   }, []);
 
   const chartData = useMemo(() => {
-    const totals = new Map(months.map((month) => [month.key, 0]));
+    const totals = new Map(months.map((month) => [month.key, { amount: 0, contributions: 0 }]));
     completed.forEach((expense) => {
       const date = completedAt(expense)!;
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-      if (totals.has(key)) totals.set(key, totals.get(key)! + expense.amountKobo);
+      if (totals.has(key)) totals.get(key)!.amount += expense.amountKobo;
     });
-    return months.map((month) => ({ ...month, amount: totals.get(month.key) || 0 }));
-  }, [completed, months]);
+    payments.filter((payment) => payment.status === "matched" || payment.status === "partial").forEach((payment) => {
+      const date = new Date(payment.createdAt);
+      if (Number.isNaN(date.getTime())) return;
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      const month = totals.get(key);
+      if (month) month.contributions += payment.amountKobo;
+    });
+    return months.map((month) => ({ ...month, ...(totals.get(month.key) || { amount: 0, contributions: 0 }) }));
+  }, [completed, months, payments]);
 
   const recurring = useMemo(() => {
     const byCategory = new Map<string, ExpenseRequest[]>();
@@ -92,12 +100,7 @@ export default function PotSpendingInsights({ expenses, groupId }: Props) {
         )}
       </div>
 
-      {completed.length === 0 ? (
-        <div className="rounded-lg bg-slate-50 px-3 py-5 text-center text-xs text-slate-500 dark:bg-white/5 dark:text-slate-400">
-          Completed payout history will appear here as this pot is used.
-        </div>
-      ) : (
-        <div className="h-48 w-full sm:h-56">
+      <div className="relative h-48 w-full sm:h-56">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ top: 6, right: 8, left: -14, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -107,15 +110,24 @@ export default function PotSpendingInsights({ expenses, groupId }: Props) {
                 content={({ active, payload, label }) => active && payload?.length ? (
                   <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs shadow-lg dark:border-slate-700 dark:bg-slate-900">
                     <p className="mb-1 text-slate-500 dark:text-slate-400">{label}</p>
-                    <p className="font-semibold text-slate-800 dark:text-slate-100">{formatNaira(Number(payload[0].value))}</p>
+                    {payload.map((item) => <p key={String(item.dataKey)} className="font-semibold text-slate-800 dark:text-slate-100">{item.name}: {formatNaira(Number(item.value))}</p>)}
                   </div>
                 ) : null}
               />
-              <Bar dataKey="amount" name="Completed payouts" fill="#7c3aed" radius={[5, 5, 0, 0]} maxBarSize={34} />
+              <Bar dataKey="contributions" name="Contributions" fill="#16a34a" radius={[5, 5, 0, 0]} maxBarSize={28} />
+              <Bar dataKey="amount" name="Payouts" fill="#7c3aed" radius={[5, 5, 0, 0]} maxBarSize={28} />
             </BarChart>
           </ResponsiveContainer>
-        </div>
-      )}
+          {completed.length === 0 && payments.every((payment) => payment.status !== "matched" && payment.status !== "partial") && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center pt-6">
+              <span className="rounded-full bg-white/90 px-3 py-1.5 text-[11px] text-slate-500 shadow-sm dark:bg-slate-900/90 dark:text-slate-400">Transactions will appear here</span>
+            </div>
+          )}
+      </div>
+      <div className="mt-2 flex items-center justify-center gap-4 text-[10px] text-slate-500 dark:text-slate-400">
+        <span className="inline-flex items-center gap-1.5"><i className="h-2 w-2 rounded-sm bg-green-600" /> Contributions</span>
+        <span className="inline-flex items-center gap-1.5"><i className="h-2 w-2 rounded-sm bg-violet-600" /> Completed payouts</span>
+      </div>
 
       <div className="mt-3 border-t border-slate-100 pt-3 dark:border-white/10">
         <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-slate-800 dark:text-slate-100">
