@@ -1,12 +1,38 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowDownToLine, ArrowLeft, Eye, EyeOff, File as FileIcon, FileText, Loader2, MessageSquare, Mic, Pause, Paperclip, Play, Send, Square, X } from "lucide-react";
+import {
+  ArrowDownToLine,
+  ArrowLeft,
+  Check,
+  CheckCheck,
+  Download,
+  File as FileIcon,
+  FileArchive,
+  FileSpreadsheet,
+  FileText,
+  Film,
+  Image as ImageIcon,
+  Loader2,
+  MessageSquare,
+  Mic,
+  Paperclip,
+  Pause,
+  Play,
+  Presentation,
+  Reply,
+  Send,
+  Smile,
+  X,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 import { useGroup } from "../../providers/GroupProvider";
 import {
   ApiError, chatWebSocketProtocols, chatWebSocketUrl, getChatAttachment, getStoredUser, listChat, listChatParticipants, markChatRead, postChat, uploadChatAttachment,
   type ChatMessage, type Membership,
 } from "../../lib/api";
+
+const cn = (...parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join(" ");
 
 // A missing /chat route means this backend predates the chat endpoints. Show a
 // plain message instead of the raw "request failed (404)".
@@ -17,24 +43,95 @@ function describeError(err: unknown, fallback: string) {
   return err instanceof Error ? err.message : fallback;
 }
 
-function timeLabel(iso: string) {
-  return new Date(iso).toLocaleString("en-NG", {
-    day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
-  });
-}
-
 function formatAudioTime(seconds: number) {
-  if (!Number.isFinite(seconds)) return "0:00";
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
   return `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
 }
 
-function AudioAttachment({ src, author = "", mine = false }: { src: string; author?: string; mine?: boolean }) {
+function clockLabel(iso: string) {
+  return new Date(iso).toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" });
+}
+
+function dayKey(iso: string) {
+  return new Date(iso).toDateString();
+}
+
+function dayLabel(iso: string) {
+  const date = new Date(iso);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (date.toDateString() === today.toDateString()) return "Today";
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return date.toLocaleDateString("en-NG", { weekday: "long", day: "numeric", month: "long" });
+}
+
+// Deterministic avatar colour so the same member always looks the same.
+const AVATAR_COLORS = ["#e0533d", "#ef8a3c", "#0d9488", "#7c3aed", "#e11d48", "#0284c7", "#16a34a", "#db2777", "#b45309", "#4f46e5"];
+
+function colorFor(id: string) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+}
+
+function initialsOf(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  return parts.slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "").join("");
+}
+
+function Avatar({ id, name, className = "h-9 w-9 text-[11px]" }: { id: string; name: string; className?: string }) {
+  return (
+    <span
+      className={cn("grid shrink-0 place-items-center rounded-full font-bold text-white shadow-sm", className)}
+      style={{ backgroundColor: colorFor(id) }}
+    >
+      {initialsOf(name)}
+    </span>
+  );
+}
+
+const EMOJIS = [
+  "😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😌", "😍", "🥰",
+  "😘", "😋", "😜", "🤪", "🤨", "🧐", "😎", "🥳", "🤩", "🥺", "😢", "😭", "😤", "😠", "😳", "🥵",
+  "🥶", "😱", "🤔", "🤗", "🤭", "🤫", "😐", "😴", "🤔", "🤐", "🤢", "🤧", "😷", "👍", "👎", "👌",
+  "✌️", "🤞", "🤟", "🤘", "👈", "👉", "👆", "👇", "☝️", "✋", "🤚", "👋", "🤝", "🙏", "💪", "👏",
+  "🙌", "👐", "🤲", "✍️", "💅", "💃", "🕺", "👀", "🧠", "❤️", "🧡", "💛", "💚", "💙", "💜", "🖤",
+  "🤍", "💔", "❣️", "💕", "💞", "💓", "💗", "💖", "💘", "💝", "💟", "🔥", "✨", "⭐", "🌟", "💫",
+  "💥", "💯", "🎉", "🎊", "🎁", "🎈", "🏆", "🥇", "⚽", "🏀", "🎯", "🚀", "✅", "❌", "💰", "💸",
+  "🧾", "📌", "📎", "🕐", "📅", "💬", "📣", "🔔", "🔒", "🔑", "💡", "📢", "📲", "🧮", "📊", "📈",
+  "📉", "🗓️", "🍀", "🌴", "☕", "🍚", "🎂", "🥂", "🌈", "🔔", "🚩", "🥳", "🤝", "💐", "🧿", "🪙",
+];
+
+// A compact emoji tray for the composer — no third-party picker needed.
+function EmojiTray({ onPick }: { onPick: (emoji: string) => void }) {
+  return (
+    <div className="absolute bottom-full left-0 z-30 mb-2 max-h-56 w-[min(20rem,88vw)] overflow-y-auto rounded-2xl border border-black/5 bg-white p-2 shadow-2xl dark:border-white/10 dark:bg-[#182229]">
+      <div className="grid grid-cols-8 gap-0.5">
+        {EMOJIS.map((emoji, index) => (
+          <button
+            key={`${emoji}-${index}`}
+            type="button"
+            onClick={() => onPick(emoji)}
+            className="grid h-8 w-8 place-items-center rounded-lg text-lg leading-none transition hover:bg-slate-100 dark:hover:bg-white/10"
+          >
+            {emoji}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// WhatsApp-style voice note: play button, elapsed time, tappable waveform.
+function VoiceNote({ src, label }: { src: string; label?: string }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
-  const progress = duration ? currentTime / duration : 0;
-  const bars = Array.from({ length: 36 }, (_, i) => 5 + ((i * 17 + i * i * 7) % 16));
+  const progress = duration > 0 ? Math.min(1, currentTime / duration) : 0;
+  const bars = useMemo(() => Array.from({ length: 32 }, (_, i) => 5 + ((i * 37 + i * i * 11) % 17)), []);
 
   const toggle = async () => {
     const audio = audioRef.current;
@@ -44,8 +141,15 @@ function AudioAttachment({ src, author = "", mine = false }: { src: string; auth
     } else audio.pause();
   };
 
+  const seek = (ratio: number) => {
+    const audio = audioRef.current;
+    if (!audio || !duration) return;
+    audio.currentTime = duration * ratio;
+    setCurrentTime(audio.currentTime);
+  };
+
   return (
-    <div className={`my-1 w-[min(20rem,76vw)] max-w-full rounded-2xl border p-3 shadow-sm ${mine ? "border-[#b7e2c1] bg-[#e6f5e9] dark:border-[#087c68] dark:bg-[#064d41]" : "border-[#e2e8ec] bg-[#f7f9fa] dark:border-[#34444e] dark:bg-[#26343c]"}`}>
+    <div className="flex min-w-[13rem] max-w-full items-center gap-3 py-0.5">
       <audio
         ref={audioRef}
         src={src}
@@ -53,84 +157,151 @@ function AudioAttachment({ src, author = "", mine = false }: { src: string; auth
         className="hidden"
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
-        onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)}
+        onLoadedMetadata={(event) => {
+          const value = event.currentTarget.duration;
+          setDuration(Number.isFinite(value) ? value : 0);
+        }}
         onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
         onEnded={() => { setPlaying(false); setCurrentTime(0); }}
       />
-      <div className="mb-2 flex items-center gap-2">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#00a884] text-xs font-bold text-white">{author.trim().charAt(0).toUpperCase() || <Mic className="h-4 w-4" />}</span>
-        <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-[#263238] dark:text-[#e9edef]">{author || "Voice message"}</p><p className="text-[9px] font-bold uppercase tracking-[.12em] text-[#667781] dark:text-[#aebac1]">Voice message</p></div>
-        <span className="rounded-full bg-white/80 px-2 py-1 text-[9px] font-semibold text-[#667781] dark:bg-white/10 dark:text-[#c5d0d6]">AUDIO</span>
+      <button
+        type="button"
+        onClick={() => void toggle()}
+        aria-label={playing ? "Pause voice note" : "Play voice note"}
+        className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#00a884] text-white shadow-md shadow-[#00a884]/30 transition hover:bg-[#009c7a]"
+      >
+        {playing ? <Pause className="h-4 w-4 fill-current" /> : <Play className="ml-0.5 h-4 w-4 fill-current" />}
+      </button>
+      <span className="shrink-0 text-[11px] font-semibold tabular-nums text-slate-500 dark:text-slate-300">
+        {formatAudioTime(currentTime || duration)}
+      </span>
+      <div className="flex h-6 min-w-0 flex-1 items-center gap-[2px]">
+        {bars.map((height, i) => (
+          <button
+            key={i}
+            type="button"
+            aria-label={`Seek to ${Math.round((i / bars.length) * 100)} percent`}
+            onClick={() => seek(i / bars.length)}
+            className={cn(
+              "min-w-[2px] flex-1 rounded-full transition-colors",
+              i / bars.length <= progress ? "bg-[#00a884]" : "bg-[#c3cdd2] dark:bg-[#465761]",
+            )}
+            style={{ height: `${height + 4}px` }}
+          />
+        ))}
       </div>
-      <div className="flex items-center gap-3">
-        <button type="button" onClick={() => void toggle()} aria-label={playing ? "Pause voice note" : "Play voice note"} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#008f76] text-white shadow-md shadow-[#008f76]/20 transition hover:bg-[#007e69] dark:bg-[#00a884] dark:hover:bg-[#00bf9a]">
-          {playing ? <Pause className="h-4 w-4 fill-current" /> : <Play className="ml-0.5 h-4 w-4 fill-current" />}
-        </button>
-        <div className="min-w-0 flex-1">
-          <div className="flex h-9 items-center gap-[2px]" aria-label="Voice note waveform">
-            {bars.map((height, i) => (
-              <button key={i} type="button" aria-label={`Seek voice note to ${Math.round((i / bars.length) * 100)} percent`} onClick={() => { const audio = audioRef.current; if (audio && duration) { audio.currentTime = duration * (i / bars.length); setCurrentTime(audio.currentTime); } }} className={`min-w-[2px] flex-1 rounded-full transition-colors ${i / bars.length <= progress ? "bg-[#008f76] dark:bg-[#00a884]" : "bg-[#aab7bd] dark:bg-[#687a83]"}`} style={{ height: `${height + 5}px` }} />
-            ))}
-          </div>
-          <div className="mt-1 flex items-center justify-between text-[10px] font-medium tabular-nums text-[#667781] dark:text-[#aebac1]">
-            <span>{formatAudioTime(playing || currentTime > 0 ? currentTime : duration)}</span><span>{duration ? formatAudioTime(duration) : "Audio"}</span>
-          </div>
-        </div>
-      </div>
+      {label ? <span className="sr-only">{label}</span> : null}
     </div>
   );
 }
 
-function ChatAttachment({ message, mine }: { message: ChatMessage; mine: boolean }) {
-  const [url, setUrl] = useState("");
-  const [fileSize, setFileSize] = useState(0);
-  const [showDownload, setShowDownload] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
-  const [attachmentError, setAttachmentError] = useState(false);
+type FileKind = { label: string; color: string; Icon: LucideIcon };
+
+function fileKind(name = "", type = ""): FileKind {
+  const ext = (name.split(".").pop() ?? "").toLowerCase();
+  if (ext === "pdf" || type === "application/pdf") return { label: "PDF", color: "#e04747", Icon: FileText };
+  if (["doc", "docx", "odt", "rtf"].includes(ext)) return { label: ext.toUpperCase(), color: "#2b579a", Icon: FileText };
+  if (["xls", "xlsx", "ods"].includes(ext)) return { label: ext.toUpperCase(), color: "#1d6f42", Icon: FileSpreadsheet };
+  if (["csv"].includes(ext)) return { label: "CSV", color: "#1d6f42", Icon: FileSpreadsheet };
+  if (["ppt", "pptx", "odp"].includes(ext)) return { label: ext.toUpperCase(), color: "#d24726", Icon: Presentation };
+  if (["zip", "rar", "7z", "tar", "gz"].includes(ext)) return { label: ext.toUpperCase(), color: "#b45309", Icon: FileArchive };
+  if (["mp3", "wav", "m4a", "ogg", "aac", "flac"].includes(ext) || type.startsWith("audio/")) return { label: "AUDIO", color: "#0e7490", Icon: Mic };
+  if (["mp4", "mov", "webm", "mkv", "avi"].includes(ext) || type.startsWith("video/")) return { label: "VIDEO", color: "#7c3aed", Icon: Film };
+  if (["txt", "md", "log"].includes(ext)) return { label: ext.toUpperCase(), color: "#64748b", Icon: FileText };
+  if (type.startsWith("image/")) return { label: ext.toUpperCase() || "IMAGE", color: "#be185d", Icon: ImageIcon };
+  return { label: ext.toUpperCase() || "FILE", color: "#64748b", Icon: FileIcon };
+}
+
+// Attachments are streamed from the API with the bearer token, so they are
+// fetched as blobs and shown through a local object URL.
+function useAttachmentBlob(url?: string) {
+  const [blob, setBlob] = useState<{ url: string; size: number } | null>(null);
+  const [failed, setFailed] = useState(false);
+
   useEffect(() => {
-    if (!message.attachmentUrl) return;
+    if (!url) { setBlob(null); setFailed(false); return; }
     let objectUrl = "";
     let alive = true;
-    getChatAttachment(message.attachmentUrl).then((blob) => {
-      objectUrl = URL.createObjectURL(blob);
-      if (alive) setFileSize(blob.size);
-      if (alive) setUrl(objectUrl); else URL.revokeObjectURL(objectUrl);
-    }).catch(() => { if (alive) setAttachmentError(true); });
+    setBlob(null);
+    setFailed(false);
+    getChatAttachment(url)
+      .then((data) => {
+        objectUrl = URL.createObjectURL(data);
+        if (alive) setBlob({ url: objectUrl, size: data.size });
+        else URL.revokeObjectURL(objectUrl);
+      })
+      .catch(() => { if (alive) setFailed(true); });
     return () => { alive = false; if (objectUrl) URL.revokeObjectURL(objectUrl); };
-  }, [message.attachmentUrl]);
-  if (!url) return <span className="my-1 block text-xs opacity-70">{attachmentError ? "Attachment could not be loaded." : "Loading attachment…"}</span>;
-  const isAudio = message.attachmentType?.startsWith("audio/");
-  const isImage = message.attachmentType?.startsWith("image/");
-  const isPdf = message.attachmentType === "application/pdf" || message.attachmentName?.toLowerCase().endsWith(".pdf");
-  if (isAudio) return <AudioAttachment src={url} author={message.author} mine={mine} />;
-  const extension = message.attachmentName?.split(".").pop()?.toUpperCase() || (isImage ? "IMAGE" : "FILE");
-  const sizeLabel = fileSize >= 1024 * 1024 ? `${(fileSize / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(fileSize / 1024))} KB`;
-  return <>
-    <div className="mt-2 w-[min(20rem,76vw)] max-w-full overflow-hidden rounded-xl border border-[#d9e2e7] bg-[#f7f9fa] text-[#111b21] shadow-sm dark:border-[#34444e] dark:bg-[#26343c] dark:text-[#e9edef]">
-      <div className="flex items-center gap-3 p-3">
-        <span className={`grid h-12 w-11 shrink-0 place-items-center rounded-lg text-white shadow-sm ${isImage ? "bg-[#00a884]" : isPdf ? "bg-[#e05b5b]" : "bg-[#607d8b]"}`}>{isImage ? <FileIcon className="h-5 w-5" /> : <FileText className="h-5 w-5" />}</span>
-        <span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-semibold">{message.attachmentName || "Shared file"}</span><span className="mt-1 block text-[10px] font-medium text-[#667781] dark:text-[#aebac1]">{extension} · {sizeLabel}</span></span>
-        <button type="button" onClick={() => setShowDownload(true)} className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-[#54656f] shadow-sm transition hover:bg-[#e9edef] dark:bg-[#34444e] dark:text-[#e9edef] dark:hover:bg-[#435660]" aria-label="Download attachment"><ArrowDownToLine className="h-4 w-4" /></button>
-      </div>
-      <div className="flex border-t border-[#d9e2e7] bg-white/70 dark:border-[#34444e] dark:bg-black/10">
-        <button type="button" onClick={() => setShowPreview((visible) => !visible)} aria-expanded={showPreview} className="flex min-h-10 flex-1 items-center justify-center gap-1.5 text-[11px] font-bold text-[#008f76] transition hover:bg-[#e9f5ee] dark:text-[#00a884] dark:hover:bg-white/5">
-          {showPreview ? <><EyeOff className="h-3.5 w-3.5" /> Hide file</> : <><Eye className="h-3.5 w-3.5" /> View file</>}
-        </button>
-        <button type="button" onClick={() => setShowDownload(true)} className="border-l border-black/10 px-3 text-[11px] font-semibold opacity-70 transition hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5">Download</button>
-      </div>
-      {showPreview && <div className="border-t border-current/10 p-2">
-        {isImage ? <img className="max-h-64 w-full rounded-lg object-contain" src={url} alt={message.attachmentName || "Shared image"} /> : isPdf ? <iframe title={message.attachmentName || "PDF preview"} src={url} className="h-64 w-full rounded-lg bg-white" /> : <p className="px-2 py-4 text-center text-[11px] opacity-70">Preview isn’t available for this file type. Download it to open.</p>}
-      </div>}
+  }, [url]);
+
+  return { blob, failed };
+}
+
+function sizeLabel(bytes: number) {
+  if (!bytes) return "";
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+function downloadBlob(url: string, name: string) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name || "potkeeper-file";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+function AttachmentBlock({
+  message,
+  onOpenImage,
+}: {
+  message: ChatMessage;
+  onOpenImage: (url: string, name: string) => void;
+}) {
+  const { blob, failed } = useAttachmentBlob(message.attachmentUrl);
+  const isAudio = !!message.attachmentType?.startsWith("audio/");
+  const isImage = !!message.attachmentType?.startsWith("image/");
+
+  if (failed) return <p className="mt-1 text-[12px] opacity-70">Attachment could not be loaded.</p>;
+  if (!blob) return <p className="mt-1 text-[12px] opacity-70">Loading attachment…</p>;
+  if (isAudio) return <div className="mt-1"><VoiceNote src={blob.url} label={message.attachmentName} /></div>;
+  if (isImage) {
+    return (
+      <button
+        type="button"
+        onClick={() => onOpenImage(blob.url, message.attachmentName || "Shared image")}
+        className="mt-1 block w-full overflow-hidden rounded-xl"
+        aria-label={`Open ${message.attachmentName || "image"}`}
+      >
+        <img src={blob.url} alt={message.attachmentName || "Shared image"} className="max-h-80 w-full object-cover" />
+      </button>
+    );
+  }
+
+  const kind = fileKind(message.attachmentName, message.attachmentType);
+  const Icon = kind.Icon;
+  return (
+    <div className="mt-1 flex w-[min(19rem,72vw)] max-w-full items-center gap-3 rounded-xl border border-black/[0.06] bg-white p-2.5 dark:border-white/10 dark:bg-[#2a3942]">
+      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-white shadow-sm" style={{ backgroundColor: kind.color }}>
+        <Icon className="h-5 w-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-semibold text-[#111b21] dark:text-[#e9edef]">{message.attachmentName || "Shared file"}</span>
+        <span className="mt-0.5 block text-[11px] font-medium text-slate-500 dark:text-slate-400">
+          {kind.label}{sizeLabel(blob.size) ? ` · ${sizeLabel(blob.size)}` : ""}
+        </span>
+      </span>
+      <button
+        type="button"
+        onClick={() => downloadBlob(blob.url, message.attachmentName || "potkeeper-file")}
+        aria-label={`Download ${message.attachmentName || "file"}`}
+        className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#e9edef] text-[#54656f] transition hover:bg-[#dde3e6] dark:bg-white/10 dark:text-[#e9edef] dark:hover:bg-white/20"
+      >
+        <Download className="h-4 w-4" />
+      </button>
     </div>
-    {showDownload && <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/65 p-3 backdrop-blur-sm sm:items-center" onClick={() => setShowDownload(false)}>
-      <div role="dialog" aria-modal="true" aria-labelledby="download-title" onClick={(event) => event.stopPropagation()} className="w-full max-w-sm rounded-[1.75rem] border border-white/10 bg-white p-5 shadow-2xl dark:bg-[#101a2b] sm:p-6">
-        <div className="mb-4 flex items-start justify-between"><span className="grid h-12 w-12 place-items-center rounded-2xl bg-violet-50 text-violet-700 dark:bg-violet-400/10 dark:text-violet-200"><FileIcon className="h-5 w-5" /></span><button type="button" onClick={() => setShowDownload(false)} aria-label="Close" className="rounded-full p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10"><X className="h-4 w-4" /></button></div>
-        <h3 id="download-title" className="font-sora text-lg font-bold text-slate-900 dark:text-white">Download shared file?</h3>
-        <p className="mt-1 break-all text-sm text-slate-500 dark:text-slate-400">{message.attachmentName || "Shared file"}</p>
-        <button type="button" onClick={() => { const link = document.createElement("a"); link.href = url; link.download = message.attachmentName || "potkeeper-file"; document.body.appendChild(link); link.click(); link.remove(); setShowDownload(false); }} className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-700 to-violet-500 px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-violet-900/20 transition hover:brightness-105 active:scale-[.99]"><ArrowDownToLine className="h-4 w-4" /> Download file</button>
-      </div>
-    </div>}
-  </>;
+  );
 }
 
 // A standalone, WhatsApp-style group chat for one pot. Reached from the pot
@@ -151,12 +322,18 @@ function ChatRoom({ groupId, groupName }: { groupId: string; groupName: string }
   const [voiceDraft, setVoiceDraft] = useState<File | null>(null);
   const [voiceDraftUrl, setVoiceDraftUrl] = useState("");
   const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [showEmoji, setShowEmoji] = useState(false);
+  const [lightbox, setLightbox] = useState<{ url: string; name: string } | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const stickToBottom = useRef(true);
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const recordedChunks = useRef<Blob[]>([]);
   const cancelRecording = useRef(false);
   const recordingTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const textInput = useRef<HTMLTextAreaElement>(null);
 
   const nameById = (uid: string) =>
     participants.find((p) => p.userId === uid)?.user?.name ??
@@ -216,9 +393,64 @@ function ChatRoom({ groupId, groupName }: { groupId: string; groupName: string }
     return () => { stopped = true; if (retry) clearTimeout(retry); socket?.close(); };
   }, [groupId]);
 
+  // Keep the newest message in view, but never yank a reader who has
+  // scrolled up to read history. Attachments load asynchronously, so the
+  // content height is watched as well to stay pinned at the bottom.
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length]);
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const onScroll = () => {
+      stickToBottom.current = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 90;
+    };
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    return () => scroller.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller || loading || !stickToBottom.current) return;
+    scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
+  }, [messages.length, loading]);
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    const content = contentRef.current;
+    if (!scroller || !content || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      if (stickToBottom.current) scroller.scrollTop = scroller.scrollHeight;
+    });
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, []);
+
+
+  // Consecutive messages from the same member are grouped into one run, the
+  // way messenger apps draw them.
+  const rows = useMemo(() => {
+    const out: { message: ChatMessage; isFirst: boolean; isLast: boolean; divider?: string }[] = [];
+    let lastDay = "";
+    messages.forEach((message, index) => {
+      const prev = messages[index - 1];
+      const next = messages[index + 1];
+      const stamp = new Date(message.createdAt).getTime();
+      const prevStamp = prev ? new Date(prev.createdAt).getTime() : 0;
+      const nextStamp = next ? new Date(next.createdAt).getTime() : 0;
+      const sameAsPrev = !!prev && prev.userId === message.userId && stamp - prevStamp < 5 * 60 * 1000;
+      const sameAsNext = !!next && next.userId === message.userId && nextStamp - stamp < 5 * 60 * 1000;
+      const day = dayKey(message.createdAt);
+      const row: { message: ChatMessage; isFirst: boolean; isLast: boolean; divider?: string } = {
+        message,
+        isFirst: !sameAsPrev,
+        isLast: !sameAsNext,
+      };
+      if (day !== lastDay) {
+        row.divider = dayLabel(message.createdAt);
+        lastDay = day;
+      }
+      out.push(row);
+    });
+    return out;
+  }, [messages]);
 
   const send = async () => {
     const text = body.trim();
@@ -300,110 +532,132 @@ function ChatRoom({ groupId, groupName }: { groupId: string; groupName: string }
   useEffect(() => () => { if (voiceDraftUrl) URL.revokeObjectURL(voiceDraftUrl); }, [voiceDraftUrl]);
   const clock = (seconds: number) => `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 
+  const insertEmoji = (emoji: string) => {
+    const field = textInput.current;
+    if (!field) { setBody((current) => current + emoji); return; }
+    const start = field.selectionStart ?? field.value.length;
+    const end = field.selectionEnd ?? field.value.length;
+    setBody((current) => current.slice(0, start) + emoji + current.slice(end));
+    requestAnimationFrame(() => {
+      field.focus();
+      const caret = start + emoji.length;
+      field.setSelectionRange(caret, caret);
+    });
+  };
+
   return (
     <div className="fixed inset-0 z-40 flex flex-col overflow-hidden bg-[#efeae2] text-[#111b21] dark:bg-[#0b141a] dark:text-[#e9edef] lg:bottom-0 lg:left-60">
-      <div className="flex items-center gap-3 border-b border-black/5 bg-[#008069] px-3 pb-3 pt-[max(.75rem,env(safe-area-inset-top))] text-white shadow-lg dark:border-white/5 dark:bg-[#202c33] sm:px-5">
+      <div className="flex items-center gap-3 bg-[#008069] px-3 pb-3 pt-[max(.75rem,env(safe-area-inset-top))] text-white shadow-md dark:bg-[#1f2c33] sm:px-5">
         <Link
           to={`/pots/${id}`}
-          className="rounded-full p-2 text-white/75 transition hover:bg-white/10 hover:text-white"
+          className="rounded-full p-2 text-white/80 transition hover:bg-white/10 hover:text-white"
           aria-label="Back to pot"
         >
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#00a884] font-sora font-extrabold text-white shadow-md shadow-black/10">
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/15 font-sora font-extrabold text-white">
           {(groupName || "?").charAt(0).toUpperCase()}
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate font-sora text-sm font-bold text-white">{groupName}</p>
           <p className="flex items-center gap-1.5 truncate text-[11px] text-white/75">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#b9f5d0]" /> {participants.length} member{participants.length === 1 ? "" : "s"} · live pot room
+            <span className="h-1.5 w-1.5 rounded-full bg-[#b9f5d0]" /> {participants.length} member{participants.length === 1 ? "" : "s"} · pot room
           </p>
         </div>
       </div>
 
-      <div className="flex-1 space-y-2.5 overflow-y-auto bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,.35)_0_1px,transparent_1.5px),radial-gradient(circle_at_80%_60%,rgba(255,255,255,.28)_0_1px,transparent_1.5px)] bg-[length:28px_28px] px-3 py-4 sm:px-6 sm:py-6 dark:bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,.035)_0_1px,transparent_1.5px),radial-gradient(circle_at_80%_60%,rgba(255,255,255,.025)_0_1px,transparent_1.5px)]">
+      <div ref={scrollerRef} className="cp-chat-wall flex-1 overflow-y-auto px-3 py-3 sm:px-5">
+        <div ref={contentRef}>
         {loading ? (
           <div className="flex justify-center py-10">
             <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
           </div>
         ) : messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center text-center">
-            <MessageSquare className="mb-2 h-8 w-8 text-slate-300" />
-            <p className="text-sm text-slate-400">No messages yet. Say hello to the pot.</p>
+            <MessageSquare className="mb-2 h-8 w-8 text-slate-400/70" />
+            <p className="text-sm text-slate-500">No messages yet. Say hello to the pot.</p>
           </div>
         ) : (
-          messages.map((m, i) => {
+          rows.map((row) => {
+            const m = row.message;
             const mine = m.userId === myId;
             const parent = m.replyToId ? messages.find((x) => x.id === m.replyToId) : null;
             const readers = (m.readBy ?? []).filter((r) => r !== m.userId);
-            const prev = messages[i - 1];
-            const showName = !mine && (!prev || prev.userId !== m.userId);
+            const isImage = !!m.attachmentType?.startsWith("image/");
+            const bubbleBg = mine ? "bg-[#d9fdd3] dark:bg-[#005c4b]" : "bg-white dark:bg-[#202c33]";
+            const meta = (
+              <span className={cn("flex shrink-0 items-center gap-1 text-[10px] font-medium", mine ? "text-[#4b8a5f] dark:text-white/55" : "text-slate-400")}>
+                <span>{clockLabel(m.createdAt)}</span>
+                {mine && (readers.length > 0
+                  ? <CheckCheck className="h-3.5 w-3.5 text-[#53bdeb]" aria-label={`Read by ${readers.map(nameById).join(", ")}`} />
+                  : <Check className="h-3.5 w-3.5" aria-label="Sent" />)}
+              </span>
+            );
             return (
-              <div key={m.id} className={["flex flex-col", mine ? "items-end" : "items-start"].join(" ")}>
-                <div
-                  className={[
-                    "max-w-[90%] rounded-[1.35rem] px-3.5 py-2.5 shadow-sm sm:max-w-[70%]",
-                    mine
-                      ? "rounded-br-md bg-[#d9fdd3] text-[#111b21] shadow-black/5 dark:bg-[#005c4b] dark:text-[#e9edef]"
-                      : "rounded-bl-md border border-black/[0.035] bg-white text-[#111b21] dark:border-white/5 dark:bg-[#202c33] dark:text-[#e9edef]",
-                  ].join(" ")}
-                >
-                  {showName && (
-                    <p className="mb-0.5 text-[11px] font-semibold text-brand-600 dark:text-brand-400">
-                      {m.author || "Member"}
-                    </p>
-                  )}
-                  {parent && (
-                    <div
-                      className={[
-                        "mb-1.5 rounded-lg border-l-2 px-2 py-1 text-xs",
-                        mine ? "border-white/50 bg-white/10 text-white/80" : "border-brand-300 bg-slate-50 text-slate-500 dark:bg-slate-900/40",
-                      ].join(" ")}
-                    >
-                      <p className="font-semibold">{parent.author}</p>
-                      <p className="truncate">{parent.body}</p>
+              <Fragment key={m.id}>
+                {row.divider && (
+                  <div className="my-3 flex justify-center">
+                    <span className="rounded-full bg-white/80 px-3 py-1 text-[11px] font-semibold text-slate-500 shadow-sm backdrop-blur dark:bg-white/10 dark:text-slate-300">{row.divider}</span>
+                  </div>
+                )}
+                <div className={cn("group flex items-end gap-2", mine ? "justify-end" : "justify-start", row.isFirst ? "mt-3" : "mt-[2px]")}>
+                  {!mine && (row.isLast
+                    ? <Avatar id={m.userId} name={m.author} />
+                    : <span className="h-0 w-9 shrink-0" />)}
+                  <div className={cn("flex min-w-0 max-w-[min(85%,30rem)] items-end gap-1", mine ? "flex-row-reverse" : "flex-row")}>
+                    <div className={cn("relative w-fit min-w-0 max-w-full shadow-sm", bubbleBg, mine ? "rounded-br-[6px]" : "rounded-bl-[6px]", isImage ? "rounded-[1.1rem] p-1" : "rounded-[1.1rem] px-3 py-2")}>
+                      <span className={cn("cp-bubble-tail", bubbleBg, mine ? "-bottom-1 -right-1" : "-bottom-1 -left-1")} aria-hidden />
+                      {row.isFirst && !mine && (
+                        <p className="mb-1 text-[12px] font-bold" style={{ color: colorFor(m.userId) }}>{m.author || "Member"}</p>
+                      )}
+                      {parent && (
+                        <div className="mb-1 flex max-w-full items-stretch gap-2 rounded-lg bg-black/[0.05] px-2 py-1.5 dark:bg-white/[0.07]">
+                          <span className="w-1 shrink-0 rounded-full bg-[#00a884]" />
+                          <span className="min-w-0 flex-1 overflow-hidden">
+                            <span className="block truncate text-[12px] font-bold text-[#00a884]">{parent.author || "Member"}</span>
+                            <span className="block truncate text-[12px] text-slate-500 dark:text-slate-300">{parent.body || "Attachment"}</span>
+                          </span>
+                        </div>
+                      )}
+                      {m.body && !m.attachmentUrl && (
+                        <div className="flex items-end gap-2">
+                          <p className="flex-1 whitespace-pre-wrap break-words text-[14.5px] leading-[1.35]">{m.body}</p>
+                          {meta}
+                        </div>
+                      )}
+                      {m.body && m.attachmentUrl && <p className="whitespace-pre-wrap break-words text-[14.5px] leading-[1.35]">{m.body}</p>}
+                      {m.attachmentUrl && <AttachmentBlock message={m} onOpenImage={(url, name) => setLightbox({ url, name })} />}
+                      {m.attachmentUrl && <div className="mt-1 flex justify-end">{meta}</div>}
+                      {!m.body && !m.attachmentUrl && <div className="flex justify-end">{meta}</div>}
                     </div>
-                  )}
-                  {m.body ? <p className="whitespace-pre-wrap break-words text-sm">{m.body}</p> : m.attachmentType?.startsWith("audio/") && <p className="text-xs font-semibold opacity-80">Voice note · {m.author}</p>}
-                  {m.attachmentUrl && <ChatAttachment message={m} mine={mine} />}
-                  <div
-                    className={[
-                      "mt-1 flex items-center justify-end gap-1.5 text-[10px]",
-                      mine ? "text-white/70" : "text-slate-400",
-                    ].join(" ")}
-                  >
-                    <span>{timeLabel(m.createdAt)}</span>
-                    {mine && <span>{readers.length > 0 ? "✓✓" : "✓"}</span>}
+                    {!mine && (
+                      <button
+                        type="button"
+                        onClick={() => setReplyTo(m)}
+                        aria-label={`Reply to ${m.author}`}
+                        className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white/70 text-slate-500 opacity-60 shadow-sm transition hover:bg-white hover:text-[#008069] dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/20 sm:opacity-0 sm:group-hover:opacity-100"
+                      >
+                        <Reply className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
-                {readers.length > 0 && (
-                  <span className="mt-0.5 px-1 text-[10px] text-slate-400">
-                    Seen by {readers.map(nameById).join(", ")}
-                  </span>
-                )}
-                {!mine && (
-                  <button
-                    type="button"
-                    onClick={() => setReplyTo(m)}
-                    className="mt-0.5 px-1 text-[10px] font-semibold text-brand-600 dark:text-brand-400"
-                  >
-                    Reply
-                  </button>
-                )}
-              </div>
+              </Fragment>
             );
           })
         )}
         <div ref={endRef} />
+        </div>
       </div>
 
       {replyTo && (
-        <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-3 py-2 dark:border-white/10">
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold text-brand-600 dark:text-brand-400">
-              Replying to {replyTo.author}
-            </p>
-            <p className="truncate text-xs text-slate-400">{replyTo.body}</p>
+        <div className="flex items-center justify-between gap-2 border-t border-black/5 bg-white px-3 py-2 dark:border-white/5 dark:bg-[#1f2c33]">
+          <div className="flex min-w-0 items-stretch gap-2">
+            <span className="w-1 shrink-0 rounded-full bg-[#00a884]" />
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold text-[#00a884]">Replying to {replyTo.author}</p>
+              <p className="truncate text-xs text-slate-500 dark:text-slate-400">{replyTo.body || "Attachment"}</p>
+            </div>
           </div>
           <button
             type="button"
@@ -418,49 +672,95 @@ function ChatRoom({ groupId, groupName }: { groupId: string; groupName: string }
 
       {error && <p role="status" className="bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">{error}</p>}
 
-      {voiceDraft && voiceDraftUrl && <div className="flex items-center gap-3 border-t border-[#d9e5dd] bg-[#f0f2f5] px-3 py-2.5 dark:border-white/5 dark:bg-[#202c33] sm:px-5">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#00a884] text-white shadow-sm"><Mic className="h-4 w-4" /></span>
-        <div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">Voice note ready · {clock(recordingSeconds)}</p><AudioAttachment src={voiceDraftUrl} author="You" mine /></div>
-        <button type="button" onClick={() => { setVoiceDraft(null); setVoiceDraftUrl(""); setRecordingSeconds(0); }} className="rounded-full p-2 text-slate-500 hover:bg-white dark:hover:bg-white/10" aria-label="Discard voice note"><X className="h-4 w-4" /></button>
-        <button type="button" onClick={sendVoiceNote} disabled={uploading} className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#008f76] px-3.5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#007e69] disabled:opacity-50 dark:bg-[#00a884] dark:hover:bg-[#00bf9a]"><Send className="h-3.5 w-3.5" />{uploading ? "Sending" : "Send audio"}</button>
-      </div>}
-
-      <div className="border-t border-black/5 bg-[#f0f2f5] p-2.5 pb-[max(.65rem,env(safe-area-inset-bottom))] dark:border-white/5 dark:bg-[#202c33] sm:px-5">
-        {recording && <div className="mb-2 flex items-center gap-2 px-1 text-xs font-semibold text-violet-600 dark:text-violet-300"><span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400 opacity-75" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-violet-500" /></span>Recording voice note <span className="font-mono">{clock(recordingSeconds)}</span><span className="ml-auto flex h-4 items-center gap-0.5" aria-hidden="true">{[1, 2, 3, 4, 5, 6, 7].map((n) => <span key={n} className="w-1 animate-pulse rounded-full bg-violet-400" style={{ height: `${6 + (n % 4) * 3}px`, animationDelay: `${n * 90}ms` }} />)}</span></div>}
-        <div className="flex items-end gap-2">
-        <input ref={fileInput} type="file" className="hidden" onChange={(e) => { void upload(e.target.files?.[0]); e.currentTarget.value = ""; }} />
-        <button type="button" onClick={() => fileInput.current?.click()} disabled={uploading || recording || !!voiceDraft} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-[#54656f] transition hover:bg-white hover:text-[#008f76] disabled:opacity-40 dark:text-[#aebac1] dark:hover:bg-[#2a3942] dark:hover:text-[#00a884]" aria-label="Attach file">
-          {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Paperclip className="h-5 w-5" />}
-        </button>
-        <button type="button" onClick={recording ? () => stopRecording(false) : startRecording} disabled={!!voiceDraft} className={`grid h-11 w-11 shrink-0 place-items-center rounded-full transition ${recording ? "bg-rose-500 text-white shadow-lg shadow-rose-900/20" : "text-[#54656f] hover:bg-white hover:text-[#008f76] dark:text-[#aebac1] dark:hover:bg-[#2a3942] dark:hover:text-[#00a884]"}`} aria-label={recording ? "Finish voice note" : "Record voice note"}>
-          {recording ? <Square className="h-4 w-4 fill-current" /> : <Mic className="h-5 w-5" />}
-        </button>
-        {recording && <button type="button" onClick={() => stopRecording(true)} className="grid h-11 w-9 shrink-0 place-items-center rounded-xl text-slate-500 hover:bg-violet-50 hover:text-violet-600 dark:text-slate-300 dark:hover:bg-violet-500/10" aria-label="Cancel recording"><X className="h-4 w-4" /></button>}
-        <textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              send();
-            }
-          }}
-          rows={1}
-          placeholder={recording ? "Tap the square to finish your recording" : "Write a message…"}
-          className="max-h-32 min-h-11 flex-1 resize-none rounded-2xl border border-black/5 bg-white px-4 py-3 text-sm text-[#111b21] placeholder:text-[#667781] focus:border-[#00a884] focus:outline-none focus:ring-2 focus:ring-[#00a884]/20 dark:border-white/5 dark:bg-[#2a3942] dark:text-[#e9edef] dark:placeholder:text-[#8696a0]"
-          disabled={recording || !!voiceDraft}
-        />
-        <button
-          type="button"
-          onClick={send}
-          disabled={sending || !body.trim()}
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#008f76] text-white shadow-sm transition hover:bg-[#007e69] disabled:opacity-45 dark:bg-[#00a884] dark:hover:bg-[#00bf9a]"
-          aria-label="Send"
-        >
-          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-        </button>
+      {voiceDraft && voiceDraftUrl && (
+        <div className="flex items-center gap-3 border-t border-black/5 bg-[#f0f2f5] px-3 py-2.5 dark:border-white/5 dark:bg-[#1f2c33] sm:px-5">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#00a884] text-white shadow-sm"><Mic className="h-4 w-4" /></span>
+          <div className="min-w-0 flex-1"><VoiceNote src={voiceDraftUrl} label="Voice note ready to send" /></div>
+          <button type="button" onClick={() => { setVoiceDraft(null); setVoiceDraftUrl(""); setRecordingSeconds(0); }} className="rounded-full p-2 text-slate-500 hover:bg-white dark:hover:bg-white/10" aria-label="Discard voice note"><X className="h-4 w-4" /></button>
+          <button type="button" onClick={sendVoiceNote} disabled={uploading} className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#00a884] px-3.5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#009c7a] disabled:opacity-50"><Send className="h-3.5 w-3.5" />{uploading ? "Sending" : "Send"}</button>
         </div>
+      )}
+
+      <div className="border-t border-black/5 bg-[#f0f2f5] px-2 py-2 pb-[max(.65rem,env(safe-area-inset-bottom))] dark:border-white/5 dark:bg-[#1f2c33] sm:px-4">
+        {recording ? (
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => stopRecording(true)} className="grid h-11 w-9 shrink-0 place-items-center rounded-xl text-slate-500 transition hover:bg-white hover:text-rose-600 dark:text-slate-300 dark:hover:bg-white/10" aria-label="Cancel recording"><X className="h-5 w-5" /></button>
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-rose-500 text-white shadow-lg shadow-rose-900/20 animate-pulse"><Mic className="h-5 w-5" /></span>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Recording voice note…</p>
+              <div className="mt-1 flex h-4 items-center gap-0.5" aria-hidden="true">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
+                  <span key={n} className="w-1 animate-pulse rounded-full bg-rose-400" style={{ height: `${5 + (n % 5) * 3}px`, animationDelay: `${n * 70}ms` }} />
+                ))}
+              </div>
+            </div>
+            <span className="shrink-0 text-sm font-bold tabular-nums text-slate-500 dark:text-slate-300">{clock(recordingSeconds)}</span>
+            <button type="button" onClick={() => stopRecording(false)} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#00a884] text-white shadow-sm transition hover:bg-[#009c7a]" aria-label="Finish voice note"><Send className="h-5 w-5" /></button>
+          </div>
+        ) : (
+          <div className="relative flex items-end gap-1.5">
+            {showEmoji && <EmojiTray onPick={insertEmoji} />}
+            <input ref={fileInput} type="file" className="hidden" onChange={(e) => { void upload(e.target.files?.[0]); e.currentTarget.value = ""; }} />
+            <button type="button" onClick={() => setShowEmoji((open) => !open)} className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-full transition", showEmoji ? "bg-white text-[#00a884] dark:bg-white/10" : "text-slate-500 hover:bg-white hover:text-[#00a884] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-[#00a884]")} aria-label="Insert emoji">
+              <Smile className="h-5 w-5" />
+            </button>
+            <button type="button" onClick={() => fileInput.current?.click()} disabled={uploading || !!voiceDraft} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-slate-500 transition hover:bg-white hover:text-[#00a884] disabled:opacity-40 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-[#00a884]" aria-label="Attach file">
+              {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Paperclip className="h-5 w-5" />}
+            </button>
+            <textarea
+              ref={textInput}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  send();
+                }
+              }}
+              rows={1}
+              placeholder="Write a message…"
+              className="max-h-32 min-h-11 flex-1 resize-none rounded-2xl border border-black/5 bg-white px-4 py-3 text-sm text-[#111b21] placeholder:text-slate-400 focus:border-[#00a884] focus:outline-none focus:ring-2 focus:ring-[#00a884]/20 dark:border-white/5 dark:bg-[#2a3942] dark:text-[#e9edef] dark:placeholder:text-slate-500"
+              disabled={!!voiceDraft}
+            />
+            {body.trim() ? (
+              <button
+                type="button"
+                onClick={send}
+                disabled={sending}
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#00a884] text-white shadow-sm transition hover:bg-[#009c7a] disabled:opacity-45"
+                aria-label="Send"
+              >
+                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={startRecording}
+                disabled={!!voiceDraft}
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#00a884] text-white shadow-sm transition hover:bg-[#009c7a] disabled:opacity-45"
+                aria-label="Record voice note"
+              >
+                <Mic className="h-5 w-5" />
+              </button>
+            )}
+          </div>
+        )}
       </div>
+
+      {lightbox && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/90 p-4" onClick={() => setLightbox(null)}>
+          <div className="relative flex max-h-full w-full max-w-3xl flex-col items-center gap-3" onClick={(event) => event.stopPropagation()}>
+            <img src={lightbox.url} alt={lightbox.name} className="max-h-[78vh] w-auto max-w-full rounded-xl object-contain shadow-2xl" />
+            <div className="flex w-full items-center justify-between gap-3">
+              <p className="truncate text-xs font-medium text-white/80">{lightbox.name}</p>
+              <div className="flex shrink-0 items-center gap-2">
+                <button type="button" onClick={() => downloadBlob(lightbox.url, lightbox.name)} className="grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20" aria-label="Download image"><ArrowDownToLine className="h-4 w-4" /></button>
+                <button type="button" onClick={() => setLightbox(null)} className="grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20" aria-label="Close image"><X className="h-4 w-4" /></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

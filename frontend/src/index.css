@@ -41,4 +41,21 @@ body,
   .cp-btn-ghost {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition;
   }
+
+  /* Doodle wallpaper for the pot chat, in the spirit of messenger apps. */
+  .cp-chat-wall {
+    background-color: #efeae2;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cg fill='none' stroke='%23cbc3b4' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M30 34c0-7 5-12 11-12s11 5 11 12c0 6-5 11-11 14-6-3-11-8-11-14z'/%3E%3Ccircle cx='120' cy='30' r='10'/%3E%3Cpath d='M150 96l6 11 11 6-11 6-6 11-6-11-11-6 11-6z'/%3E%3Cpath d='M60 92c10-12 26-12 32 0-8 10-22 14-32 14z'/%3E%3Cpath d='M20 140c12 0 20-7 20-17'/%3E%3Cpath d='M100 150c8 0 14-5 14-12'/%3E%3C/g%3E%3C/svg%3E");
+    background-size: 180px 180px;
+  }
+
+  .dark .cp-chat-wall {
+    background-color: #0b141a;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cg fill='none' stroke='%23333f47' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M30 34c0-7 5-12 11-12s11 5 11 12c0 6-5 11-11 14-6-3-11-8-11-14z'/%3E%3Ccircle cx='120' cy='30' r='10'/%3E%3Cpath d='M150 96l6 11 11 6-11 6-6 11-6-11-11-6 11-6z'/%3E%3Cpath d='M60 92c10-12 26-12 32 0-8 10-22 14-32 14z'/%3E%3Cpath d='M20 140c12 0 20-7 20-17'/%3E%3Cpath d='M100 150c8 0 14-5 14-12'/%3E%3C/g%3E%3C/svg%3E");
+  }
+
+  /* Chat bubbles carry a small tail on the author's side. */
+  .cp-bubble-tail {
+    @apply absolute h-3.5 w-3.5 rotate-45;
+  }
 }
