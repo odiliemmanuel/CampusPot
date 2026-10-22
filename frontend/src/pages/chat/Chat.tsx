@@ -28,7 +28,7 @@ function formatAudioTime(seconds: number) {
   return `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
 }
 
-function AudioAttachment({ src }: { src: string }) {
+function AudioAttachment({ src, author = "", mine = false }: { src: string; author?: string; mine?: boolean }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -45,7 +45,7 @@ function AudioAttachment({ src }: { src: string }) {
   };
 
   return (
-    <div className="my-1 flex w-[min(17rem,72vw)] max-w-full items-center gap-2.5 rounded-2xl bg-slate-900/[0.06] px-2.5 py-2 dark:bg-black/20">
+    <div className={`my-1 w-[min(20rem,76vw)] max-w-full rounded-2xl border p-3 shadow-sm ${mine ? "border-[#b7e2c1] bg-[#e6f5e9] dark:border-[#087c68] dark:bg-[#064d41]" : "border-[#e2e8ec] bg-[#f7f9fa] dark:border-[#34444e] dark:bg-[#26343c]"}`}>
       <audio
         ref={audioRef}
         src={src}
@@ -57,26 +57,33 @@ function AudioAttachment({ src }: { src: string }) {
         onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
         onEnded={() => { setPlaying(false); setCurrentTime(0); }}
       />
-      <button type="button" onClick={() => void toggle()} aria-label={playing ? "Pause voice note" : "Play voice note"} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#008f76] text-white shadow-sm transition hover:bg-[#007e69] dark:bg-[#00a884] dark:hover:bg-[#00bf9a]">
-        {playing ? <Pause className="h-4 w-4 fill-current" /> : <Play className="ml-0.5 h-4 w-4 fill-current" />}
-      </button>
-      <div className="min-w-0 flex-1">
-        <div className="flex h-7 items-center gap-[2px]" aria-label="Voice note waveform">
-          {bars.map((height, i) => (
-            <span key={i} className={`min-w-[2px] flex-1 rounded-full ${i / bars.length <= progress ? "bg-[#008f76] dark:bg-[#00a884]" : "bg-slate-400/60 dark:bg-slate-400/50"}`} style={{ height: `${height}px` }} />
-          ))}
-        </div>
-        <div className="mt-0.5 flex items-center justify-between text-[10px] tabular-nums opacity-70">
-          <span>{formatAudioTime(playing || currentTime > 0 ? currentTime : duration)}</span>
-          <span className="inline-flex items-center gap-1"><Mic className="h-3 w-3" />Voice note</span>
+      <div className="mb-2 flex items-center gap-2">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#00a884] text-xs font-bold text-white">{author.trim().charAt(0).toUpperCase() || <Mic className="h-4 w-4" />}</span>
+        <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-[#263238] dark:text-[#e9edef]">{author || "Voice message"}</p><p className="text-[9px] font-bold uppercase tracking-[.12em] text-[#667781] dark:text-[#aebac1]">Voice message</p></div>
+        <span className="rounded-full bg-white/80 px-2 py-1 text-[9px] font-semibold text-[#667781] dark:bg-white/10 dark:text-[#c5d0d6]">AUDIO</span>
+      </div>
+      <div className="flex items-center gap-3">
+        <button type="button" onClick={() => void toggle()} aria-label={playing ? "Pause voice note" : "Play voice note"} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#008f76] text-white shadow-md shadow-[#008f76]/20 transition hover:bg-[#007e69] dark:bg-[#00a884] dark:hover:bg-[#00bf9a]">
+          {playing ? <Pause className="h-4 w-4 fill-current" /> : <Play className="ml-0.5 h-4 w-4 fill-current" />}
+        </button>
+        <div className="min-w-0 flex-1">
+          <div className="flex h-9 items-center gap-[2px]" aria-label="Voice note waveform">
+            {bars.map((height, i) => (
+              <button key={i} type="button" aria-label={`Seek voice note to ${Math.round((i / bars.length) * 100)} percent`} onClick={() => { const audio = audioRef.current; if (audio && duration) { audio.currentTime = duration * (i / bars.length); setCurrentTime(audio.currentTime); } }} className={`min-w-[2px] flex-1 rounded-full transition-colors ${i / bars.length <= progress ? "bg-[#008f76] dark:bg-[#00a884]" : "bg-[#aab7bd] dark:bg-[#687a83]"}`} style={{ height: `${height + 5}px` }} />
+            ))}
+          </div>
+          <div className="mt-1 flex items-center justify-between text-[10px] font-medium tabular-nums text-[#667781] dark:text-[#aebac1]">
+            <span>{formatAudioTime(playing || currentTime > 0 ? currentTime : duration)}</span><span>{duration ? formatAudioTime(duration) : "Audio"}</span>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function ChatAttachment({ message }: { message: ChatMessage }) {
+function ChatAttachment({ message, mine }: { message: ChatMessage; mine: boolean }) {
   const [url, setUrl] = useState("");
+  const [fileSize, setFileSize] = useState(0);
   const [showDownload, setShowDownload] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [attachmentError, setAttachmentError] = useState(false);
@@ -86,6 +93,7 @@ function ChatAttachment({ message }: { message: ChatMessage }) {
     let alive = true;
     getChatAttachment(message.attachmentUrl).then((blob) => {
       objectUrl = URL.createObjectURL(blob);
+      if (alive) setFileSize(blob.size);
       if (alive) setUrl(objectUrl); else URL.revokeObjectURL(objectUrl);
     }).catch(() => { if (alive) setAttachmentError(true); });
     return () => { alive = false; if (objectUrl) URL.revokeObjectURL(objectUrl); };
@@ -94,16 +102,18 @@ function ChatAttachment({ message }: { message: ChatMessage }) {
   const isAudio = message.attachmentType?.startsWith("audio/");
   const isImage = message.attachmentType?.startsWith("image/");
   const isPdf = message.attachmentType === "application/pdf" || message.attachmentName?.toLowerCase().endsWith(".pdf");
-  if (isAudio) return <AudioAttachment src={url} />;
+  if (isAudio) return <AudioAttachment src={url} author={message.author} mine={mine} />;
+  const extension = message.attachmentName?.split(".").pop()?.toUpperCase() || (isImage ? "IMAGE" : "FILE");
+  const sizeLabel = fileSize >= 1024 * 1024 ? `${(fileSize / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(fileSize / 1024))} KB`;
   return <>
-    <div className="mt-2 w-[min(18rem,74vw)] max-w-full overflow-hidden rounded-xl bg-black/[0.045] text-[#111b21] dark:bg-black/20 dark:text-[#e9edef]">
-      <div className="flex items-center gap-2.5 p-2.5">
-        <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg text-white ${isImage ? "bg-[#00a884]" : "bg-[#667781]"}`}>{isImage ? <FileIcon className="h-5 w-5" /> : <FileText className="h-5 w-5" />}</span>
-        <span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold">{message.attachmentName || "Shared file"}</span><span className="block text-[10px] opacity-60">{isImage ? "Image" : isPdf ? "PDF document" : "File attachment"}</span></span>
-        <button type="button" onClick={() => setShowDownload(true)} className="grid h-8 w-8 shrink-0 place-items-center rounded-full transition hover:bg-slate-900/10 dark:hover:bg-white/10" aria-label="Download attachment"><ArrowDownToLine className="h-4 w-4 opacity-80" /></button>
+    <div className="mt-2 w-[min(20rem,76vw)] max-w-full overflow-hidden rounded-xl border border-[#d9e2e7] bg-[#f7f9fa] text-[#111b21] shadow-sm dark:border-[#34444e] dark:bg-[#26343c] dark:text-[#e9edef]">
+      <div className="flex items-center gap-3 p-3">
+        <span className={`grid h-12 w-11 shrink-0 place-items-center rounded-lg text-white shadow-sm ${isImage ? "bg-[#00a884]" : isPdf ? "bg-[#e05b5b]" : "bg-[#607d8b]"}`}>{isImage ? <FileIcon className="h-5 w-5" /> : <FileText className="h-5 w-5" />}</span>
+        <span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-semibold">{message.attachmentName || "Shared file"}</span><span className="mt-1 block text-[10px] font-medium text-[#667781] dark:text-[#aebac1]">{extension} · {sizeLabel}</span></span>
+        <button type="button" onClick={() => setShowDownload(true)} className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-[#54656f] shadow-sm transition hover:bg-[#e9edef] dark:bg-[#34444e] dark:text-[#e9edef] dark:hover:bg-[#435660]" aria-label="Download attachment"><ArrowDownToLine className="h-4 w-4" /></button>
       </div>
-      <div className="flex border-t border-current/10">
-        <button type="button" onClick={() => setShowPreview((visible) => !visible)} aria-expanded={showPreview} className="flex min-h-9 flex-1 items-center justify-center gap-1.5 text-[11px] font-semibold text-[#008f76] transition hover:bg-black/5 dark:text-[#00a884] dark:hover:bg-white/5">
+      <div className="flex border-t border-[#d9e2e7] bg-white/70 dark:border-[#34444e] dark:bg-black/10">
+        <button type="button" onClick={() => setShowPreview((visible) => !visible)} aria-expanded={showPreview} className="flex min-h-10 flex-1 items-center justify-center gap-1.5 text-[11px] font-bold text-[#008f76] transition hover:bg-[#e9f5ee] dark:text-[#00a884] dark:hover:bg-white/5">
           {showPreview ? <><EyeOff className="h-3.5 w-3.5" /> Hide file</> : <><Eye className="h-3.5 w-3.5" /> View file</>}
         </button>
         <button type="button" onClick={() => setShowDownload(true)} className="border-l border-black/10 px-3 text-[11px] font-semibold opacity-70 transition hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5">Download</button>
@@ -355,7 +365,7 @@ function ChatRoom({ groupId, groupName }: { groupId: string; groupName: string }
                     </div>
                   )}
                   {m.body ? <p className="whitespace-pre-wrap break-words text-sm">{m.body}</p> : m.attachmentType?.startsWith("audio/") && <p className="text-xs font-semibold opacity-80">Voice note · {m.author}</p>}
-                  {m.attachmentUrl && <ChatAttachment message={m} />}
+                  {m.attachmentUrl && <ChatAttachment message={m} mine={mine} />}
                   <div
                     className={[
                       "mt-1 flex items-center justify-end gap-1.5 text-[10px]",
@@ -410,7 +420,7 @@ function ChatRoom({ groupId, groupName }: { groupId: string; groupName: string }
 
       {voiceDraft && voiceDraftUrl && <div className="flex items-center gap-3 border-t border-[#d9e5dd] bg-[#f0f2f5] px-3 py-2.5 dark:border-white/5 dark:bg-[#202c33] sm:px-5">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#00a884] text-white shadow-sm"><Mic className="h-4 w-4" /></span>
-        <div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">Voice note ready · {clock(recordingSeconds)}</p><AudioAttachment src={voiceDraftUrl} /></div>
+        <div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">Voice note ready · {clock(recordingSeconds)}</p><AudioAttachment src={voiceDraftUrl} author="You" mine /></div>
         <button type="button" onClick={() => { setVoiceDraft(null); setVoiceDraftUrl(""); setRecordingSeconds(0); }} className="rounded-full p-2 text-slate-500 hover:bg-white dark:hover:bg-white/10" aria-label="Discard voice note"><X className="h-4 w-4" /></button>
         <button type="button" onClick={sendVoiceNote} disabled={uploading} className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#008f76] px-3.5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#007e69] disabled:opacity-50 dark:bg-[#00a884] dark:hover:bg-[#00bf9a]"><Send className="h-3.5 w-3.5" />{uploading ? "Sending" : "Send audio"}</button>
       </div>}
