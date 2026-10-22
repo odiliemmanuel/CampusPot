@@ -34,6 +34,20 @@ func (v VerifiedAccount) Destination() string {
 	return fmt.Sprintf("Bank: %s · %s · %s", v.BankName, v.AccountNumber, v.AccountHolderName)
 }
 
+// PotAccount is the result of resolving a pot's dedicated collection account
+// (its virtual NUBAN). It is what the sender confirms before paying into a pot:
+// the pot name, the account, and whether the caller is actually a member (only
+// members may pay into a pot, so money can never land uncredited).
+type PotAccount struct {
+	GroupID         uuid.UUID `json:"groupId"`
+	GroupName       string    `json:"groupName"`
+	AccountNumber   string    `json:"accountNumber"`
+	BankName        string    `json:"bankName"`
+	AccountName     string    `json:"accountName"`
+	IsMember        bool      `json:"isMember"`
+	OutstandingKobo int64     `json:"outstandingKobo"`
+}
+
 // LookedUpUser is the PotKeeper counterpart of a name enquiry: it resolves an
 // email/phone to the account holder's name so a wallet transfer to another
 // member can be confirmed before it is sent.
@@ -161,6 +175,45 @@ func (s *Service) verifyBankAccount(ctx context.Context, bmoniUserID, accountNum
 		BankCode:          code,
 		AccountHolderName: strings.TrimSpace(holder.Name),
 	}, nil
+}
+
+// LookupPotAccount resolves a 10-digit account number to the pot that owns it
+// (each pot has its own dedicated collection account). It reports whether the
+// caller is an active member of that pot, so the UI can confirm a member before
+// they pay in and warn anyone else that only members can contribute.
+func (s *Service) LookupPotAccount(_ context.Context, userID uuid.UUID, accountNumber string) (*PotAccount, error) {
+	accountNumber = strings.TrimSpace(accountNumber)
+	if len(accountNumber) != 10 || !allDigits(accountNumber) {
+		return nil, fmt.Errorf("%w: an account number must be exactly 10 digits", ErrInvalid)
+	}
+	var group models.Group
+	if err := s.db.Where("virtual_account_number = ?", accountNumber).First(&group).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("%w: no pot collection account matches %s", ErrAccountNotFound, accountNumber)
+		}
+		return nil, err
+	}
+	out := &PotAccount{
+		GroupID:       group.ID,
+		GroupName:     group.Name,
+		AccountNumber: group.VirtualAccountNumber,
+		BankName:      group.VirtualAccountBank,
+		AccountName:   group.VirtualAccountName,
+	}
+	var m models.Membership
+	if err := s.db.Where("group_id = ? AND user_id = ? AND status = ?", group.ID, userID, models.MembershipActive).
+		First(&m).Error; err == nil {
+		out.IsMember = true
+		var levy models.Levy
+		if err := s.db.Where("group_id = ? AND status = ?", group.ID, "open").
+			Order("created_at DESC").First(&levy).Error; err == nil {
+			paid, perr := paidByUserTx(s.db, group.ID, levy.ID, userID)
+			if perr == nil && levy.AmountKobo-paid > 0 {
+				out.OutstandingKobo = levy.AmountKobo - paid
+			}
+		}
+	}
+	return out, nil
 }
 
 // LookupUser resolves a PotKeeper recipient (email or phone) to a display

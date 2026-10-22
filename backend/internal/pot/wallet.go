@@ -91,15 +91,19 @@ type WalletTransferRequest struct {
 	Note string `json:"note"`
 }
 
-// WalletTransfer moves money to another PotKeeper user or out to a bank
-// account. Both paths resolve the recipient before any debit:
+// WalletTransfer moves money to another PotKeeper user, into a pot's collection
+// account, or out to a bank account. Every path resolves the recipient before
+// any debit:
 //
 //   - a bank payout runs name enquiry against B Moni and records the resolved
 //     account holder's name, so money never leaves for an account that does
 //     not exist;
 //   - a PotKeeper send must match a registered user by email or phone. A
 //     recipient that matches neither a user nor a verified bank account is
-//     refused rather than silently recorded as a faceless payout.
+//     refused rather than silently recorded as a faceless payout;
+//   - a send to a pot's dedicated account is paid INTO that pot: only active
+//     members may do it, and it is recorded as the sender's contribution (a
+//     real Payment), never as a bank payout.
 //
 // Every send also requires the owner's transaction PIN.
 func (s *Service) WalletTransfer(ctx context.Context, userID uuid.UUID, req WalletTransferRequest) (*WalletOverview, error) {
@@ -112,6 +116,19 @@ func (s *Service) WalletTransfer(ctx context.Context, userID uuid.UUID, req Wall
 	}
 	if err := s.requireTransactionPin(userID, req.Pin); err != nil {
 		return nil, err
+	}
+
+	// A 10-digit recipient may be a pot's dedicated collection account. Paying
+	// into a pot is a contribution, not a bank payout — so resolve it first.
+	if len(recipient) == 10 && allDigits(recipient) {
+		var pot models.Group
+		err := s.db.Where("virtual_account_number = ?", recipient).First(&pot).Error
+		if err == nil {
+			return s.payIntoPot(ctx, userID, &pot, req)
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
 	}
 
 	var to *models.User
@@ -201,86 +218,140 @@ func (s *Service) WalletPayPot(_ context.Context, userID uuid.UUID, req WalletPa
 	if err := s.requireTransactionPin(userID, req.Pin); err != nil {
 		return nil, err
 	}
-	m, err := s.requireMember(req.GroupID, userID)
-	if err != nil {
+	if _, err := s.requireMember(req.GroupID, userID); err != nil {
 		return nil, err
 	}
 
 	var payment models.Payment
-	err = s.db.Transaction(func(tx *gorm.DB) error {
-		// Resolve the levy (explicit, else latest open).
-		levyID := req.LevyID
-		var levy models.Levy
-		if levyID != nil {
-			if err := tx.First(&levy, "id = ? AND group_id = ?", *levyID, req.GroupID).Error; err != nil {
-				return fmt.Errorf("%w: levy not found", ErrNotFound)
-			}
-		} else {
-			if err := tx.Where("group_id = ? AND status = ?", req.GroupID, "open").
-				Order("created_at DESC").First(&levy).Error; err != nil {
-				return fmt.Errorf("%w: no open levy for this group", ErrNotFound)
-			}
-			lid := levy.ID
-			levyID = &lid
-		}
-
-		// Take the money out of the member's wallet first.
-		if err := debitWallet(tx, userID, req.AmountKobo); err != nil {
-			return err
-		}
-
-		paid, err := paidByUserTx(tx, req.GroupID, levy.ID, userID)
-		if err != nil {
-			return err
-		}
-		status := models.PaymentPartial
-		if paid+req.AmountKobo >= levy.AmountKobo {
-			status = models.PaymentMatched
-		}
-
-		entry := &models.LedgerEntry{
-			GroupID:     req.GroupID,
-			Kind:        models.LedgerCredit,
-			AmountKobo:  req.AmountKobo,
-			Description: "Wallet payment: " + levy.Title,
-			RefType:     "payment",
-			ActorUserID: &userID,
-		}
-		if err := s.appendLedger(tx, entry); err != nil {
-			return err
-		}
-
-		payment = models.Payment{
-			GroupID:         req.GroupID,
-			LevyID:          levyID,
-			UserID:          &userID,
-			AmountKobo:      req.AmountKobo,
-			Status:          status,
-			ProviderEventID: "WALLET-" + uuid.NewString(),
-			QuotedReference: m.Reference,
-			MatchedBy:       "wallet",
-			LedgerEntryID:   &entry.ID,
-		}
-		if err := tx.Create(&payment).Error; err != nil {
-			return err
-		}
-		if err := tx.Create(&models.WalletTransaction{
-			UserID:       userID,
-			Kind:         models.WalletPotPayment,
-			AmountKobo:   req.AmountKobo,
-			Counterparty: "Pot contribution",
-			GroupID:      &req.GroupID,
-			LevyID:       levyID,
-			Note:         levy.Title,
-		}).Error; err != nil {
-			return err
-		}
-		return s.advanceRecurringContributionTx(tx, req.GroupID, levy.ID)
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		var err error
+		payment, err = s.payPotTx(tx, userID, req.GroupID, req.AmountKobo, req.LevyID)
+		return err
 	})
 	if err != nil {
 		return nil, err
 	}
 	return &payment, nil
+}
+
+// payIntoPot is the WalletTransfer branch for a send addressed to a pot's own
+// collection account. Because every pot has a dedicated NUBAN, sending money to
+// it is paying INTO the pot — not an external bank payout. Only active members
+// may do this, and the money is recorded as the sender's contribution so it
+// shows up in their standing immediately.
+func (s *Service) payIntoPot(ctx context.Context, userID uuid.UUID, group *models.Group, req WalletTransferRequest) (*WalletOverview, error) {
+	if _, err := s.requireMember(group.ID, userID); err != nil {
+		// A non-member may see the pot's account (it is public on the pot page),
+		// but cannot pay into it: the money would be unattributable. Refund path
+		// is avoided entirely by refusing before any debit.
+		return nil, fmt.Errorf("%w: only members of %s can pay into it — join the pot first, then send", ErrForbidden, group.Name)
+	}
+
+	var payment models.Payment
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		var err error
+		payment, err = s.payPotTx(tx, userID, group.ID, req.AmountKobo, nil)
+		if err != nil {
+			return err
+		}
+		// Mirror the sender's own activity: mark the outgoing wallet leg too,
+		// referencing the pot, so their wallet history reads "Sent to <pot>".
+		gid := group.ID
+		return tx.Create(&models.WalletTransaction{
+			UserID:       userID,
+			Kind:         models.WalletTransferOut,
+			AmountKobo:   req.AmountKobo,
+			Counterparty: "Pot contribution · " + group.Name,
+			GroupID:      &gid,
+			Note:         req.Note,
+		}).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	_ = payment // recorded as the sender's contribution on this pot
+	return s.Wallet(ctx, userID)
+}
+
+// payPotTx records a member's wallet contribution into a pot, inside an open
+// transaction. It takes the money from the member's wallet, credits the pot
+// ledger, and creates a Payment reconciled to that member and the levy — the
+// same record a bank deposit would produce, so the contribution reflects in
+// their standing whether they paid from the app or by transfer.
+func (s *Service) payPotTx(tx *gorm.DB, userID, groupID uuid.UUID, amountKobo int64, levyID *uuid.UUID) (models.Payment, error) {
+	var payment models.Payment
+	// Resolve the levy (explicit, else latest open).
+	var levy models.Levy
+	if levyID != nil {
+		if err := tx.First(&levy, "id = ? AND group_id = ?", *levyID, groupID).Error; err != nil {
+			return payment, fmt.Errorf("%w: levy not found", ErrNotFound)
+		}
+	} else {
+		if err := tx.Where("group_id = ? AND status = ?", groupID, "open").
+			Order("created_at DESC").First(&levy).Error; err != nil {
+			return payment, fmt.Errorf("%w: no open levy for this group", ErrNotFound)
+		}
+	}
+	lid := levy.ID
+
+	// Take the money out of the member's wallet first.
+	if err := debitWallet(tx, userID, amountKobo); err != nil {
+		return payment, err
+	}
+
+	paid, err := paidByUserTx(tx, groupID, levy.ID, userID)
+	if err != nil {
+		return payment, err
+	}
+	status := models.PaymentPartial
+	if paid+amountKobo >= levy.AmountKobo {
+		status = models.PaymentMatched
+	}
+
+	entry := &models.LedgerEntry{
+		GroupID:     groupID,
+		Kind:        models.LedgerCredit,
+		AmountKobo:  amountKobo,
+		Description: "Wallet payment: " + levy.Title,
+		RefType:     "payment",
+		ActorUserID: &userID,
+	}
+	if err := s.appendLedger(tx, entry); err != nil {
+		return payment, err
+	}
+
+	var m models.Membership
+	_ = tx.Select("reference").Where("group_id = ? AND user_id = ?", groupID, userID).First(&m).Error
+
+	payment = models.Payment{
+		GroupID:         groupID,
+		LevyID:          &lid,
+		UserID:          &userID,
+		AmountKobo:      amountKobo,
+		Status:          status,
+		ProviderEventID: "WALLET-" + uuid.NewString(),
+		QuotedReference: m.Reference,
+		MatchedBy:       "wallet",
+		LedgerEntryID:   &entry.ID,
+	}
+	if err := tx.Create(&payment).Error; err != nil {
+		return payment, err
+	}
+	if err := tx.Create(&models.WalletTransaction{
+		UserID:       userID,
+		Kind:         models.WalletPotPayment,
+		AmountKobo:   amountKobo,
+		Counterparty: "Pot contribution",
+		GroupID:      &groupID,
+		LevyID:       &lid,
+		Note:         levy.Title,
+	}).Error; err != nil {
+		return payment, err
+	}
+	if err := s.advanceRecurringContributionTx(tx, groupID, levy.ID); err != nil {
+		return payment, err
+	}
+	return payment, nil
 }
 
 // debitWallet removes amount from a wallet, refusing to overdraw. The

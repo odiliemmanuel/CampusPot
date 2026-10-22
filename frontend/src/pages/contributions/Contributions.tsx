@@ -8,6 +8,7 @@ import {
 import AppShell from "../../layouts/AppShell";
 import GroupGate from "../../components/GroupGate";
 import PageHeader from "../../components/PageHeader";
+import AlertError from "../../components/AlertError";
 import PinField from "../../components/PinField";
 import { useGroup } from "../../providers/GroupProvider";
 import {
@@ -115,7 +116,7 @@ export function ContributionsInner() {
           <CheckCircle2 className="w-4 h-4" /> {notice}
         </div>
       )}
-      {error && <p className="mb-4 text-sm text-violet-600">{error}</p>}
+      {error && <AlertError message={error} className="mb-4" />}
 
       <div className="grid gap-2.5 sm:gap-3 lg:grid-cols-3">
         <div className="cp-card rounded-xl p-2.5 sm:rounded-2xl sm:p-3.5 lg:col-span-2">

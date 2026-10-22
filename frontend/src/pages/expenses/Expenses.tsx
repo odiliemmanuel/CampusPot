@@ -8,6 +8,7 @@ import {
 import AppShell from "../../layouts/AppShell";
 import GroupGate from "../../components/GroupGate";
 import PageHeader from "../../components/PageHeader";
+import AlertError from "../../components/AlertError";
 import { useGroup } from "../../providers/GroupProvider";
 import {
   listExpenses, listApprovals, listMembers, listDisputes, createExpense,
@@ -244,7 +245,7 @@ export function ExpensesInner() {
         }
       />
 
-      {error && <p className="mb-4 text-sm text-violet-600">{error}</p>}
+      {error && <AlertError message={error} className="mb-4" />}
 
       {showForm && isTreasurer && (
         <motion.form

@@ -7,11 +7,12 @@ import {
 } from "lucide-react";
 
 import AppShell from "../../layouts/AppShell";
+import AlertError from "../../components/AlertError";
 import PinField from "../../components/PinField";
 import {
-  getAccountOverview, getStoredUser, getWallet, listBanks, lookupUser, setWalletPin, verifyBankAccount,
+  getAccountOverview, getStoredUser, getWallet, listBanks, lookupPotAccount, lookupUser, setWalletPin, verifyBankAccount,
   walletDeposit, walletTransfer,
-  walletPayPot, type AccountOverview, type BankOption, type LookedUpUser, type PotMembership,
+  walletPayPot, type AccountOverview, type BankOption, type LookedUpUser, type PotAccount, type PotMembership,
   type VerifiedAccount, type WalletOverview, type WalletTransaction,
 } from "../../lib/api";
 import { formatNaira, nairaToKobo } from "../../lib/format";
@@ -169,7 +170,7 @@ function AddMoneySheet({ onClose, onDone }: { onClose: () => void; onDone: () =>
           Money lands in <span className="font-semibold text-brand-600 dark:text-brand-300">your wallet</span>, not a pot.
           You can then send it to anyone or pay your contribution.
         </p>
-        {error && <p className="text-sm text-violet-600">{error}</p>}
+        {error && <AlertError message={error} />}
         <SubmitButton busy={busy} label="Add to wallet" />
       </form>
     </Sheet>
@@ -210,8 +211,21 @@ function RecipientConfirm({ label, detail }: { label: string; detail: string }) 
   );
 }
 
+/** Amber warning: the destination is a pot the sender doesn't belong to. */
+function NotAMemberAlert({ potName }: { potName: string }) {
+  return (
+    <p className="flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-[12px] font-medium text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+      <span>
+        Only members of <span className="font-bold">{potName}</span> can pay into it. Join the pot first, then send.
+      </span>
+    </p>
+  );
+}
+
+
 function SendSheet({ balanceKobo, pinSet, onClose, onDone }: { balanceKobo: number; pinSet: boolean; onClose: () => void; onDone: () => void }) {
-  const [mode, setMode] = useState<"member" | "bank">("member");
+  const [mode, setMode] = useState<"member" | "pot" | "bank">("member");
   const [amount, setAmount] = useState("");
   const [recipient, setRecipient] = useState("");
   // Transaction PIN authorises the debit; first-time users create it inline.
@@ -226,6 +240,7 @@ function SendSheet({ balanceKobo, pinSet, onClose, onDone }: { balanceKobo: numb
   // Name enquiry results — the recipient is confirmed before money moves.
   const [verified, setVerified] = useState<VerifiedAccount | null>(null);
   const [lookedUp, setLookedUp] = useState<LookedUpUser | null>(null);
+  const [potAccount, setPotAccount] = useState<PotAccount | null>(null);
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState("");
   const verifySeq = useRef(0);
@@ -239,10 +254,22 @@ function SendSheet({ balanceKobo, pinSet, onClose, onDone }: { balanceKobo: numb
 
   // Look the recipient up whenever it changes, debounced. A stale response is
   // dropped by comparing sequence numbers.
-  const refreshLookup = useCallback((value: string, currentMode: "member" | "bank", currentBank: string) => {
+  const refreshLookup = useCallback((value: string, currentMode: "member" | "pot" | "bank", currentBank: string) => {
     const seq = ++verifySeq.current;
     const target = value.trim();
-    setVerified(null); setLookedUp(null); setCheckError("");
+    setVerified(null); setLookedUp(null); setPotAccount(null); setCheckError("");
+    if (currentMode === "pot") {
+      if (!/^\d{10}$/.test(target)) return;
+      setChecking(true);
+      lookupPotAccount(target)
+        .then((p) => { if (seq === verifySeq.current) setPotAccount(p); })
+        .catch((err) => {
+          if (seq !== verifySeq.current) return;
+          setCheckError(err instanceof Error ? err.message : "No pot owns that account number.");
+        })
+        .finally(() => { if (seq === verifySeq.current) setChecking(false); });
+      return;
+    }
     if (currentMode === "bank") {
       if (!/^\d{10}$/.test(target)) return;
       setChecking(true);
@@ -270,11 +297,13 @@ function SendSheet({ balanceKobo, pinSet, onClose, onDone }: { balanceKobo: numb
 
   const amountKobo = nairaToKobo(amount);
   const overBalance = amountKobo > balanceKobo;
-  const confirmed = mode === "member" ? !!lookedUp : !!verified;
+  const confirmed = mode === "member" ? !!lookedUp : mode === "pot" ? !!potAccount : !!verified;
+  // Paying into a pot is member-only: refuse to arm the send otherwise.
+  const memberBlocked = mode === "pot" && !!potAccount && !potAccount.isMember;
   // The PIN authorises the debit; first-time senders also type their password
   // once so the PIN can be created as part of this same send.
   const pinOk = pinSet ? pin.length >= 4 : pin.length >= 4 && password.length > 0;
-  const canSend = confirmed && !checking && amountKobo > 0 && !overBalance && pinOk;
+  const canSend = confirmed && !checking && !memberBlocked && amountKobo > 0 && !overBalance && pinOk;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -286,7 +315,11 @@ function SendSheet({ balanceKobo, pinSet, onClose, onDone }: { balanceKobo: numb
       return;
     }
     if (!confirmed) {
-      setError(mode === "member" ? "Confirm the recipient's PotKeeper account first." : "Confirm the bank account holder's name first.");
+      setError(mode === "member" ? "Confirm the recipient's PotKeeper account first." : "Confirm the destination first.");
+      return;
+    }
+    if (memberBlocked) {
+      setError(`Only members of ${potAccount!.groupName} can pay into it.`);
       return;
     }
     if (pin.length < 4) { setError("Enter your 4–6 digit transaction PIN."); return; }
@@ -296,6 +329,9 @@ function SendSheet({ balanceKobo, pinSet, onClose, onDone }: { balanceKobo: numb
       if (!pinSet) await setWalletPin(pin, "", password);
       if (mode === "member") {
         await walletTransfer(kobo, recipient.trim(), note || `Sent to ${lookedUp!.name}`, "", "", pin);
+      } else if (mode === "pot") {
+        // Sending to a pot's own account pays INTO that pot as a contribution.
+        await walletTransfer(kobo, recipient.trim(), note || `Contribution to ${potAccount!.groupName}`, "", "", pin);
       } else {
         const chosen = banks.find((b) => b.name === bank);
         await walletTransfer(kobo, recipient.trim(), note || `Sent to ${verified!.accountHolderName}`, verified!.bankName, chosen?.code ?? verified!.bankCode, pin);
@@ -309,8 +345,8 @@ function SendSheet({ balanceKobo, pinSet, onClose, onDone }: { balanceKobo: numb
   return (
     <Sheet title="Send money" onClose={onClose}>
       <form onSubmit={submit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1 dark:bg-white/5">
-          {([["member", "PotKeeper user"], ["bank", "Bank account"]] as const).map(([key, label]) => (
+        <div className="grid grid-cols-3 gap-2 rounded-xl bg-slate-100 p-1 dark:bg-white/5">
+          {([["member", "PotKeeper user"], ["pot", "A pot"], ["bank", "Bank account"]] as const).map(([key, label]) => (
             <button
               key={key}
               type="button"
@@ -324,7 +360,7 @@ function SendSheet({ balanceKobo, pinSet, onClose, onDone }: { balanceKobo: numb
           ))}
         </div>
 
-        {mode === "member" ? (
+        {mode === "member" && (
           <label className="block">
             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">To (email or phone)</span>
             <input
@@ -334,7 +370,23 @@ function SendSheet({ balanceKobo, pinSet, onClose, onDone }: { balanceKobo: numb
               className="cp-input mt-1"
             />
           </label>
-        ) : (
+        )}
+
+        {mode === "pot" && (
+          <label className="block">
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Pot account number</span>
+            <input
+              value={recipient}
+              onChange={(e) => setRecipient(e.target.value.replace(/[^0-9]/g, "").slice(0, 10))}
+              placeholder="Pot's collection account"
+              inputMode="numeric"
+              className="cp-input mt-1"
+            />
+            <span className="mt-1 block text-[11px] text-slate-400">Every pot has its own account. Sending to it pays into that pot.</span>
+          </label>
+        )}
+
+        {mode === "bank" && (
           <div className="space-y-3">
             <label className="block">
               <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Bank</span>
@@ -373,12 +425,22 @@ function SendSheet({ balanceKobo, pinSet, onClose, onDone }: { balanceKobo: numb
             detail={`PotKeeper · ${lookedUp.email || lookedUp.phone || ""}`}
           />
         )}
-        {!checking && checkError && (
-          <p className="flex items-start gap-2 rounded-xl bg-rose-50 px-3 py-2 text-[12px] font-medium text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>{checkError}</span>
-          </p>
+        {!checking && potAccount && (
+          <div className="space-y-2">
+            <RecipientConfirm
+              label={potAccount.groupName}
+              detail={`Pot · ${potAccount.bankName || ""} · ${potAccount.accountNumber}`}
+            />
+            {potAccount.isMember && (
+              <p className="rounded-xl bg-emerald-50 px-3 py-2 text-[11px] font-medium text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                You&apos;re a member — this counts as your contribution.
+                {potAccount.outstandingKobo > 0 ? ` You owe ${formatNaira(potAccount.outstandingKobo)}.` : " You're all paid up."}
+              </p>
+            )}
+            {!potAccount.isMember && <NotAMemberAlert potName={potAccount.groupName} />}
+          </div>
         )}
+        {!checking && checkError && <AlertError message={checkError} />}
 
         <AmountInput amount={amount} setAmount={setAmount} />
         {overBalance && <LowBalanceAlert needed={amountKobo} available={balanceKobo} />}
@@ -411,8 +473,8 @@ function SendSheet({ balanceKobo, pinSet, onClose, onDone }: { balanceKobo: numb
         <p className="text-[11px] text-slate-400">
           Wallet balance: {money(balanceKobo)}. We check the recipient's name before any money leaves your wallet.
         </p>
-        {error && <p className="text-sm text-violet-600">{error}</p>}
-        <SubmitButton busy={busy} disabled={!canSend} label={canSend ? "Send money" : checking ? "Checking…" : confirmed && !pinOk ? "Enter PIN to send" : "Confirm recipient to send"} />
+        {error && <AlertError message={error} />}
+        <SubmitButton busy={busy} disabled={!canSend} label={canSend ? "Send money" : checking ? "Checking…" : memberBlocked ? "Not a member" : confirmed && !pinOk ? "Enter PIN to send" : "Confirm recipient to send"} />
       </form>
     </Sheet>
   );
@@ -499,7 +561,7 @@ function PayPotSheet({ pots, balanceKobo, pinSet, onClose, onDone }: { pots: Pot
           </label>
         )}
         <p className="text-[11px] text-slate-400">Wallet balance: {money(balanceKobo)}. This credits the pot and marks your contribution paid.</p>
-        {error && <p className="text-sm text-violet-600">{error}</p>}
+        {error && <AlertError message={error} />}
         <SubmitButton busy={busy} disabled={!pinOk} label={pinOk ? "Pay from wallet" : "Enter PIN to pay"} />
       </form>
     </Sheet>

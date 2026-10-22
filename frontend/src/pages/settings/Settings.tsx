@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { CheckCircle2, Loader2, LogOut, PiggyBank, Save, ShieldCheck, Trash2, UserRound } from "lucide-react";
 
 import AppShell from "../../layouts/AppShell";
+import AlertError from "../../components/AlertError";
 import PageHeader from "../../components/PageHeader";
 import PinField from "../../components/PinField";
 import { useGroup } from "../../providers/GroupProvider";
@@ -194,7 +195,7 @@ export default function Settings() {
                     <CheckCircle2 className="h-4 w-4" /> {notice}
                   </p>
                 )}
-                {error && <p className="text-sm text-violet-600">{error}</p>}
+                {error && <AlertError message={error} />}
 
                 <button type="submit" disabled={!dirty || saving} className="cp-btn-primary w-full text-sm sm:w-auto">
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
@@ -296,7 +297,7 @@ export default function Settings() {
                     <CheckCircle2 className="h-4 w-4" /> {pinNotice}
                   </p>
                 )}
-                {pinError && <p className="text-sm text-violet-600">{pinError}</p>}
+                {pinError && <AlertError message={pinError} />}
 
                 <button type="submit" disabled={pinBusy} className="cp-btn-primary w-full text-sm sm:w-auto">
                   {pinBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}

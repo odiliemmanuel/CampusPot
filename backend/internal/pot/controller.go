@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -85,6 +86,7 @@ func (ct *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.GET("/banks", ct.listBanks)
 	rg.POST("/banks/verify", ct.verifyBankAccount)
 	rg.GET("/users/lookup", ct.lookupUser)
+	rg.GET("/pots/lookup", ct.lookupPotAccount)
 }
 
 func (ct *Controller) listBanks(c *gin.Context) {
@@ -121,6 +123,18 @@ func (ct *Controller) lookupUser(c *gin.Context) {
 		return
 	}
 	response.OK(c, user)
+}
+
+// lookupPotAccount resolves a pot's dedicated collection account (by account
+// number) so the sender can confirm which pot they are paying into, and
+// whether they are a member of it.
+func (ct *Controller) lookupPotAccount(c *gin.Context) {
+	account, err := ct.svc.LookupPotAccount(c.Request.Context(), auth.MustUserID(c), c.Query("accountNumber"))
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, account)
 }
 
 func (ct *Controller) createGroup(c *gin.Context) {
@@ -809,7 +823,13 @@ func respondErr(c *gin.Context, err error) {
 	case errors.Is(err, ErrInvalidPin):
 		response.Error(c, http.StatusUnauthorized, "INVALID_PIN", err.Error())
 	case errors.Is(err, ErrForbidden):
-		response.Error(c, http.StatusForbidden, "FORBIDDEN", "you do not have access to this action")
+		// Surface the specific reason (e.g. "only members of X can pay into it")
+		// when one was given, so the UI can show it verbatim.
+		if msg := strings.TrimSpace(strings.TrimPrefix(err.Error(), ErrForbidden.Error()+":")); msg != "" {
+			response.Error(c, http.StatusForbidden, "FORBIDDEN", msg)
+		} else {
+			response.Error(c, http.StatusForbidden, "FORBIDDEN", "you do not have access to this action")
+		}
 	case errors.Is(err, ErrConflict):
 		response.Error(c, http.StatusConflict, "CONFLICT", err.Error())
 	case errors.Is(err, ErrInvalid):

@@ -672,6 +672,26 @@ export const verifyBankAccount = (accountNumber: string, bankName = "", bankCode
 export const lookupUser = (recipient: string) =>
   request<LookedUpUser>(`/users/lookup?recipient=${encodeURIComponent(recipient)}`);
 
+/** A pot's dedicated collection account, resolved by account number. */
+export interface PotAccount {
+  groupId: string;
+  groupName: string;
+  accountNumber: string;
+  bankName?: string;
+  accountName?: string;
+  /** True when the caller is an active member of the pot. */
+  isMember: boolean;
+  /** What the caller still owes the pot's open levy, if any. */
+  outstandingKobo: number;
+}
+
+/**
+ * Resolve a 10-digit account number to the pot that owns it (each pot has its
+ * own collection account). Throws ACCOUNT_NOT_FOUND when no pot owns it.
+ */
+export const lookupPotAccount = (accountNumber: string) =>
+  request<PotAccount>(`/pots/lookup?accountNumber=${encodeURIComponent(accountNumber)}`);
+
 export const walletPayPot = (groupId: string, amountKobo: number, pin = "", levyId?: string) =>
   request<Payment>("/wallet/pay", {
     method: "POST",
