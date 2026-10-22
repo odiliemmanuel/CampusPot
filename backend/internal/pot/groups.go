@@ -17,13 +17,13 @@ import (
 
 // CreateGroupRequest is the body for creating a pot.
 type CreateGroupRequest struct {
-	Name              string `json:"name" binding:"required,min=2"`
-	PotType           string `json:"potType"` // goal | rotating
-	ContributionFrequency string `json:"contributionFrequency"` // one_time | daily | weekly | monthly | quarterly
-	ContributionDueDate *FlexTime `json:"contributionDueDate"`
-	ApprovalThreshold int    `json:"approvalThreshold"` // defaults to 2
-	ApprovalTotal     int    `json:"approvalTotal"`     // defaults to 3
-	LargeExpenseKobo  int64  `json:"largeExpenseKobo"`  // 0 = no soft limit
+	Name                  string    `json:"name" binding:"required,min=2"`
+	PotType               string    `json:"potType"`               // goal | rotating
+	ContributionFrequency string    `json:"contributionFrequency"` // one_time | daily | weekly | monthly | quarterly
+	ContributionDueDate   *FlexTime `json:"contributionDueDate"`
+	ApprovalThreshold     int       `json:"approvalThreshold"` // defaults to 2
+	ApprovalTotal         int       `json:"approvalTotal"`     // defaults to 3
+	LargeExpenseKobo      int64     `json:"largeExpenseKobo"`  // 0 = no soft limit
 	// PerMemberKobo is the amount every member pays in. When > 0 the pot opens
 	// with a matching levy, so the collection target is per-member × members.
 	PerMemberKobo int64 `json:"perMemberKobo"`
@@ -79,17 +79,17 @@ func (s *Service) CreateGroup(ctx context.Context, treasurerID uuid.UUID, req Cr
 	}
 
 	group := &models.Group{
-		Name:              req.Name,
-		PotType:           req.PotType,
-		ContributionFrequency: req.ContributionFrequency,
+		Name:                   req.Name,
+		PotType:                req.PotType,
+		ContributionFrequency:  req.ContributionFrequency,
 		ContributionAmountKobo: req.PerMemberKobo,
-		ContributionDueDate: contributionDueDate,
-		Currency:          "NGN",
-		CreatedBy:         treasurerID,
-		ApprovalThreshold: req.ApprovalThreshold,
-		ApprovalTotal:     req.ApprovalTotal,
-		LargeExpenseKobo:  req.LargeExpenseKobo,
-		BMoniUserID:       treasurer.BMoniUserID,
+		ContributionDueDate:    contributionDueDate,
+		Currency:               "NGN",
+		CreatedBy:              treasurerID,
+		ApprovalThreshold:      req.ApprovalThreshold,
+		ApprovalTotal:          req.ApprovalTotal,
+		LargeExpenseKobo:       req.LargeExpenseKobo,
+		BMoniUserID:            treasurer.BMoniUserID,
 	}
 
 	for i := 0; i < 5; i++ {
@@ -273,10 +273,11 @@ func (s *Service) Invite(_ context.Context, groupID, actorID uuid.UUID, req Invi
 // one field without resending the rest; LargeExpenseKobo uses a pointer so that
 // 0 (no soft limit) is a valid, explicit value.
 type UpdateGroupRequest struct {
-	Name              *string `json:"name"`
-	ApprovalThreshold *int    `json:"approvalThreshold"`
-	ApprovalTotal     *int    `json:"approvalTotal"`
-	LargeExpenseKobo  *int64  `json:"largeExpenseKobo"`
+	Name                *string   `json:"name"`
+	ApprovalThreshold   *int      `json:"approvalThreshold"`
+	ApprovalTotal       *int      `json:"approvalTotal"`
+	LargeExpenseKobo    *int64    `json:"largeExpenseKobo"`
+	ContributionDueDate *FlexTime `json:"contributionDueDate"`
 }
 
 // UpdateGroup changes a pot's name and spending rules. Treasurer only.
@@ -305,6 +306,16 @@ func (s *Service) UpdateGroup(_ context.Context, groupID, actorID uuid.UUID, req
 	if req.LargeExpenseKobo != nil {
 		group.LargeExpenseKobo = *req.LargeExpenseKobo
 	}
+	if req.ContributionDueDate != nil {
+		due := req.ContributionDueDate.Time()
+		if due.IsZero() {
+			return nil, fmt.Errorf("%w: contribution deadline is required", ErrInvalid)
+		}
+		if due.UTC().Format("2006-01-02") < s.now().UTC().Format("2006-01-02") {
+			return nil, fmt.Errorf("%w: contribution deadline must be today or later", ErrInvalid)
+		}
+		group.ContributionDueDate = &due
+	}
 
 	if group.ApprovalThreshold <= 0 || group.ApprovalTotal <= 0 {
 		return nil, fmt.Errorf("%w: approval rules must be positive", ErrInvalid)
@@ -313,7 +324,23 @@ func (s *Service) UpdateGroup(_ context.Context, groupID, actorID uuid.UUID, req
 		return nil, fmt.Errorf("%w: approval threshold cannot exceed total approvers", ErrInvalid)
 	}
 
-	if err := s.db.Save(&group).Error; err != nil {
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(&group).Error; err != nil {
+			return err
+		}
+		if req.ContributionDueDate != nil {
+			var levy models.Levy
+			if err := tx.Where("group_id = ? AND status = ?", groupID, "open").Order("created_at DESC").First(&levy).Error; err == nil {
+				levy.DueDate = group.ContributionDueDate
+				if err := tx.Save(&levy).Error; err != nil {
+					return err
+				}
+			} else if err != gorm.ErrRecordNotFound {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
 		return nil, err
 	}
 	return &group, nil

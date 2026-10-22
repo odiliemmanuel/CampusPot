@@ -29,6 +29,7 @@ export default function PotSettings() {
   const [largeLimit, setLargeLimit] = useState(
     activeGroup!.largeExpenseKobo > 0 ? String(activeGroup!.largeExpenseKobo / 100) : ""
   );
+  const [dueDate, setDueDate] = useState(activeGroup!.contributionDueDate?.slice(0, 10) ?? "");
 
   useEffect(() => {
     setLoading(true);
@@ -50,6 +51,7 @@ export default function PotSettings() {
         approvalThreshold: threshold,
         approvalTotal: total,
         largeExpenseKobo: largeLimit.trim() ? nairaToKobo(largeLimit) : 0,
+        contributionDueDate: dueDate || undefined,
       });
       await refresh();
       setNotice("Pot settings saved.");
@@ -106,7 +108,7 @@ export default function PotSettings() {
       {error && <p className="mb-4 text-sm text-violet-600">{error}</p>}
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <form onSubmit={save} className="space-y-5 rounded-3xl border border-slate-100 bg-white p-6 shadow-sm lg:col-span-2">
+        <form onSubmit={save} className="space-y-5 rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-panel-dark lg:col-span-2">
           <div>
             <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Pot name</label>
             <input
@@ -160,6 +162,19 @@ export default function PotSettings() {
             )}
           </div>
 
+          <div>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Contribution deadline</label>
+            <input
+              type="date"
+              value={dueDate}
+              min={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => setDueDate(e.target.value)}
+              disabled={!canManage}
+              className="cp-input mt-1 disabled:opacity-60"
+            />
+            <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">Changing this updates the open contribution cycle and its deadline reminders.</p>
+          </div>
+
           {canManage ? (
             <button type="submit" disabled={busy} className="cp-btn-primary">
               {busy ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save changes
@@ -175,7 +190,7 @@ export default function PotSettings() {
           <JoinCard code={activeGroup!.joinCode} />
 
           {canManage && (
-            <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+            <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-panel-dark">
               <div className="mb-2 flex items-center gap-2">
                 <ShieldAlert className="h-4 w-4 text-violet-500" />
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Join code</p>

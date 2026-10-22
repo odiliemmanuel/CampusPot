@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
-  AlertTriangle, ArrowDownLeft, CheckCircle2, Loader2, Lock, ShieldAlert, Wallet, Send,
+  AlertTriangle, ArrowDownLeft, CalendarClock, CheckCircle2, Loader2, Lock, ShieldAlert, Wallet, Send,
 } from "lucide-react";
 
 import DataTable, { type Column } from "../../components/DataTable";
@@ -13,6 +13,8 @@ import {
   type Dispute, type Membership, type OutstandingMember, type Payment, type GroupSummary, type ExpenseRequest,
 } from "../../lib/api";
 import { formatNaira } from "../../lib/format";
+
+const PotSpendingInsights = lazy(() => import("./PotSpendingInsights"));
 
 // The dashboard tab: your position in the pot, member disputes, and the
 // contributions coming in. Contribution amounts are shown to the treasurer
@@ -131,6 +133,20 @@ export default function PotDashboard() {
   const openDisputes = disputes.filter((d) => d.status === "open");
   const iDisputed = openDisputes.some((d) => d.userId === myId);
   const frozen = summary?.spendingFrozen ?? openDisputes.length >= 2;
+  const deadline = summary?.levy?.dueDate || activeGroup?.contributionDueDate;
+  const deadlineState = useMemo(() => {
+    if (!deadline) return null;
+    const parsed = new Date(deadline);
+    if (Number.isNaN(parsed.getTime())) return null;
+    const dueDay = new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()).getTime();
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    return Math.ceil((dueDay - today) / (24 * 60 * 60 * 1000));
+  }, [deadline]);
+  const targetKobo = summary?.expectedKobo ?? 0;
+  const remainingKobo = summary?.outstandingKobo ?? 0;
+  const collectedForLevy = Math.max(0, targetKobo - remainingKobo);
+  const progressPct = targetKobo > 0 ? Math.min(100, Math.round((collectedForLevy / targetKobo) * 100)) : 0;
 
   const handleRaise = async () => {
     setDisputeBusy(true); setError("");
@@ -196,6 +212,46 @@ export default function PotDashboard() {
           </div>
         </div>
       )}
+
+      {summary && (
+        <section className="mb-4 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-panel-dark sm:p-4">
+          <div className="flex items-start gap-2.5">
+            <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${deadlineState !== null && deadlineState < 0 && remainingKobo > 0 ? "bg-rose-50 text-rose-600 dark:bg-rose-500/10" : "bg-violet-50 text-violet-600 dark:bg-violet-500/10"}`}>
+              <CalendarClock className="h-4 w-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Contribution deadline</h2>
+                  {deadlineState === null ? (
+                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Set a due date to track this pot's contribution progress.</p>
+                  ) : remainingKobo === 0 ? (
+                    <p className="mt-0.5 text-xs text-emerald-700 dark:text-emerald-300">All contributions for this levy are in.</p>
+                  ) : deadlineState < 0 ? (
+                    <p className="mt-0.5 text-xs font-medium text-rose-600 dark:text-rose-300">{Math.abs(deadlineState)} day{Math.abs(deadlineState) === 1 ? "" : "s"} overdue · {formatNaira(remainingKobo)} outstanding</p>
+                  ) : (
+                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{deadlineState === 0 ? "Due today" : `Due in ${deadlineState} day${deadlineState === 1 ? "" : "s"}`} · {formatNaira(remainingKobo)} outstanding</p>
+                  )}
+                </div>
+                <Link to={deadlineState === null ? `/pots/${id}?tab=settings` : `/pots/${id}?tab=contributions`} className="inline-flex shrink-0 items-center rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-semibold text-violet-700 hover:bg-violet-50 dark:border-white/10 dark:text-violet-300 dark:hover:bg-white/5">
+                  {deadlineState === null ? "Set deadline" : "Review contributions"}
+                </Link>
+              </div>
+              {targetKobo > 0 && (
+                <div className="mt-3">
+                  <div className="mb-1 flex justify-between text-[10px] text-slate-500 dark:text-slate-400"><span>{formatNaira(collectedForLevy)} collected of {formatNaira(targetKobo)}</span><span>{progressPct}%</span></div>
+                  <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10"><div className="h-full rounded-full bg-violet-600 transition-all" style={{ width: `${progressPct}%` }} /></div>
+                  {deadlineState !== null && deadlineState > 0 && remainingKobo > 0 && (
+                    <p className="mt-1.5 text-[10px] text-slate-500 dark:text-slate-400">To meet the date, the group needs about {formatNaira(Math.ceil(remainingKobo / deadlineState))} per day.</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {id && <Suspense fallback={<div className="mb-4 h-40 animate-pulse rounded-xl bg-slate-100 dark:bg-white/5" />}><PotSpendingInsights expenses={expenses} groupId={id} /></Suspense>}
 
       {/* Member disputes */}
       <section className="mb-4 rounded-xl border border-slate-100 bg-white p-2.5 shadow-sm sm:p-3 dark:border-white/10 dark:bg-panel-dark">

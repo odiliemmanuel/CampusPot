@@ -1,6 +1,6 @@
 import {
-  listDisputes, listExpenses, listPayments,
-  type Dispute, type ExpenseRequest, type Payment,
+  getSummary, listDisputes, listExpenses, listPayments,
+  type Dispute, type ExpenseRequest, type Payment, type GroupSummary,
 } from "./api";
 import { formatNaira } from "./format";
 
@@ -10,7 +10,7 @@ export interface PotActivityNotification {
   body: string;
   createdAt: string;
   href: string;
-  kind: "payment" | "payout" | "dispute";
+  kind: "payment" | "payout" | "dispute" | "deadline";
 }
 
 export const notificationReadKey = (userId: string, groupId: string) =>
@@ -43,7 +43,7 @@ export function activityDate(value: string) {
   return date.toLocaleDateString("en-NG", { day: "numeric", month: "short" });
 }
 
-function buildNotifications(groupId: string, payments: Payment[], expenses: ExpenseRequest[], disputes: Dispute[]) {
+function buildNotifications(groupId: string, payments: Payment[], expenses: ExpenseRequest[], disputes: Dispute[], summary?: GroupSummary) {
   const items: PotActivityNotification[] = [
     ...payments.filter((payment) => isRecent(payment.createdAt)).map((payment) => ({
       id: `payment:${payment.id}`,
@@ -74,19 +74,38 @@ function buildNotifications(groupId: string, payments: Payment[], expenses: Expe
       kind: "dispute" as const,
     })),
   ];
+  const levy = summary?.levy;
+  if (summary && levy?.dueDate && levy.status === "open" && summary.outstandingKobo > 0) {
+    const due = new Date(levy.dueDate);
+    const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime();
+    const today = new Date();
+    const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+    const days = Math.ceil((dueDay - todayDay) / (24 * 60 * 60 * 1000));
+    if (days <= 7) {
+      items.push({
+        id: `deadline:${levy.id}:${levy.dueDate}`,
+        title: days < 0 ? "Contribution deadline passed" : days === 0 ? "Contribution deadline is today" : "Contribution deadline approaching",
+        body: days < 0 ? `${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} overdue · ${formatNaira(summary.outstandingKobo)} outstanding` : `${days === 0 ? "Due today" : `Due in ${days} day${days === 1 ? "" : "s"}`} · ${formatNaira(summary.outstandingKobo)} outstanding`,
+        createdAt: new Date().toISOString(),
+        href: `/pots/${groupId}?tab=contributions`,
+        kind: "deadline",
+      });
+    }
+  }
   return items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 30);
 }
 
 export async function loadPotNotifications(groupId: string) {
   const results = await Promise.allSettled([
-    listPayments(groupId), listExpenses(groupId), listDisputes(groupId),
+    listPayments(groupId), listExpenses(groupId), listDisputes(groupId), getSummary(groupId),
   ] as const);
   if (results.every((result) => result.status === "rejected")) throw new Error("Pot activity is unavailable.");
   const payments = results[0].status === "fulfilled" ? results[0].value : [];
   const expenses = results[1].status === "fulfilled" ? results[1].value : [];
   const disputes = results[2].status === "fulfilled" ? results[2].value : [];
+  const summary = results[3].status === "fulfilled" ? results[3].value : undefined;
   return {
-    notifications: buildNotifications(groupId, payments, expenses, disputes),
+    notifications: buildNotifications(groupId, payments, expenses, disputes, summary),
     partial: results.some((result) => result.status === "rejected"),
   };
 }

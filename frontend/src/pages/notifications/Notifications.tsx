@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, Bell, CheckCheck, Gavel, HandCoins, Loader2, Send } from "lucide-react";
+import { ArrowLeft, Bell, CalendarClock, CheckCheck, Gavel, HandCoins, Loader2, Send } from "lucide-react";
 
 import AppShell from "../../layouts/AppShell";
 import GroupGate from "../../components/GroupGate";
@@ -93,7 +93,7 @@ function NotificationsInner() {
           <div className="divide-y divide-violet-100/80 dark:divide-white/5">
             {notifications.map((item) => {
               const unread = !readIds.includes(item.id);
-              const Icon = item.kind === "payment" ? HandCoins : item.kind === "payout" ? Send : Gavel;
+              const Icon = item.kind === "payment" ? HandCoins : item.kind === "payout" ? Send : item.kind === "deadline" ? CalendarClock : Gavel;
               return (
                 <Link key={item.id} to={item.href} onClick={() => markRead([item.id])} className={`flex items-center gap-3 px-3 py-2.5 transition hover:bg-white/70 dark:hover:bg-white/5 sm:px-4 ${unread ? "bg-white/40 dark:bg-white/[.025]" : ""}`}>
                   <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300"><Icon className="h-4 w-4" /></span>

@@ -199,6 +199,7 @@ export interface ExpenseRequest {
   riskLevel: "low" | "medium" | "high";
   riskReasons?: string;
   createdAt: string;
+  executedAt?: string;
 }
 
 export type PayoutDestination = "member" | "user" | "bank";
@@ -416,7 +417,7 @@ export const createGroup = (
 export const getGroup = (id: string) => request<Group>(`/groups/${id}`);
 export const updateGroup = (
   id: string,
-  patch: Partial<Pick<Group, "name" | "approvalThreshold" | "approvalTotal" | "largeExpenseKobo">>
+  patch: Partial<Pick<Group, "name" | "approvalThreshold" | "approvalTotal" | "largeExpenseKobo" | "contributionDueDate">>
 ) => request<Group>(`/groups/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
 export const regenerateJoinCode = (id: string) =>
   request<Group>(`/groups/${id}/join-code`, { method: "POST" });
