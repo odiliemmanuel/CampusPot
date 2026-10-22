@@ -4,6 +4,13 @@
 
 body {
   font-family: "Inter", system-ui, sans-serif;
+  @apply bg-[#F7F5FF] text-slate-900 transition-colors duration-200 dark:bg-[#0b0c14] dark:text-slate-100;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
 }
 
 /* Shared card surface with the app's violet accent. */

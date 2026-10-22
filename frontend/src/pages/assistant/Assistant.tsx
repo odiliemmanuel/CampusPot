@@ -69,7 +69,7 @@ export function AssistantInner() {
 
   return (
     <>
-      <div className="mb-3 flex items-center justify-between gap-2">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300"><Sparkles className="h-4 w-4" /></span>
           <div className="min-w-0"><h2 className="text-sm font-semibold text-slate-900 dark:text-white">AI Treasurer</h2><p className="truncate text-[11px] text-slate-500 dark:text-slate-400">Pot insights, deadlines, payout patterns</p></div>
@@ -77,10 +77,10 @@ export function AssistantInner() {
         <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"><ShieldCheck className="h-3 w-3" /> Read-only</span>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-3">
+      <div className="grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]">
         {/* Chat */}
-        <div className="lg:col-span-2 cp-card flex h-[min(44dvh,360px)] min-h-[225px] flex-col rounded-xl p-2.5 sm:p-3">
-          <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto py-1.5">
+        <div className="cp-card flex h-[clamp(320px,58dvh,560px)] min-w-0 flex-col rounded-xl p-2 sm:p-3">
+          <div ref={scrollRef} className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain py-1.5">
             {messages.length === 0 && (
               <div className="rounded-lg bg-slate-50 px-3 py-2.5 dark:bg-white/5">
                 <p className="text-xs font-medium text-slate-700 dark:text-slate-200">Ask a question about this pot.</p>
@@ -89,7 +89,7 @@ export function AssistantInner() {
             )}
             {messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[90%] rounded-2xl px-3 py-2.5 text-sm leading-relaxed ${
+                <div className={`max-w-[92%] break-words [overflow-wrap:anywhere] rounded-2xl px-3 py-2.5 text-sm leading-relaxed ${
                   m.role === "user"
                     ? "bg-primary-600 text-white"
                     : "bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-700 dark:text-slate-200"
@@ -128,22 +128,22 @@ export function AssistantInner() {
               e.preventDefault();
               ask(input);
             }}
-            className="flex gap-1.5"
+            className="flex min-w-0 gap-1.5"
           >
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask the AI Treasurer..."
-              className="cp-input min-h-9 flex-1 py-2 text-xs"
+              className="cp-input min-h-10 min-w-0 flex-1 py-2 text-sm"
             />
-            <button type="submit" disabled={busy || !input.trim()} aria-label="Send question" className="cp-btn-primary min-h-9 px-3">
+            <button type="submit" disabled={busy || !input.trim()} aria-label="Send question" className="cp-btn-primary min-h-10 shrink-0 px-3">
               <Send className="h-3.5 w-3.5" />
             </button>
           </form>
         </div>
 
         {/* Reminders */}
-        <div className="cp-card rounded-xl p-2.5 sm:p-3">
+        <div className="cp-card min-w-0 rounded-xl p-2.5 sm:p-3">
           <div className="mb-2 flex items-center gap-1.5">
             <Bell className="h-3.5 w-3.5 text-primary-600" />
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Reminder drafts</p>
