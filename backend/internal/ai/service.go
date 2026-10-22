@@ -99,8 +99,15 @@ func (s *Service) Answer(ctx context.Context, groupID, actorID uuid.UUID, questi
 		if err != nil {
 			return nil, err
 		}
+		if s.llm != nil {
+			outstanding, levy, _ := s.pots.WhoHasntPaid(ctx, groupID, nil)
+			expenses, _ := s.pots.ListExpenses(ctx, groupID, actorID)
+			if answer, err := s.llm.AnswerPotQuestion(ctx, question, sum, outstanding, levy, expenses); err == nil && answer != "" {
+				return &AnswerResponse{Answer: answer, Intent: "pot_question", Data: sum}, nil
+			}
+		}
 		answer := s.renderSummary(ctx, sum)
-		extra := "Ask me: \"Who hasn't paid?\" or \"Draft reminders for the excursion levy.\""
+		extra := "I can answer questions about this pot's balance, contributions, members owing, spending, and payout approvals. Ask about a specific part of the pot and I'll look it up."
 		return &AnswerResponse{
 			Answer: answer + "\n\n" + extra,
 			Intent: "summary",

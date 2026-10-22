@@ -16,8 +16,8 @@ interface Message {
 
 const suggestions = [
   "Who hasn't paid?",
-  "Give me a summary of the pot",
-  "Which members are partially paid?",
+  "Can this pot cover a ₦10,000 payout?",
+  "What payouts are pending?",
 ];
 
 export function AssistantInner() {
@@ -60,12 +60,12 @@ export function AssistantInner() {
     <>
       <PageHeader title="AI Treasurer" subtitle="Ask about the pot in plain English. It reads — it never moves money." />
 
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid gap-4 lg:grid-cols-3">
         {/* Chat */}
-        <div className="lg:col-span-2 cp-card rounded-3xl p-5 flex flex-col h-[calc(100vh-260px)] min-h-[420px]">
-          <div className="flex items-center gap-2 pb-4 border-b border-slate-100 dark:border-slate-800">
-            <div className="w-9 h-9 rounded-xl bg-primary-600 flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-white" />
+        <div className="lg:col-span-2 cp-card flex h-[min(62dvh,580px)] min-h-[330px] flex-col rounded-2xl p-3 sm:p-4">
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-3 dark:border-slate-800">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-600">
+              <Sparkles className="h-4 w-4 text-white" />
             </div>
             <div>
               <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">AI Treasurer</p>
@@ -75,18 +75,18 @@ export function AssistantInner() {
             </div>
           </div>
 
-          <div ref={scrollRef} className="flex-1 overflow-y-auto py-4 space-y-4">
+          <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto py-3">
             {messages.length === 0 && (
-              <div className="text-center py-8">
-                <Sparkles className="w-8 h-8 text-primary-300 mx-auto mb-3" />
+              <div className="py-5 text-center">
+                <Sparkles className="mx-auto mb-2 h-7 w-7 text-primary-300" />
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                  Ask me about contributions, outstanding members, or the pot summary.
+                  Ask about the balance, contributions, spending, members, or payout approvals in this pot.
                 </p>
               </div>
             )}
             {messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                <div className={`max-w-[90%] rounded-2xl px-3 py-2.5 text-sm leading-relaxed ${
                   m.role === "user"
                     ? "bg-primary-600 text-white"
                     : "bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-700 dark:text-slate-200"
@@ -107,12 +107,12 @@ export function AssistantInner() {
           {error && <p className="text-sm text-violet-600 mb-3">{error}</p>}
 
           {/* Suggestions */}
-          <div className="flex flex-wrap gap-2 mb-3">
+          <div className="mb-2 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {suggestions.map((s) => (
               <button
                 key={s}
                 onClick={() => ask(s)}
-                className="text-xs px-3 py-2 rounded-lg border border-primary-200 dark:border-primary-800/50 bg-primary-50 dark:bg-primary-900/30 text-slate-600 dark:text-slate-300 hover:border-primary-400 transition"
+                className="shrink-0 rounded-lg border border-primary-200 bg-primary-50 px-2.5 py-1.5 text-[11px] text-slate-600 transition hover:border-primary-400 dark:border-primary-800/50 dark:bg-primary-900/30 dark:text-slate-300"
               >
                 {s}
               </button>
@@ -139,8 +139,8 @@ export function AssistantInner() {
         </div>
 
         {/* Reminders */}
-        <div className="cp-card rounded-3xl p-6">
-          <div className="flex items-center gap-2 mb-4">
+        <div className="cp-card rounded-2xl p-3 sm:p-4">
+          <div className="mb-3 flex items-center gap-2">
             <Bell className="w-4 h-4 text-primary-600" />
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Reminders</p>
           </div>

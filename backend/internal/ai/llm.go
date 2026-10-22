@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/odiliemmmanuel/campuspot/common/money"
@@ -98,5 +99,54 @@ func (c *llmClient) DraftReminder(ctx context.Context, name string, levy *models
 	user := fmt.Sprintf(
 		"Tone: %s\nMember: %s\nOutstanding: %s\nLevy: %s\nPayment reference: %s\nWrite the reminder.",
 		tone, name, money.Kobo(o.OutstandingKobo).Format(), levyTitle, o.Reference)
+	return c.chat(ctx, system, user)
+}
+
+// AnswerPotQuestion answers open-ended questions from a deliberately small,
+// read-only snapshot of the current pot. Payout account details are excluded.
+func (c *llmClient) AnswerPotQuestion(ctx context.Context, question string, sum *pot.GroupSummary, outstanding []pot.OutstandingMember, levy *models.Levy, expenses []models.ExpenseRequest) (string, error) {
+	type memberFact struct {
+		Name      string `json:"name"`
+		State     string `json:"state"`
+		PaidKobo  int64  `json:"paidKobo"`
+		OwingKobo int64  `json:"owingKobo"`
+	}
+	type payoutFact struct {
+		AmountKobo int64  `json:"amountKobo"`
+		Category   string `json:"category,omitempty"`
+		Status     string `json:"status"`
+		Risk       string `json:"risk"`
+	}
+	contextData := map[string]interface{}{
+		"groupName": sum.GroupName, "currency": sum.Currency,
+		"balanceKobo": sum.BalanceKobo, "collectedKobo": sum.CollectedKobo,
+		"spentKobo": sum.SpentKobo, "members": sum.Members,
+		"paidCount": sum.PaidCount, "partialCount": sum.PartialCount,
+		"unpaidCount": sum.OutstandingCount, "outstandingKobo": sum.OutstandingKobo,
+		"pendingPayouts": sum.PendingExpenses, "openDisputes": sum.OpenDisputes,
+		"spendingFrozen": sum.SpendingFrozen,
+	}
+	if levy != nil {
+		contextData["openLevy"] = map[string]interface{}{"title": levy.Title, "amountKobo": levy.AmountKobo, "dueDate": levy.DueDate}
+	}
+	members := make([]memberFact, 0, len(outstanding))
+	for _, m := range outstanding {
+		members = append(members, memberFact{Name: m.Name, State: m.State, PaidKobo: m.PaidKobo, OwingKobo: m.OutstandingKobo})
+	}
+	contextData["membersOwing"] = members
+	latest := make([]payoutFact, 0, 8)
+	for i, e := range expenses {
+		if i >= 8 {
+			break
+		}
+		latest = append(latest, payoutFact{AmountKobo: e.AmountKobo, Category: e.Category, Status: e.Status, Risk: e.RiskLevel})
+	}
+	contextData["recentPayouts"] = latest
+	encoded, err := json.Marshal(contextData)
+	if err != nil {
+		return "", err
+	}
+	system := "You are PotKeeper's AI treasurer for a Nigerian student group. Answer the user's question conversationally and specifically using only the supplied current-pot snapshot. The snapshot amounts are integer kobo (100 kobo = ₦1); format them as naira. You may explain balances, contributions, member arrears, payout status, spending and disputes. If a fact is absent, say you cannot see it. Never invent details, claim to have sent messages, approve or initiate payouts, or imply you can move money. Politely redirect questions unrelated to this pot toward the pot's money and group activity. Keep answers concise and friendly."
+	user := "Current pot snapshot (JSON):\n" + string(encoded) + "\n\nMember question: " + strings.TrimSpace(question)
 	return c.chat(ctx, system, user)
 }

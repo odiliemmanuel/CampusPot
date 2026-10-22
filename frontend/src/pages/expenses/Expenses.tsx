@@ -191,7 +191,7 @@ export function ExpensesInner() {
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           onSubmit={handleCreate}
-          className="cp-card mb-4 grid gap-3 rounded-2xl p-3 sm:mb-6 sm:grid-cols-2 sm:gap-4 sm:rounded-3xl sm:p-5"
+          className="mb-4 grid gap-3 rounded-xl border border-slate-200/80 bg-white/80 p-3 shadow-sm dark:border-white/10 dark:bg-[#171626]/70 sm:mb-5 sm:grid-cols-2 sm:gap-3.5 sm:p-4"
         >
           <div>
             <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Amount (₦)</label>
@@ -266,12 +266,12 @@ export function ExpensesInner() {
       )}
 
       {expenses.length === 0 ? (
-        <div className="cp-card rounded-3xl p-10 text-center">
-          <Send className="w-8 h-8 text-slate-300 mx-auto mb-3" />
+        <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center dark:border-white/10">
+          <Send className="mx-auto mb-2 h-6 w-6 text-slate-300" />
           <p className="text-slate-500 dark:text-slate-400">No payouts yet.</p>
         </div>
       ) : (
-        <div className="space-y-2.5 sm:space-y-3">
+        <div className="divide-y divide-slate-200/80 dark:divide-white/10">
           {expenses.map((e) => {
             const approvalsFor = approvals[e.id] ?? [];
             const approvalsCount = approvalsFor.filter((a) => a.decision === "approve").length;
@@ -287,12 +287,12 @@ export function ExpensesInner() {
               ["pending_approval", "approved", "executing", "completed"].includes(e.status);
 
             return (
-              <motion.div key={e.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="cp-card rounded-2xl p-3 sm:rounded-3xl sm:p-4">
-                <div className="flex flex-wrap items-start justify-between gap-2">
+              <motion.div key={e.id} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="py-3 first:pt-0 sm:py-3.5">
+                <div className="flex flex-wrap items-start justify-between gap-1.5">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-sora font-bold text-slate-900 dark:text-white">{formatNaira(e.amountKobo)}</h3>
-                      <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${statusStyle[e.status] ?? ""}`}>
+                      <h3 className="font-sora text-base font-bold text-slate-900 dark:text-white sm:text-lg">{formatNaira(e.amountKobo)}</h3>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusStyle[e.status] ?? ""}`}>
                         {e.status.replace("_", " ")}
                       </span>
                       {disputed && (
@@ -310,19 +310,19 @@ export function ExpensesInner() {
                         </span>
                       )}
                     </div>
-                    <p className="mt-1 text-xs text-slate-600 dark:text-slate-300 sm:text-sm">To {e.destination}{e.category ? ` · ${e.category}` : ""}</p>
+                    <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-300">To {e.destination}{e.category ? ` · ${e.category}` : ""}</p>
                     {e.note && <p className="mt-0.5 text-[11px] text-slate-400">{e.note}</p>}
                   </div>
                 </div>
 
                 {e.riskReasons && (
-                  <p className="mt-3 text-xs text-violet-700 dark:text-violet-400 bg-violet-50 dark:bg-violet-500/10 rounded-lg px-3 py-2">
+                  <p className="mt-2 rounded-lg bg-violet-50 px-2.5 py-2 text-xs text-violet-700 dark:bg-violet-500/10 dark:text-violet-400">
                     {e.riskReasons}
                   </p>
                 )}
 
                 {disputed && (
-                  <p className="mt-3 text-xs text-violet-700 dark:text-violet-400 bg-violet-50 dark:bg-violet-500/10 rounded-lg px-3 py-2">
+                  <p className="mt-2 rounded-lg bg-violet-50 px-2.5 py-2 text-xs text-violet-700 dark:bg-violet-500/10 dark:text-violet-400">
                     {expenseDisputes.length} member{expenseDisputes.length === 1 ? "" : "s"} disputed this payout
                     {expenseDisputes.map((d) => d.name).filter(Boolean).length
                       ? `: ${expenseDisputes.map((d) => d.name).filter(Boolean).join(", ")}`
@@ -331,7 +331,7 @@ export function ExpensesInner() {
                 )}
 
                 {/* Approval progress */}
-                <div className="mt-2.5 sm:mt-3">
+                <div className="mt-2">
                   {members.length === 1 && e.status === "approved" ? (
                     <p className="inline-flex items-center gap-1.5 text-[11px] font-medium text-violet-600 dark:text-violet-300">
                       <ShieldCheck className="w-3.5 h-3.5" /> Approved automatically · only member
@@ -356,7 +356,7 @@ export function ExpensesInner() {
                 </div>
 
                 {/* Actions */}
-                <div className="mt-2.5 flex flex-wrap items-center gap-1.5 sm:mt-3 sm:gap-2">
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   {e.status === "pending_approval" && (
                     canDecide ? (
                       <>

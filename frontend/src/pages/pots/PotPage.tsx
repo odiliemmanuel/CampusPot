@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { useParams, useSearchParams, Link } from "react-router-dom";
+import { useParams, useSearchParams, Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   ArrowRight, ArrowUpRight, HandCoins, LayoutDashboard, MessageSquare, QrCode, Send,
@@ -25,6 +25,7 @@ const TABS = [
   { key: "members", label: "Members", icon: Users },
   { key: "invite", label: "Invite", icon: QrCode },
   { key: "assistant", label: "AI Treasurer", icon: Sparkles },
+  { key: "chat", label: "Chat", icon: MessageSquare },
   { key: "settings", label: "Settings", icon: SettingsIcon },
 ] as const;
 
@@ -66,6 +67,7 @@ function StatTile({
 export default function PotPage() {
   const { id } = useParams<{ id: string }>();
   const { activeGroup } = useGroup();
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [summary, setSummary] = useState<GroupSummary | null>(null);
   const chatActive = activeGroup?.id === id;
@@ -85,6 +87,10 @@ export default function PotPage() {
   }, [id]);
 
   const select = (key: TabKey) => {
+    if (key === "chat") {
+      navigate(`/pots/${id}/chat`);
+      return;
+    }
     const next = new URLSearchParams(params);
     next.set("tab", key);
     setParams(next);
