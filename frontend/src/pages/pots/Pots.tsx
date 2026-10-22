@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronRight, Loader2, PiggyBank, Plus } from "lucide-react";
+import { ChevronRight, Loader2, PiggyBank, Plus, Repeat2, Target } from "lucide-react";
 
 import AppShell from "../../layouts/AppShell";
 import PageHeader from "../../components/PageHeader";
@@ -60,6 +60,7 @@ function PotsGrid() {
   const navigate = useNavigate();
   const [summaries, setSummaries] = useState<Record<string, GroupSummary>>({});
   const [summariesLoading, setSummariesLoading] = useState(false);
+  const [potTypeFilter, setPotTypeFilter] = useState<"all" | Group["potType"]>("all");
 
   const ids = groups.map((g) => g.id).join(",");
 
@@ -105,6 +106,11 @@ function PotsGrid() {
     }] : [];
   }), [groups, summaries]);
 
+  const visibleGroups = useMemo(
+    () => potTypeFilter === "all" ? groups : groups.filter((group) => group.potType === potTypeFilter),
+    [groups, potTypeFilter],
+  );
+
   if (loading) {
     return (
       <div className="flex justify-center py-24">
@@ -146,8 +152,38 @@ function PotsGrid() {
       {summariesLoading && chartRows.length === 0 && <div className="my-4 flex items-center gap-2 text-xs text-slate-400"><Loader2 className="h-4 w-4 animate-spin" />Loading pot overview…</div>}
       {chartRows.length === 0 && !summariesLoading && <p className="my-3 rounded-xl border border-dashed border-slate-200 px-3 py-2 text-xs text-slate-500 dark:border-white/10 dark:text-slate-400">Pot overview charts are unavailable right now.</p>}
 
+      <section aria-label="Your pots" className="mt-5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">Your pots</h2>
+          <div className="flex max-w-full gap-1.5 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900" role="group" aria-label="Filter pots by type">
+            {([
+              { value: "all", label: "All", count: groups.length },
+              { value: "goal", label: "One-time goal", count: groups.filter((group) => group.potType === "goal").length },
+              { value: "rotating", label: "Recurring", count: groups.filter((group) => group.potType === "rotating").length },
+            ] as const).map((filter) => {
+              const active = potTypeFilter === filter.value;
+              const Icon = filter.value === "goal" ? Target : filter.value === "rotating" ? Repeat2 : null;
+              return (
+                <button
+                  key={filter.value}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setPotTypeFilter(filter.value)}
+                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold transition sm:px-3 ${active ? "bg-violet-700 text-white shadow-sm" : "text-slate-600 hover:bg-violet-50 dark:text-slate-300 dark:hover:bg-slate-800"}`}
+                >
+                  {Icon && <Icon className="h-3.5 w-3.5" />}
+                  {filter.label}<span className={active ? "text-violet-200" : "text-slate-400"}>{filter.count}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {visibleGroups.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">No {potTypeFilter === "goal" ? "one-time goal" : "recurring"} pots yet.</p>
+        ) : (
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {groups.map((group) => (
+        {visibleGroups.map((group) => (
           <PotCard
             key={group.id}
             group={group}
@@ -163,6 +199,8 @@ function PotsGrid() {
           <Plus className="h-4 w-4" /> Create a pot
         </Link>
       </div>
+        )}
+      </section>
       </>
       )}
     </>
