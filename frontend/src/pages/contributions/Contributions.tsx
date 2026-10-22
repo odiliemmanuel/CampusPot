@@ -105,23 +105,23 @@ export function ContributionsInner() {
       )}
       {error && <p className="mb-4 text-sm text-violet-600">{error}</p>}
 
-      <div className="grid gap-3 sm:gap-5 lg:grid-cols-3">
-        <div className="cp-card rounded-2xl p-3 sm:rounded-3xl sm:p-5 lg:col-span-2">
-          <div className="mb-3 flex items-center justify-between gap-2">
+      <div className="grid gap-2.5 sm:gap-3 lg:grid-cols-3">
+        <div className="cp-card rounded-xl p-2.5 sm:rounded-2xl sm:p-3.5 lg:col-span-2">
+          <div className="mb-2 flex items-center justify-between gap-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Your contribution</p>
             <Link to={`/pots/${gid}/members`} className="text-xs font-semibold text-violet-700 hover:underline dark:text-violet-300">See members</Link>
           </div>
           {mine && mine.state !== "none" ? (
-            <div className="grid grid-cols-2 gap-2 sm:gap-3">
-              <div className="rounded-xl bg-violet-100 p-3 dark:bg-violet-500/10 sm:p-4">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-lg bg-violet-100 px-2.5 py-2 dark:bg-violet-500/10 sm:px-3">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">Paid</p>
-                <p className="mt-1 truncate font-sora text-lg font-bold text-violet-900 dark:text-violet-100">{formatNaira(mine.paidKobo)}</p>
+                <p className="mt-0.5 truncate font-sora text-base font-bold text-violet-900 dark:text-violet-100 sm:text-lg">{formatNaira(mine.paidKobo)}</p>
               </div>
-              <div className="rounded-xl bg-violet-100 p-3 dark:bg-violet-500/10 sm:p-4">
+              <div className="rounded-lg bg-violet-100 px-2.5 py-2 dark:bg-violet-500/10 sm:px-3">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">Outstanding</p>
-                <p className="mt-1 truncate font-sora text-lg font-bold text-violet-900 dark:text-violet-100">{formatNaira(Math.max(0, mine.amountKobo - mine.paidKobo))}</p>
+                <p className="mt-0.5 truncate font-sora text-base font-bold text-violet-900 dark:text-violet-100 sm:text-lg">{formatNaira(Math.max(0, mine.amountKobo - mine.paidKobo))}</p>
               </div>
-              <div className="col-span-2 flex items-center justify-between gap-2 px-1 text-xs text-slate-500 dark:text-slate-400">
+              <div className="col-span-2 flex items-center justify-between gap-2 px-1 pt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
                 <span>{mine.state === "paid" ? "You are paid in full" : mine.state === "partial" ? "Partially paid" : "Payment due"}</span>
                 <span>{formatNaira(mine.amountKobo)} total</span>
               </div>
@@ -130,19 +130,19 @@ export function ContributionsInner() {
         </div>
 
         {/* Right column */}
-        <div className="space-y-6">
+        <div className="space-y-2.5">
           {mine && mine.state !== "none" && (
-            <div className="cp-card rounded-2xl p-3 sm:rounded-3xl sm:p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">
+            <div className="cp-card rounded-xl p-2.5 sm:rounded-2xl sm:p-3">
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Your dues
               </p>
               <div className="flex items-baseline justify-between">
-                  <span className="font-sora text-xl font-bold text-slate-900 dark:text-white">
+                  <span className="font-sora text-lg font-bold text-slate-900 dark:text-white">
                   {formatNaira(Math.max(0, mine.amountKobo - mine.paidKobo))}
                 </span>
                 <span className="text-xs text-slate-400">left to pay</span>
               </div>
-              <div className="mt-2 space-y-1 border-t border-slate-100 pt-2 text-xs dark:border-slate-800">
+              <div className="mt-1.5 space-y-1 border-t border-slate-100 pt-1.5 text-[11px] dark:border-slate-800">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500 dark:text-slate-400">Your dues</span>
                   <span className="font-medium text-slate-700 dark:text-slate-200">{formatNaira(mine.amountKobo)}</span>
@@ -153,7 +153,7 @@ export function ContributionsInner() {
                 </div>
               </div>
               {myOwed > 0 && (
-                <div className="mt-3 space-y-2">
+                <div className="mt-2 space-y-1.5">
                   <div className="flex items-center gap-2">
                     <input
                       value={payAmount}
@@ -175,32 +175,32 @@ export function ContributionsInner() {
           )}
 
           {canManage ? (
-            <div className="cp-card rounded-2xl p-3 sm:rounded-3xl sm:p-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-4">
+            <div className="cp-card rounded-xl p-2.5 sm:rounded-2xl sm:p-3">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Recent payments
               </p>
               {payments.length === 0 ? (
                 <p className="text-sm text-slate-400">No payments yet.</p>
               ) : (
-                <div className="space-y-2">
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
                   {payments.slice(0, 8).map((p) => (
-                    <div key={p.id} className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-500/15">
-                        <ArrowDownLeft className="h-4 w-4 text-violet-700 dark:text-violet-300" />
+                    <div key={p.id} className="flex items-center gap-2 py-1.5 first:pt-0">
+                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-violet-100 dark:bg-violet-500/15">
+                        <ArrowDownLeft className="h-3.5 w-3.5 text-violet-700 dark:text-violet-300" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm text-slate-700 dark:text-slate-200 truncate">{p.payerName || p.quotedReference || "Deposit"}</p>
-                        <p className="text-xs text-slate-400">{new Date(p.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}</p>
+                        <p className="truncate text-xs text-slate-700 dark:text-slate-200">{p.payerName || p.quotedReference || "Deposit"}</p>
+                        <p className="text-[10px] text-slate-400">{new Date(p.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}</p>
                       </div>
-                      <span className="shrink-0 text-sm font-semibold text-violet-700 dark:text-violet-300">{formatNaira(p.amountKobo)}</span>
+                      <span className="shrink-0 text-xs font-semibold text-violet-700 dark:text-violet-300">{formatNaira(p.amountKobo)}</span>
                     </div>
                   ))}
                 </div>
               )}
             </div>
           ) : (
-            <div className="cp-card rounded-3xl p-6">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-3">
+            <div className="cp-card rounded-xl p-2.5 sm:rounded-2xl sm:p-3">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Still to pay ({unpaid.length})
               </p>
               {unpaid.length === 0 ? (

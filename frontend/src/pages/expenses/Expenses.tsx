@@ -287,7 +287,7 @@ export function ExpensesInner() {
               ["pending_approval", "approved", "executing", "completed"].includes(e.status);
 
             return (
-              <motion.div key={e.id} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="py-3 first:pt-0 sm:py-3.5">
+              <motion.div key={e.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="py-2 first:pt-0 sm:py-2.5">
                 <div className="flex flex-wrap items-start justify-between gap-1.5">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -311,18 +311,18 @@ export function ExpensesInner() {
                       )}
                     </div>
                     <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-300">To {e.destination}{e.category ? ` · ${e.category}` : ""}</p>
-                    {e.note && <p className="mt-0.5 text-[11px] text-slate-400">{e.note}</p>}
+                    {e.note && <p className="mt-0.5 line-clamp-1 text-[10px] text-slate-400">{e.note}</p>}
                   </div>
                 </div>
 
                 {e.riskReasons && (
-                  <p className="mt-2 rounded-lg bg-violet-50 px-2.5 py-2 text-xs text-violet-700 dark:bg-violet-500/10 dark:text-violet-400">
+                  <p className="mt-1 rounded-md bg-violet-50 px-2 py-1.5 text-[11px] text-violet-700 dark:bg-violet-500/10 dark:text-violet-400">
                     {e.riskReasons}
                   </p>
                 )}
 
                 {disputed && (
-                  <p className="mt-2 rounded-lg bg-violet-50 px-2.5 py-2 text-xs text-violet-700 dark:bg-violet-500/10 dark:text-violet-400">
+                  <p className="mt-1 rounded-md bg-violet-50 px-2 py-1.5 text-[11px] text-violet-700 dark:bg-violet-500/10 dark:text-violet-400">
                     {expenseDisputes.length} member{expenseDisputes.length === 1 ? "" : "s"} disputed this payout
                     {expenseDisputes.map((d) => d.name).filter(Boolean).length
                       ? `: ${expenseDisputes.map((d) => d.name).filter(Boolean).join(", ")}`
@@ -331,7 +331,7 @@ export function ExpensesInner() {
                 )}
 
                 {/* Approval progress */}
-                <div className="mt-2">
+                <div className="mt-1.5">
                   {members.length === 1 && e.status === "approved" ? (
                     <p className="inline-flex items-center gap-1.5 text-[11px] font-medium text-violet-600 dark:text-violet-300">
                       <ShieldCheck className="w-3.5 h-3.5" /> Approved automatically · only member
@@ -356,23 +356,23 @@ export function ExpensesInner() {
                 </div>
 
                 {/* Actions */}
-                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <div className="mt-1.5 flex flex-wrap items-center gap-1">
                   {e.status === "pending_approval" && (
                     canDecide ? (
                       <>
                         <button
                           onClick={() => handleDecision(e.id, "approve")}
                           disabled={busy}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-800 disabled:opacity-60 sm:rounded-xl sm:px-4 sm:py-2.5 sm:text-sm"
+                          className="inline-flex items-center gap-1 rounded-lg bg-violet-700 px-2.5 py-1.5 text-[11px] font-semibold text-white transition hover:bg-violet-800 disabled:opacity-60"
                         >
-                          <ThumbsUp className="w-4 h-4" /> Approve
+                          <ThumbsUp className="h-3.5 w-3.5" /> Approve
                         </button>
                         <button
                           onClick={() => handleDecision(e.id, "reject")}
                           disabled={busy}
-                          className="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 text-violet-600 border border-violet-200 dark:border-violet-900/50 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition disabled:opacity-60"
+                          className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-violet-600 transition hover:bg-violet-50 disabled:opacity-60 dark:border-violet-900/50 dark:bg-slate-800 dark:hover:bg-violet-900/20"
                         >
-                          <ThumbsDown className="w-4 h-4" /> Reject
+                          <ThumbsDown className="h-3.5 w-3.5" /> Reject
                         </button>
                       </>
                     ) : (
@@ -393,9 +393,9 @@ export function ExpensesInner() {
                     <button
                       onClick={() => handleExecute(e.id)}
                       disabled={busy || disputed}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-800 disabled:opacity-60 sm:rounded-xl sm:px-4 sm:py-2.5 sm:text-sm"
+                      className="inline-flex items-center gap-1 rounded-lg bg-violet-700 px-2.5 py-1.5 text-[11px] font-semibold text-white transition hover:bg-violet-800 disabled:opacity-60"
                     >
-                      <Send className="w-4 h-4" /> Pay out
+                      <Send className="h-3.5 w-3.5" /> Pay out
                     </button>
                   )}
 
@@ -409,9 +409,9 @@ export function ExpensesInner() {
                     <button
                       onClick={() => handleDispute(e.id)}
                       disabled={busy}
-                      className="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 text-violet-600 border border-violet-200 dark:border-violet-900/50 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition disabled:opacity-60"
+                      className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-violet-600 transition hover:bg-violet-50 disabled:opacity-60 dark:border-violet-900/50 dark:bg-slate-800 dark:hover:bg-violet-900/20"
                     >
-                      <Gavel className="w-4 h-4" /> Dispute this payout
+                      <Gavel className="h-3.5 w-3.5" /> Dispute payout
                     </button>
                   )}
                 </div>
