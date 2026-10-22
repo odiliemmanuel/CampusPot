@@ -58,12 +58,13 @@ func (s *Service) assessRisk(group *models.Group, amountKobo, balanceKobo int64,
 // CreateExpenseRequest proposes a withdrawal from the pot. A payout targets
 // either a PotKeeper account (member/user, identified by Recipient as a user
 // id or email/phone) or an external bank account (Recipient as the account
-// number, with BankName/AccountName).
+// number, with BankName/BankCode — both optional, the account is verified).
 type CreateExpenseRequest struct {
 	AmountKobo      int64  `json:"amountKobo" binding:"required,gt=0"`
 	DestinationType string `json:"destinationType"` // member | user | bank
 	Recipient       string `json:"recipient"`
 	BankName        string `json:"bankName"`
+	BankCode        string `json:"bankCode"`
 	AccountName     string `json:"accountName"`
 	Category        string `json:"category"`
 	Note            string `json:"note"`
@@ -77,23 +78,30 @@ type payoutTarget struct {
 	dest       string
 	user       *models.User
 	bankName   string
+	bankCode   string
 	accountNo  string
 	accountNam string
+	// verified is set for bank payouts whose account passed name enquiry.
+	verified *VerifiedAccount
 }
 
 // resolvePayout turns a create request into a concrete payout target. A
 // member/user payout must resolve to a real PotKeeper account; a bank payout
-// only needs an account number.
-func (s *Service) resolvePayout(groupID uuid.UUID, req CreateExpenseRequest) (*payoutTarget, error) {
+// is name-enquiry verified — the account must exist, and the resolved
+// account holder's name is what gets recorded and shown to approvers.
+func (s *Service) resolvePayout(ctx context.Context, group *models.Group, req CreateExpenseRequest) (*payoutTarget, error) {
 	destType := strings.TrimSpace(req.DestinationType)
 	recipient := strings.TrimSpace(req.Recipient)
 
 	if destType == "" {
 		// Backwards compatible: a named bank is a bank payout, a recipient is a
 		// PotKeeper user, and a bare free-text destination is treated as an
-		// external bank account.
-		if strings.TrimSpace(req.BankName) != "" {
+		// external bank account (its number is verified below like any other).
+		if strings.TrimSpace(req.BankName) != "" || strings.TrimSpace(req.BankCode) != "" {
 			destType = models.ExpenseBank
+			if recipient == "" {
+				recipient = strings.TrimSpace(req.Destination)
+			}
 		} else if recipient != "" {
 			destType = models.ExpenseUser
 		} else if legacy := strings.TrimSpace(req.Destination); legacy != "" {
@@ -116,15 +124,18 @@ func (s *Service) resolvePayout(groupID uuid.UUID, req CreateExpenseRequest) (*p
 		if recipient == "" {
 			return nil, fmt.Errorf("%w: an account number is required", ErrInvalid)
 		}
-		parts := []string{}
-		if t.bankName != "" {
-			parts = append(parts, t.bankName)
+		// Name enquiry: the account must exist, and the pot pays the name the
+		// bank reports — never the name typed into the form.
+		verified, err := s.verifyBankAccount(ctx, group.BMoniUserID, recipient, t.bankName, req.BankCode)
+		if err != nil {
+			return nil, err
 		}
-		parts = append(parts, recipient)
-		if t.accountNam != "" {
-			parts = append(parts, t.accountNam)
-		}
-		t.dest = "Bank: " + strings.Join(parts, " · ")
+		t.verified = verified
+		t.bankName = verified.BankName
+		t.bankCode = verified.BankCode
+		t.accountNo = verified.AccountNumber
+		t.accountNam = verified.AccountHolderName
+		t.dest = fmt.Sprintf("Bank: %s · %s · %s", verified.BankName, verified.AccountNumber, verified.AccountHolderName)
 
 	case models.ExpenseMember:
 		uid, err := uuid.Parse(recipient)
@@ -133,7 +144,7 @@ func (s *Service) resolvePayout(groupID uuid.UUID, req CreateExpenseRequest) (*p
 		}
 		var m models.Membership
 		if err := s.db.Preload("User").
-			Where("group_id = ? AND user_id = ? AND status = ?", groupID, uid, models.MembershipActive).
+			Where("group_id = ? AND user_id = ? AND status = ?", group.ID, uid, models.MembershipActive).
 			First(&m).Error; err != nil {
 			return nil, fmt.Errorf("%w: that person is not an active member of this pot", ErrNotFound)
 		}
@@ -179,7 +190,7 @@ func (s *Service) CreateExpense(ctx context.Context, groupID, actorID uuid.UUID,
 	if err := s.db.First(&group, "id = ?", groupID).Error; err != nil {
 		return nil, ErrNotFound
 	}
-	t, err := s.resolvePayout(groupID, req)
+	t, err := s.resolvePayout(ctx, &group, req)
 	if err != nil {
 		return nil, err
 	}
@@ -211,6 +222,7 @@ func (s *Service) CreateExpense(ctx context.Context, groupID, actorID uuid.UUID,
 		Destination:     t.dest,
 		DestinationType: t.destType,
 		BankName:        t.bankName,
+		BankCode:        t.bankCode,
 		AccountNumber:   t.accountNo,
 		AccountName:     t.accountNam,
 		Category:        req.Category,
@@ -334,7 +346,8 @@ func (s *Service) Execute(ctx context.Context, groupID, expenseID, actorID uuid.
 		return nil, err
 	}
 	if expense.AmountKobo > balance {
-		return nil, fmt.Errorf("%w: the pot balance is too low for this payout", ErrConflict)
+		return nil, fmt.Errorf("%w: low balance — the pot has %s but this payout is %s",
+			ErrConflict, money.Kobo(balance).Format(), money.Kobo(expense.AmountKobo).Format())
 	}
 
 	// A payout to another PotKeeper account is the same movement as a wallet
@@ -342,6 +355,25 @@ func (s *Service) Execute(ctx context.Context, groupID, expenseID, actorID uuid.
 	// rail is involved.
 	if expense.RecipientUserID != nil {
 		return s.executeWalletPayout(groupID, actorID, &expense, *expense.RecipientUserID)
+	}
+
+	// Re-run name enquiry at send time: an account approved yesterday may have
+	// been closed today. Money never leaves for an account that no longer
+	// exists, and the freshest holder name is what the ledger records.
+	if expense.DestinationType == models.ExpenseBank && strings.TrimSpace(expense.AccountNumber) != "" {
+		verified, err := s.verifyBankAccount(ctx, group.BMoniUserID, expense.AccountNumber, expense.BankName, expense.BankCode)
+		if err != nil {
+			_ = s.db.Model(&expense).Update("status", models.ExpenseFailed).Error
+			return nil, fmt.Errorf("payout blocked: %w", err)
+		}
+		if strings.TrimSpace(expense.AccountName) != verified.AccountHolderName {
+			_ = s.db.Model(&expense).Updates(map[string]interface{}{
+				"account_name": verified.AccountHolderName,
+				"destination":  verified.Destination(),
+			}).Error
+			expense.AccountName = verified.AccountHolderName
+			expense.Destination = verified.Destination()
+		}
 	}
 
 	bankRef := firstNonEmpty(strings.TrimSpace(expense.AccountNumber), expense.Destination)

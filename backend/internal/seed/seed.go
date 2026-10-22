@@ -146,21 +146,26 @@ func Run(ctx context.Context, db *gorm.DB, cfg *config.Config) (*Result, error) 
 	overAmount := balance + int64(money.FromNaira(10_000))
 
 	// A medium-risk expense (over half the balance), awaiting approvals.
+	// The account passes name enquiry, so its holder name is verified and shown.
 	expense, err := potSvc.CreateExpense(ctx, group.ID, treasurer.ID, pot.CreateExpenseRequest{
-		AmountKobo:  mediumAmount,
-		Destination: "0123456789", // sandbox payout account id
-		Category:    "Excursion bus",
-		Note:        "Deposit for 18-seater bus",
+		AmountKobo:      mediumAmount,
+		DestinationType: models.ExpenseBank,
+		Recipient:       "0123456789", // sandbox payout account (verified)
+		BankName:        "GTBank",
+		Category:        "Excursion bus",
+		Note:            "Deposit for 18-seater bus",
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create expense: %w", err)
 	}
 	// An over-budget expense to demonstrate the high-risk flag.
 	overBudget, err := potSvc.CreateExpense(ctx, group.ID, treasurer.ID, pot.CreateExpenseRequest{
-		AmountKobo:  overAmount,
-		Destination: "0987654321",
-		Category:    "New speaker",
-		Note:        "Sound system upgrade",
+		AmountKobo:      overAmount,
+		DestinationType: models.ExpenseBank,
+		Recipient:       "0987654321",
+		BankName:        "Zenith Bank",
+		Category:        "New speaker",
+		Note:            "Sound system upgrade",
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create over-budget expense: %w", err)

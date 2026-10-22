@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/odiliemmmanuel/campuspot/common/money"
 	"github.com/odiliemmmanuel/campuspot/internal/models"
 )
 
@@ -79,13 +80,18 @@ type WalletTransferRequest struct {
 	// BankName, when set, marks this as an external payout to a bank account
 	// rather than a transfer to another PotKeeper user.
 	BankName string `json:"bankName"`
+	BankCode string `json:"bankCode"`
 	Note     string `json:"note"`
 }
 
 // WalletTransfer moves money to another PotKeeper user when the recipient
 // matches a registered email/phone, otherwise it records an external payout
 // (e.g. to a bank account outside PotKeeper).
-func (s *Service) WalletTransfer(_ context.Context, userID uuid.UUID, req WalletTransferRequest) (*WalletOverview, error) {
+//
+// Bank payouts are name-enquiry first: the account is verified against B Moni
+// and the resolved account holder's name is recorded, so money never leaves
+// for an account that does not exist.
+func (s *Service) WalletTransfer(ctx context.Context, userID uuid.UUID, req WalletTransferRequest) (*WalletOverview, error) {
 	if req.AmountKobo <= 0 {
 		return nil, fmt.Errorf("%w: amount must be positive", ErrInvalid)
 	}
@@ -95,8 +101,16 @@ func (s *Service) WalletTransfer(_ context.Context, userID uuid.UUID, req Wallet
 	}
 
 	var to *models.User
+	var verified *VerifiedAccount
 	// A named bank means an external payout — never match it to a user.
-	if strings.TrimSpace(req.BankName) == "" {
+	if strings.TrimSpace(req.BankName) != "" || strings.TrimSpace(req.BankCode) != "" {
+		// Name enquiry: confirm the account exists and remember who holds it.
+		v, err := s.VerifyBankAccount(ctx, userID, recipient, req.BankName, req.BankCode)
+		if err != nil {
+			return nil, err
+		}
+		verified = v
+	} else {
 		var match models.User
 		err := s.db.Where("LOWER(email) = ?", strings.ToLower(recipient)).
 			Or("phone = ?", recipient).First(&match).Error
@@ -137,13 +151,12 @@ func (s *Service) WalletTransfer(_ context.Context, userID uuid.UUID, req Wallet
 			}).Error; err != nil {
 				return err
 			}
+		} else if verified != nil {
+			// Record the verified account holder's name, not just the number,
+			// so the wallet history shows exactly who was paid.
+			out.Counterparty = fmt.Sprintf("%s · %s · %s", verified.BankName, verified.AccountNumber, verified.AccountHolderName)
 		} else {
-			bank := strings.TrimSpace(req.BankName)
-			if bank != "" {
-				out.Counterparty = fmt.Sprintf("%s · %s", bank, recipient)
-			} else {
-				out.Counterparty = recipient
-			}
+			out.Counterparty = recipient
 		}
 		return tx.Create(out).Error
 	})
@@ -250,7 +263,8 @@ func (s *Service) WalletPayPot(_ context.Context, userID uuid.UUID, req WalletPa
 }
 
 // debitWallet removes amount from a wallet, refusing to overdraw. The
-// conditional UPDATE makes concurrent sends safe.
+// conditional UPDATE makes concurrent sends safe. A refused debit reports the
+// actual balance so the UI can raise a low-balance alert with real numbers.
 func debitWallet(tx *gorm.DB, userID uuid.UUID, amount int64) error {
 	res := tx.Model(&models.User{}).
 		Where("id = ? AND wallet_balance_kobo >= ?", userID, amount).
@@ -259,7 +273,13 @@ func debitWallet(tx *gorm.DB, userID uuid.UUID, amount int64) error {
 		return res.Error
 	}
 	if res.RowsAffected == 0 {
-		return fmt.Errorf("%w: not enough money in your wallet", ErrConflict)
+		var user models.User
+		var balance int64
+		if err := tx.Select("wallet_balance_kobo").First(&user, "id = ?", userID).Error; err == nil {
+			balance = user.WalletBalanceKobo
+		}
+		return fmt.Errorf("%w: low balance — your wallet has %s but this send is %s",
+			ErrConflict, money.Kobo(balance).Format(), money.Kobo(amount).Format())
 	}
 	return nil
 }

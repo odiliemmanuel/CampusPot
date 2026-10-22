@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { motion } from "framer-motion";
 import {
   AlertTriangle, CheckCircle2, Clock, Gavel, Landmark, Loader2, Plus,
@@ -11,12 +11,18 @@ import PageHeader from "../../components/PageHeader";
 import { useGroup } from "../../providers/GroupProvider";
 import {
   listExpenses, listApprovals, listMembers, listDisputes, createExpense,
-  decideExpense, executeExpense, raiseDispute, getStoredUser,
-  type AuthUser, type ExpenseRequest, type Approval, type Role, type Membership, type Dispute,
+  decideExpense, executeExpense, raiseDispute, getStoredUser, getSummary,
+  listBanks, lookupUser, verifyBankAccount,
+  type AuthUser, type ExpenseRequest, type Approval, type Role, type Membership,
+  type Dispute, type BankOption, type LookedUpUser, type VerifiedAccount,
 } from "../../lib/api";
 import { formatNaira, nairaToKobo } from "../../lib/format";
 
-const BANKS = ["B Moni", "GTBank", "Opay", "Access Bank", "Zenith Bank", "UBA", "Kuda", "Moniepoint"];
+const FALLBACK_BANKS: BankOption[] = [
+  { name: "GTBank", code: "058" }, { name: "Zenith Bank", code: "057" },
+  { name: "Access Bank", code: "044" }, { name: "First Bank of Nigeria", code: "011" },
+  { name: "United Bank for Africa", code: "033" },
+];
 
 const statusStyle: Record<string, string> = {
   pending_approval: "bg-violet-100 dark:bg-violet-500/15 text-violet-800 dark:text-violet-200",
@@ -48,9 +54,17 @@ export function ExpensesInner() {
   const [destMode, setDestMode] = useState<DestMode>("member");
   const [memberId, setMemberId] = useState("");
   const [recipient, setRecipient] = useState("");
-  const [bankName, setBankName] = useState(BANKS[0]);
+  const [bankName, setBankName] = useState(FALLBACK_BANKS[0].name);
+  const [banks, setBanks] = useState<BankOption[]>(FALLBACK_BANKS);
   const [accountNumber, setAccountNumber] = useState("");
-  const [accountName, setAccountName] = useState("");
+
+  // Name enquiry — the payout destination is confirmed before it's submitted.
+  const [verified, setVerified] = useState<VerifiedAccount | null>(null);
+  const [lookedUp, setLookedUp] = useState<LookedUpUser | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [checkError, setCheckError] = useState("");
+  const [potBalance, setPotBalance] = useState(0);
+  const verifySeq = useRef(0);
 
   const uid = getStoredUser<AuthUser>()?.id;
   const [myRole, setMyRole] = useState<Role | null>(null);
@@ -82,26 +96,72 @@ export function ExpensesInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gid, uid]);
 
+  // Bank list + current pot balance (for the low-balance warning).
+  useEffect(() => {
+    listBanks().then((list) => { if (list.length > 0) setBanks(list); }).catch(() => { /* keep fallbacks */ });
+    getSummary(gid).then((s) => setPotBalance(s.balanceKobo)).catch(() => { /* optional */ });
+  }, [gid]);
+
+  // Look the payout destination up whenever it changes. A stale response is
+  // dropped by comparing sequence numbers.
+  const refreshLookup = useCallback((value: string, mode: DestMode, bank: string) => {
+    const seq = ++verifySeq.current;
+    const target = value.trim();
+    setVerified(null); setLookedUp(null); setCheckError("");
+    if (mode === "bank") {
+      if (!/^\d{10}$/.test(target)) return;
+      setChecking(true);
+      verifyBankAccount(target, bank)
+        .then((v) => { if (seq === verifySeq.current) setVerified(v); })
+        .catch((err) => { if (seq === verifySeq.current) setCheckError(err instanceof Error ? err.message : "We couldn't confirm that account."); })
+        .finally(() => { if (seq === verifySeq.current) setChecking(false); });
+      return;
+    }
+    if (mode === "user") {
+      if (target.length < 3) return;
+      setChecking(true);
+      lookupUser(target)
+        .then((u) => { if (seq === verifySeq.current) setLookedUp(u); })
+        .catch((err) => { if (seq === verifySeq.current) setCheckError(err instanceof Error ? err.message : "No PotKeeper account matches that."); })
+        .finally(() => { if (seq === verifySeq.current) setChecking(false); });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (destMode === "bank") refreshLookup(accountNumber, destMode, bankName);
+    else if (destMode === "user") refreshLookup(recipient, destMode, bankName);
+  }, [accountNumber, recipient, destMode, bankName, refreshLookup]);
+
   const destination = (() => {
     if (destMode === "member") {
       const m = members.find((x) => x.userId === memberId);
       return m ? `Member: ${m.user?.name ?? "member"} (${m.reference})` : "";
     }
     if (destMode === "user") {
-      return recipient.trim() ? `PotKeeper: ${recipient.trim()}` : "";
+      return lookedUp ? `PotKeeper: ${lookedUp.name} (${lookedUp.email || lookedUp.phone || recipient.trim()})` : "";
     }
-    return accountNumber.trim()
-      ? `Bank: ${bankName} · ${accountNumber.trim()}${accountName.trim() ? ` · ${accountName.trim()}` : ""}`
-      : "";
+    return verified ? `Bank: ${verified.bankName} · ${verified.accountNumber} · ${verified.accountHolderName}` : "";
   })();
+
+  // The destination must be confirmed by name enquiry before submitting.
+  const destinationConfirmed =
+    destMode === "member" ? !!memberId : destMode === "user" ? !!lookedUp : !!verified;
+
+  // Low-balance alert: the requested payout exceeds what the pot holds.
+  const overBalance = nairaToKobo(amount) > potBalance && nairaToKobo(amount) > 0;
 
   const resetForm = () => {
     setAmount(""); setCategory(""); setNote("");
-    setMemberId(""); setRecipient(""); setAccountNumber(""); setAccountName("");
+    setMemberId(""); setRecipient(""); setAccountNumber("");
+    setVerified(null); setLookedUp(null); setCheckError("");
   };
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault();
+    if (!destinationConfirmed) {
+      setError("Confirm the payout destination's name before submitting.");
+      return;
+    }
     setError(""); setBusy(true);
     try {
       await createExpense(gid, {
@@ -109,8 +169,8 @@ export function ExpensesInner() {
         destinationType: destMode,
         recipient:
           destMode === "member" ? memberId : destMode === "user" ? recipient.trim() : accountNumber.trim(),
-        bankName: destMode === "bank" ? bankName : undefined,
-        accountName: destMode === "bank" ? accountName.trim() : undefined,
+        bankName: destMode === "bank" ? verified!.bankName : undefined,
+        bankCode: destMode === "bank" ? verified!.bankCode : undefined,
         category,
         note,
       });
@@ -238,16 +298,55 @@ export function ExpensesInner() {
                 <input required value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder="Their PotKeeper email or phone" className="cp-input" />
               )}
               {destMode === "bank" && (
-                <div className="grid gap-2 sm:grid-cols-3">
+                <div className="grid gap-2 sm:grid-cols-2">
                   <select value={bankName} onChange={(e) => setBankName(e.target.value)} className="cp-input">
-                    {BANKS.map((b) => <option key={b} value={b}>{b}</option>)}
+                    {banks.map((b) => <option key={b.code} value={b.name}>{b.name}</option>)}
                   </select>
-                  <input required value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} placeholder="Account number" inputMode="numeric" className="cp-input" />
-                  <input value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="Account name" className="cp-input" />
+                  <input required value={accountNumber} onChange={(e) => setAccountNumber(e.target.value.replace(/[^0-9]/g, "").slice(0, 10))} placeholder="Account number" inputMode="numeric" className="cp-input" />
                 </div>
+              )}
+
+              {/* Name enquiry — confirm who gets paid before money can move. */}
+              {checking && (
+                <p className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking recipient…
+                </p>
+              )}
+              {!checking && verified && (
+                <div className="mt-2 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">Paying</p>
+                    <p className="truncate text-sm font-bold text-emerald-900 dark:text-emerald-200">{verified.accountHolderName}</p>
+                    <p className="truncate text-[11px] text-emerald-700/80 dark:text-emerald-300/80">{verified.bankName} · {verified.accountNumber}</p>
+                  </div>
+                </div>
+              )}
+              {!checking && lookedUp && (
+                <div className="mt-2 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">Paying</p>
+                    <p className="truncate text-sm font-bold text-emerald-900 dark:text-emerald-200">{lookedUp.name}</p>
+                    <p className="truncate text-[11px] text-emerald-700/80 dark:text-emerald-300/80">PotKeeper · {lookedUp.email || lookedUp.phone || ""}</p>
+                  </div>
+                </div>
+              )}
+              {!checking && checkError && (
+                <p className="mt-2 flex items-start gap-2 rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-medium text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>{checkError}</span>
+                </p>
               )}
             </div>
           </div>
+
+          {overBalance && (
+            <p className="sm:col-span-2 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>Low balance — this payout is {formatNaira(nairaToKobo(amount))} but the pot only holds {formatNaira(potBalance)}. Co-signers will see a high-risk flag.</span>
+            </p>
+          )}
 
           <div>
             <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Category</label>
@@ -258,7 +357,7 @@ export function ExpensesInner() {
             <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="What is it for?" className="cp-input mt-1" />
           </div>
           <div className="sm:col-span-2">
-            <button type="submit" disabled={busy || !destination} className="cp-btn-primary disabled:opacity-60">
+            <button type="submit" disabled={busy || !destination || !destinationConfirmed || checking} className="cp-btn-primary disabled:opacity-60">
               {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Submit for approval
             </button>
           </div>

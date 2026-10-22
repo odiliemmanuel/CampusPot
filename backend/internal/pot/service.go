@@ -29,6 +29,11 @@ var (
 	ErrForbidden = errors.New("forbidden")
 	ErrConflict  = errors.New("conflict")
 	ErrInvalid   = errors.New("invalid request")
+	// ErrAccountNotFound means a name enquiry came back empty: the bank
+	// account (or PotKeeper user) a sender picked does not exist. The UI uses
+	// the dedicated ACCOUNT_NOT_FOUND code to raise a red alert instead of a
+	// generic error.
+	ErrAccountNotFound = errors.New("account not found")
 )
 
 // sandboxBVN is a synthetic BVN for sandbox onboarding only. It is never a

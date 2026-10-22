@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/glebarez/sqlite"
 	"github.com/google/uuid"
@@ -15,6 +16,12 @@ import (
 	"github.com/odiliemmmanuel/campuspot/internal/bmoni"
 	"github.com/odiliemmmanuel/campuspot/internal/models"
 )
+
+// dueSoon is a valid contribution deadline for test pots (today or later).
+func dueSoon() *FlexTime {
+	ft := FlexTime(time.Now().Add(7 * 24 * time.Hour))
+	return &ft
+}
 
 // newTestService builds an in-process engine backed by a throwaway SQLite file
 // and the mock B Moni client. This exercises the real money logic end to end.
@@ -67,6 +74,7 @@ func TestPotLifecycle(t *testing.T) {
 	group, err := svc.CreateGroup(ctx, treasurer.ID, CreateGroupRequest{
 		Name: "200L Dues", ApprovalThreshold: 2, ApprovalTotal: 3,
 		LargeExpenseKobo: int64(money.FromNaira(20_000)),
+		PerMemberKobo:    int64(money.FromNaira(5_000)), ContributionDueDate: dueSoon(),
 	})
 	if err != nil {
 		t.Fatalf("CreateGroup: %v", err)
@@ -158,10 +166,14 @@ func TestPotLifecycle(t *testing.T) {
 
 	// Expense requires 2 of 3 approvals and cannot be self-approved.
 	exp, err := svc.CreateExpense(ctx, group.ID, treasurer.ID, CreateExpenseRequest{
-		AmountKobo: int64(money.FromNaira(6_000)), Destination: "acct", Category: "Bus",
+		AmountKobo: int64(money.FromNaira(6_000)), DestinationType: models.ExpenseBank,
+		Recipient: "0123456789", BankName: "GTBank", Category: "Bus",
 	})
 	if err != nil {
 		t.Fatalf("CreateExpense: %v", err)
+	}
+	if exp.AccountName == "" {
+		t.Fatal("expected the verified account holder name to be stored on the expense")
 	}
 	if exp.Status != models.ExpensePendingApproval {
 		t.Fatalf("expected pending_approval, got %s", exp.Status)
@@ -199,14 +211,15 @@ func TestRiskFlags(t *testing.T) {
 	ctx := context.Background()
 	svc, db := newTestService(t)
 	treasurer := newUser(t, db, "Ada", "ada2@x.ng")
-	group, err := svc.CreateGroup(ctx, treasurer.ID, CreateGroupRequest{Name: "G"})
+	group, err := svc.CreateGroup(ctx, treasurer.ID, CreateGroupRequest{Name: "G", PerMemberKobo: int64(money.FromNaira(1_000)), ContributionDueDate: dueSoon()})
 	if err != nil {
 		t.Fatalf("CreateGroup: %v", err)
 	}
 
 	// Over-balance spend must be flagged high risk.
 	exp, err := svc.CreateExpense(ctx, group.ID, treasurer.ID, CreateExpenseRequest{
-		AmountKobo: int64(money.FromNaira(10_000)), Destination: "acct",
+		AmountKobo: int64(money.FromNaira(10_000)), DestinationType: models.ExpenseBank,
+		Recipient: "0123456789", BankName: "GTBank",
 	})
 	if err != nil {
 		t.Fatalf("CreateExpense: %v", err)

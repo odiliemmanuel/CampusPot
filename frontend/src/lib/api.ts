@@ -210,6 +210,7 @@ export interface CreateExpenseInput {
   /** A user id (member), email/phone (user), or account number (bank). */
   recipient: string;
   bankName?: string;
+  bankCode?: string;
   accountName?: string;
   category?: string;
   note?: string;
@@ -624,11 +625,50 @@ export const walletDeposit = (amountKobo: number, reference = "", note = "") =>
     body: JSON.stringify({ amountKobo, reference, note }),
   });
 
-export const walletTransfer = (amountKobo: number, recipient: string, note = "", bankName = "") =>
+export const walletTransfer = (amountKobo: number, recipient: string, note = "", bankName = "", bankCode = "") =>
   request<WalletOverview>("/wallet/transfer", {
     method: "POST",
-    body: JSON.stringify({ amountKobo, recipient, note, bankName }),
+    body: JSON.stringify({ amountKobo, recipient, note, bankName, bankCode }),
   });
+
+// ---------- Name enquiry (confirm who you're paying) ----------
+
+export interface BankOption {
+  name: string;
+  code: string;
+}
+
+export interface VerifiedAccount {
+  accountNumber: string;
+  bankName: string;
+  bankCode: string;
+  accountHolderName: string;
+}
+
+export interface LookedUpUser {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+}
+
+export const listBanks = () =>
+  request<BankOption[] | null>("/banks").then((b) => b ?? []);
+
+/**
+ * Resolve an account number to its holder's name so the sender can confirm the
+ * destination before money moves. Throws ACCOUNT_NOT_FOUND when the account
+ * does not exist at that bank.
+ */
+export const verifyBankAccount = (accountNumber: string, bankName = "", bankCode = "") =>
+  request<VerifiedAccount>("/banks/verify", {
+    method: "POST",
+    body: JSON.stringify({ accountNumber, bankName, bankCode }),
+  });
+
+/** Resolve a PotKeeper email/phone to the account holder's name. */
+export const lookupUser = (recipient: string) =>
+  request<LookedUpUser>(`/users/lookup?recipient=${encodeURIComponent(recipient)}`);
 
 export const walletPayPot = (groupId: string, amountKobo: number, levyId?: string) =>
   request<Payment>("/wallet/pay", {

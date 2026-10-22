@@ -230,7 +230,10 @@ type ExpenseRequest struct {
 	DestinationType string     `gorm:"default:bank" json:"destinationType"`
 	RecipientUserID *uuid.UUID `gorm:"type:uuid;index" json:"recipientUserId,omitempty"`
 	BankName        string     `json:"bankName,omitempty"`
+	BankCode        string     `json:"bankCode,omitempty"`
 	AccountNumber   string     `json:"accountNumber,omitempty"`
+	// AccountName is the bank-verified account holder name from name enquiry
+	// — never a free-text value typed into the form.
 	AccountName     string     `json:"accountName,omitempty"`
 	Category        string     `json:"category,omitempty"`
 	Note            string     `json:"note,omitempty"`

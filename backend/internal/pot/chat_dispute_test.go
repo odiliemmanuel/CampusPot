@@ -4,8 +4,14 @@ import (
 	"context"
 	"testing"
 
+	"github.com/odiliemmmanuel/campuspot/common/money"
 	"github.com/odiliemmmanuel/campuspot/internal/models"
 )
+
+// testGroupRequest is a valid pot-creation body for dispute/chat tests.
+func testGroupRequest(name string) CreateGroupRequest {
+	return CreateGroupRequest{Name: name, PerMemberKobo: int64(money.FromNaira(1_000)), ContributionDueDate: dueSoon()}
+}
 
 func TestChatReadReceiptsAndReplies(t *testing.T) {
 	ctx := context.Background()
@@ -14,7 +20,7 @@ func TestChatReadReceiptsAndReplies(t *testing.T) {
 	treasurer := newUser(t, db, "Ada", "ada@x.ng")
 	member := newUser(t, db, "Chidi", "chidi@x.ng")
 
-	group, err := svc.CreateGroup(ctx, treasurer.ID, CreateGroupRequest{Name: "200L Dues"})
+	group, err := svc.CreateGroup(ctx, treasurer.ID, testGroupRequest("200L Dues"))
 	if err != nil {
 		t.Fatalf("CreateGroup: %v", err)
 	}
@@ -65,7 +71,7 @@ func TestDisputesFreezeSpending(t *testing.T) {
 	m1 := newUser(t, db, "Chidi", "chidi@x.ng")
 	m2 := newUser(t, db, "Fatima", "fatima@x.ng")
 
-	group, err := svc.CreateGroup(ctx, treasurer.ID, CreateGroupRequest{Name: "200L Dues"})
+	group, err := svc.CreateGroup(ctx, treasurer.ID, testGroupRequest("200L Dues"))
 	if err != nil {
 		t.Fatalf("CreateGroup: %v", err)
 	}
@@ -85,7 +91,7 @@ func TestDisputesFreezeSpending(t *testing.T) {
 	if frozen, n, err := svc.spendingFrozen(group.ID); err != nil || !frozen || n != 2 {
 		t.Fatalf("expected frozen with 2 disputes, got frozen=%v n=%d err=%v", frozen, n, err)
 	}
-	if _, err := svc.CreateExpense(ctx, group.ID, treasurer.ID, CreateExpenseRequest{AmountKobo: 1000, Destination: "x"}); err == nil {
+	if _, err := svc.CreateExpense(ctx, group.ID, treasurer.ID, CreateExpenseRequest{AmountKobo: 1000, DestinationType: models.ExpenseBank, Recipient: "0123456789", BankName: "GTBank"}); err == nil {
 		t.Fatal("expected CreateExpense to be blocked while frozen")
 	}
 
@@ -100,7 +106,7 @@ func TestDisputesFreezeSpending(t *testing.T) {
 	if frozen, n, _ := svc.spendingFrozen(group.ID); frozen || n != 1 {
 		t.Fatalf("expected unfrozen with 1 dispute, got frozen=%v n=%d", frozen, n)
 	}
-	if _, err := svc.CreateExpense(ctx, group.ID, treasurer.ID, CreateExpenseRequest{AmountKobo: 1000, Destination: "x"}); err != nil {
+	if _, err := svc.CreateExpense(ctx, group.ID, treasurer.ID, CreateExpenseRequest{AmountKobo: 1000, DestinationType: models.ExpenseBank, Recipient: "0123456789", BankName: "GTBank"}); err != nil {
 		t.Fatalf("expected CreateExpense to succeed after resolving, got %v", err)
 	}
 }
@@ -113,14 +119,14 @@ func TestDisputeOnExpenseBlocksItsPayout(t *testing.T) {
 	m1 := newUser(t, db, "Chidi", "chidi@x.ng")
 	m2 := newUser(t, db, "Fatima", "fatima@x.ng")
 
-	group, err := svc.CreateGroup(ctx, treasurer.ID, CreateGroupRequest{Name: "200L Dues"})
+	group, err := svc.CreateGroup(ctx, treasurer.ID, testGroupRequest("200L Dues"))
 	if err != nil {
 		t.Fatalf("CreateGroup: %v", err)
 	}
 	addTestMember(t, svc, group, treasurer.ID, m1, models.RoleMember)
 	addTestMember(t, svc, group, treasurer.ID, m2, models.RoleMember)
 
-	expense, err := svc.CreateExpense(ctx, group.ID, treasurer.ID, CreateExpenseRequest{AmountKobo: 1000, Destination: "x"})
+	expense, err := svc.CreateExpense(ctx, group.ID, treasurer.ID, CreateExpenseRequest{AmountKobo: 1000, DestinationType: models.ExpenseBank, Recipient: "0123456789", BankName: "GTBank"})
 	if err != nil {
 		t.Fatalf("CreateExpense: %v", err)
 	}
@@ -141,7 +147,7 @@ func TestDisputeOnExpenseBlocksItsPayout(t *testing.T) {
 	}
 
 	// A dispute may only target a payout in the same pot.
-	other, err := svc.CreateGroup(ctx, treasurer.ID, CreateGroupRequest{Name: "Other"})
+	other, err := svc.CreateGroup(ctx, treasurer.ID, testGroupRequest("Other"))
 	if err != nil {
 		t.Fatalf("CreateGroup other: %v", err)
 	}
@@ -170,7 +176,7 @@ func TestLeavePotRemovesFromChat(t *testing.T) {
 	m1 := newUser(t, db, "Chidi", "chidi@x.ng")
 	m2 := newUser(t, db, "Fatima", "fatima@x.ng")
 
-	group, err := svc.CreateGroup(ctx, treasurer.ID, CreateGroupRequest{Name: "200L Dues"})
+	group, err := svc.CreateGroup(ctx, treasurer.ID, testGroupRequest("200L Dues"))
 	if err != nil {
 		t.Fatalf("CreateGroup: %v", err)
 	}

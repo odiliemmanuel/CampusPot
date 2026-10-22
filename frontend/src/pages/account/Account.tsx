@@ -1,16 +1,17 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  ArrowDownLeft, ArrowUpRight, Banknote, ChevronDown, Check, Copy, Landmark,
-  Loader2, PiggyBank, Plus, QrCode, Send, Wallet, X,
+  AlertTriangle, ArrowDownLeft, ArrowUpRight, Banknote, CheckCircle2, ChevronDown,
+  Check, Copy, Landmark, Loader2, PiggyBank, Plus, QrCode, Send, Wallet, X,
 } from "lucide-react";
 
 import AppShell from "../../layouts/AppShell";
 import {
-  getAccountOverview, getStoredUser, getWallet, walletDeposit, walletTransfer,
-  walletPayPot, type AccountOverview, type PotMembership, type WalletOverview,
-  type WalletTransaction,
+  getAccountOverview, getStoredUser, getWallet, listBanks, lookupUser, verifyBankAccount,
+  walletDeposit, walletTransfer,
+  walletPayPot, type AccountOverview, type BankOption, type LookedUpUser, type PotMembership,
+  type VerifiedAccount, type WalletOverview, type WalletTransaction,
 } from "../../lib/api";
 import { formatNaira, nairaToKobo } from "../../lib/format";
 
@@ -122,11 +123,11 @@ function AmountInput({ amount, setAmount }: { amount: string; setAmount: (v: str
   );
 }
 
-function SubmitButton({ busy, label }: { busy: boolean; label: string }) {
+function SubmitButton({ busy, label, disabled = false }: { busy: boolean; label: string; disabled?: boolean }) {
   return (
     <button
       type="submit"
-      disabled={busy}
+      disabled={busy || disabled}
       className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 font-semibold text-white transition disabled:opacity-60 ${WALLET_GRADIENT}`}
     >
       {busy ? <><Loader2 className="h-4 w-4 animate-spin" /> Working…</> : label}
@@ -174,29 +175,120 @@ function AddMoneySheet({ onClose, onDone }: { onClose: () => void; onDone: () =>
   );
 }
 
+const FALLBACK_BANKS: BankOption[] = [
+  { name: "GTBank", code: "058" }, { name: "Zenith Bank", code: "057" },
+  { name: "Access Bank", code: "044" }, { name: "First Bank of Nigeria", code: "011" },
+  { name: "United Bank for Africa", code: "033" },
+];
+
+/** Amber warning: low balance, so the sender knows before they commit. */
+function LowBalanceAlert({ needed, available }: { needed: number; available: number }) {
+  return (
+    <p className="flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-[12px] font-medium text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+      <span>
+        Low balance — this send is {formatNaira(needed)} but your wallet only holds {formatNaira(available)}.
+      </span>
+    </p>
+  );
+}
+
+/** Green confirmation of WHO receives the money, shown before any send. */
+function RecipientConfirm({ label, detail }: { label: string; detail: string }) {
+  return (
+    <div className="flex items-start gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+      <div className="min-w-0">
+        <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+          You&apos;re sending to
+        </p>
+        <p className="truncate text-sm font-bold text-emerald-900 dark:text-emerald-200">{label}</p>
+        <p className="truncate text-[11px] text-emerald-700/80 dark:text-emerald-300/80">{detail}</p>
+      </div>
+    </div>
+  );
+}
+
 function SendSheet({ balanceKobo, onClose, onDone }: { balanceKobo: number; onClose: () => void; onDone: () => void }) {
   const [mode, setMode] = useState<"member" | "bank">("member");
   const [amount, setAmount] = useState("");
   const [recipient, setRecipient] = useState("");
-  const [bank, setBank] = useState(BANKS[0]);
+  const [banks, setBanks] = useState<BankOption[]>(FALLBACK_BANKS);
+  const [bank, setBank] = useState(FALLBACK_BANKS[0].name);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  // Name enquiry results — the recipient is confirmed before money moves.
+  const [verified, setVerified] = useState<VerifiedAccount | null>(null);
+  const [lookedUp, setLookedUp] = useState<LookedUpUser | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [checkError, setCheckError] = useState("");
+  const verifySeq = useRef(0);
+
+  // Load the real bank list once; the fallback keeps the demo working offline.
+  useEffect(() => {
+    listBanks()
+      .then((list) => { if (list.length > 0) { setBanks(list); setBank((b) => b || list[0].name); } })
+      .catch(() => { /* keep fallbacks */ });
+  }, []);
+
+  // Look the recipient up whenever it changes, debounced. A stale response is
+  // dropped by comparing sequence numbers.
+  const refreshLookup = useCallback((value: string, currentMode: "member" | "bank", currentBank: string) => {
+    const seq = ++verifySeq.current;
+    const target = value.trim();
+    setVerified(null); setLookedUp(null); setCheckError("");
+    if (currentMode === "bank") {
+      if (!/^\d{10}$/.test(target)) return;
+      setChecking(true);
+      verifyBankAccount(target, currentBank)
+        .then((v) => { if (seq === verifySeq.current) setVerified(v); })
+        .catch((err) => {
+          if (seq !== verifySeq.current) return;
+          setCheckError(err instanceof Error ? err.message : "We couldn't confirm that account.");
+        })
+        .finally(() => { if (seq === verifySeq.current) setChecking(false); });
+      return;
+    }
+    if (target.length < 3) return;
+    setChecking(true);
+    lookupUser(target)
+      .then((u) => { if (seq === verifySeq.current) setLookedUp(u); })
+      .catch((err) => {
+        if (seq !== verifySeq.current) return;
+        setCheckError(err instanceof Error ? err.message : "No PotKeeper account matches that.");
+      })
+      .finally(() => { if (seq === verifySeq.current) setChecking(false); });
+  }, []);
+
+  useEffect(() => { refreshLookup(recipient, mode, bank); }, [recipient, mode, bank, refreshLookup]);
+
+  const amountKobo = nairaToKobo(amount);
+  const overBalance = amountKobo > balanceKobo;
+  const confirmed = mode === "member" ? !!lookedUp : !!verified;
+  const canSend = confirmed && !checking && amountKobo > 0 && !overBalance;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const kobo = nairaToKobo(amount);
     if (kobo <= 0) { setError("Enter an amount to send."); return; }
+    if (overBalance) { setError("Top up your wallet before sending this amount."); return; }
     if (!recipient.trim()) {
       setError(mode === "member" ? "Enter the recipient's email or phone." : "Enter the account number.");
+      return;
+    }
+    if (!confirmed) {
+      setError(mode === "member" ? "Confirm the recipient's PotKeeper account first." : "Confirm the bank account holder's name first.");
       return;
     }
     setError(""); setBusy(true);
     try {
       if (mode === "member") {
-        await walletTransfer(kobo, recipient.trim(), note || `Sent to ${recipient.trim()}`);
+        await walletTransfer(kobo, recipient.trim(), note || `Sent to ${lookedUp!.name}`);
       } else {
-        await walletTransfer(kobo, recipient.trim(), note || `Sent to ${bank}`, bank);
+        const chosen = banks.find((b) => b.name === bank);
+        await walletTransfer(kobo, recipient.trim(), note || `Sent to ${verified!.accountHolderName}`, verified!.bankName, chosen?.code ?? verified!.bankCode);
       }
       onDone();
     } catch (err) {
@@ -237,14 +329,14 @@ function SendSheet({ balanceKobo, onClose, onDone }: { balanceKobo: number; onCl
             <label className="block">
               <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Bank</span>
               <select value={bank} onChange={(e) => setBank(e.target.value)} className="cp-input mt-1">
-                {BANKS.map((b) => <option key={b} value={b}>{b}</option>)}
+                {banks.map((b) => <option key={b.code} value={b.name}>{b.name}</option>)}
               </select>
             </label>
             <label className="block">
               <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Account number</span>
               <input
                 value={recipient}
-                onChange={(e) => setRecipient(e.target.value)}
+                onChange={(e) => setRecipient(e.target.value.replace(/[^0-9]/g, "").slice(0, 10))}
                 placeholder="0123456789"
                 inputMode="numeric"
                 className="cp-input mt-1"
@@ -253,16 +345,42 @@ function SendSheet({ balanceKobo, onClose, onDone }: { balanceKobo: number; onCl
           </div>
         )}
 
+        {/* Name enquiry — confirm who receives the money before sending. */}
+        {checking && (
+          <p className="flex items-center gap-2 text-[12px] text-slate-500 dark:text-slate-400">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking recipient…
+          </p>
+        )}
+        {!checking && verified && (
+          <RecipientConfirm
+            label={verified.accountHolderName}
+            detail={`${verified.bankName} · ${verified.accountNumber}`}
+          />
+        )}
+        {!checking && lookedUp && (
+          <RecipientConfirm
+            label={lookedUp.name}
+            detail={`PotKeeper · ${lookedUp.email || lookedUp.phone || ""}`}
+          />
+        )}
+        {!checking && checkError && (
+          <p className="flex items-start gap-2 rounded-xl bg-rose-50 px-3 py-2 text-[12px] font-medium text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{checkError}</span>
+          </p>
+        )}
+
         <AmountInput amount={amount} setAmount={setAmount} />
+        {overBalance && <LowBalanceAlert needed={amountKobo} available={balanceKobo} />}
         <label className="block">
           <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Note (optional)</span>
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="What's it for?" className="cp-input mt-1" />
         </label>
         <p className="text-[11px] text-slate-400">
-          Wallet balance: {money(balanceKobo)}. Sending to a registered PotKeeper user credits their wallet instantly; a bank send is an external payout.
+          Wallet balance: {money(balanceKobo)}. We check the recipient's name before any money leaves your wallet.
         </p>
         {error && <p className="text-sm text-violet-600">{error}</p>}
-        <SubmitButton busy={busy} label="Send money" />
+        <SubmitButton busy={busy} disabled={!canSend} label={canSend ? "Send money" : checking ? "Checking…" : "Confirm recipient to send"} />
       </form>
     </Sheet>
   );

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/google/uuid"
@@ -75,14 +76,33 @@ func (m *MockClient) ListNigerianBanks(_ context.Context, _ string) ([]Bank, err
 		{Name: "Access Bank", Code: "044"},
 		{Name: "First Bank of Nigeria", Code: "011"},
 		{Name: "United Bank for Africa", Code: "033"},
+		{Name: "Opay", Code: "999999"},
+		{Name: "Kuda", Code: "999992"},
+		{Name: "Moniepoint", Code: "999991"},
 	}, nil
 }
 
+// VerifyNigerianAccount resolves an account holder's name (name enquiry).
+// Account numbers starting with "000" are treated as nonexistent so the demo
+// can show the "account does not exist" alert; everything else resolves to a
+// deterministic sandbox holder name.
 func (m *MockClient) VerifyNigerianAccount(_ context.Context, _, accountNumber, bankCode string) (AccountHolder, error) {
-	if len(accountNumber) != 10 {
+	if len(accountNumber) != 10 || !allDigits(accountNumber) {
 		return AccountHolder{}, fmt.Errorf("bmoni(mock): account number must be 10 digits")
 	}
+	if strings.HasPrefix(accountNumber, "000") {
+		return AccountHolder{}, fmt.Errorf("bmoni(mock): account %s does not exist at bank %s", accountNumber, bankCode)
+	}
 	return AccountHolder{Name: fmt.Sprintf("SANDBOX HOLDER %s/%s", bankCode, accountNumber[6:])}, nil
+}
+
+func allDigits(s string) bool {
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func (m *MockClient) RegisterWithdrawalAccount(_ context.Context, req RegisterWithdrawalRequest) (WithdrawalAccount, error) {

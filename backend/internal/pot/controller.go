@@ -79,6 +79,47 @@ func (ct *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.POST("/wallet/deposit", ct.walletDeposit)
 	rg.POST("/wallet/transfer", ct.walletTransfer)
 	rg.POST("/wallet/pay", ct.walletPayPot)
+
+	// Name enquiry — confirm WHO an account belongs to before sending money.
+	rg.GET("/banks", ct.listBanks)
+	rg.POST("/banks/verify", ct.verifyBankAccount)
+	rg.GET("/users/lookup", ct.lookupUser)
+}
+
+func (ct *Controller) listBanks(c *gin.Context) {
+	banks, err := ct.svc.ListBanks(c.Request.Context(), auth.MustUserID(c))
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, banks)
+}
+
+func (ct *Controller) verifyBankAccount(c *gin.Context) {
+	var req struct {
+		AccountNumber string `json:"accountNumber" binding:"required"`
+		BankName      string `json:"bankName"`
+		BankCode      string `json:"bankCode"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "INVALID_BODY", err.Error())
+		return
+	}
+	verified, err := ct.svc.VerifyBankAccount(c.Request.Context(), auth.MustUserID(c), req.AccountNumber, req.BankName, req.BankCode)
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, verified)
+}
+
+func (ct *Controller) lookupUser(c *gin.Context) {
+	user, err := ct.svc.LookupUser(c.Request.Context(), c.Query("recipient"))
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, user)
 }
 
 func (ct *Controller) createGroup(c *gin.Context) {
@@ -746,6 +787,8 @@ func respondErr(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, ErrNotFound):
 		response.Error(c, http.StatusNotFound, "NOT_FOUND", err.Error())
+	case errors.Is(err, ErrAccountNotFound):
+		response.Error(c, http.StatusNotFound, "ACCOUNT_NOT_FOUND", err.Error())
 	case errors.Is(err, ErrForbidden):
 		response.Error(c, http.StatusForbidden, "FORBIDDEN", "you do not have access to this action")
 	case errors.Is(err, ErrConflict):
