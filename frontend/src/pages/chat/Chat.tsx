@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowDownToLine, ArrowLeft, File as FileIcon, FileText, Loader2, MessageSquare, Mic, Pause, Paperclip, Play, Send, Square, X } from "lucide-react";
+import { ArrowDownToLine, ArrowLeft, Eye, EyeOff, File as FileIcon, FileText, Loader2, MessageSquare, Mic, Pause, Paperclip, Play, Send, Square, X } from "lucide-react";
 
 import { useGroup } from "../../providers/GroupProvider";
 import {
@@ -57,13 +57,13 @@ function AudioAttachment({ src }: { src: string }) {
         onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
         onEnded={() => { setPlaying(false); setCurrentTime(0); }}
       />
-      <button type="button" onClick={() => void toggle()} aria-label={playing ? "Pause voice note" : "Play voice note"} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-violet-700 text-white shadow-sm transition hover:bg-violet-600">
+      <button type="button" onClick={() => void toggle()} aria-label={playing ? "Pause voice note" : "Play voice note"} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#008f76] text-white shadow-sm transition hover:bg-[#007e69] dark:bg-[#00a884] dark:hover:bg-[#00bf9a]">
         {playing ? <Pause className="h-4 w-4 fill-current" /> : <Play className="ml-0.5 h-4 w-4 fill-current" />}
       </button>
       <div className="min-w-0 flex-1">
         <div className="flex h-7 items-center gap-[2px]" aria-label="Voice note waveform">
           {bars.map((height, i) => (
-            <span key={i} className={`min-w-[2px] flex-1 rounded-full ${i / bars.length <= progress ? "bg-violet-600 dark:bg-violet-300" : "bg-slate-400/60 dark:bg-slate-400/50"}`} style={{ height: `${height}px` }} />
+            <span key={i} className={`min-w-[2px] flex-1 rounded-full ${i / bars.length <= progress ? "bg-[#008f76] dark:bg-[#00a884]" : "bg-slate-400/60 dark:bg-slate-400/50"}`} style={{ height: `${height}px` }} />
           ))}
         </div>
         <div className="mt-0.5 flex items-center justify-between text-[10px] tabular-nums opacity-70">
@@ -96,17 +96,17 @@ function ChatAttachment({ message }: { message: ChatMessage }) {
   const isPdf = message.attachmentType === "application/pdf" || message.attachmentName?.toLowerCase().endsWith(".pdf");
   if (isAudio) return <AudioAttachment src={url} />;
   return <>
-    <div className="mt-2 w-[min(18rem,74vw)] max-w-full overflow-hidden rounded-xl border border-current/10 bg-slate-900/[0.04] dark:bg-black/15">
+    <div className="mt-2 w-[min(18rem,74vw)] max-w-full overflow-hidden rounded-xl bg-black/[0.045] text-[#111b21] dark:bg-black/20 dark:text-[#e9edef]">
       <div className="flex items-center gap-2.5 p-2.5">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-600/10 text-violet-700 dark:text-violet-300">{isImage ? <FileIcon className="h-5 w-5" /> : <FileText className="h-5 w-5" />}</span>
+        <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg text-white ${isImage ? "bg-[#00a884]" : "bg-[#667781]"}`}>{isImage ? <FileIcon className="h-5 w-5" /> : <FileText className="h-5 w-5" />}</span>
         <span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold">{message.attachmentName || "Shared file"}</span><span className="block text-[10px] opacity-60">{isImage ? "Image" : isPdf ? "PDF document" : "File attachment"}</span></span>
         <button type="button" onClick={() => setShowDownload(true)} className="grid h-8 w-8 shrink-0 place-items-center rounded-full transition hover:bg-slate-900/10 dark:hover:bg-white/10" aria-label="Download attachment"><ArrowDownToLine className="h-4 w-4 opacity-80" /></button>
       </div>
       <div className="flex border-t border-current/10">
-        <button type="button" onClick={() => setShowPreview((visible) => !visible)} aria-expanded={showPreview} className="flex min-h-9 flex-1 items-center justify-center gap-1.5 text-[11px] font-semibold text-violet-700 transition hover:bg-violet-500/10 dark:text-violet-300">
-          {showPreview ? "Hide file" : "View file"}
+        <button type="button" onClick={() => setShowPreview((visible) => !visible)} aria-expanded={showPreview} className="flex min-h-9 flex-1 items-center justify-center gap-1.5 text-[11px] font-semibold text-[#008f76] transition hover:bg-black/5 dark:text-[#00a884] dark:hover:bg-white/5">
+          {showPreview ? <><EyeOff className="h-3.5 w-3.5" /> Hide file</> : <><Eye className="h-3.5 w-3.5" /> View file</>}
         </button>
-        <button type="button" onClick={() => setShowDownload(true)} className="border-l border-current/10 px-3 text-[11px] font-semibold opacity-70 transition hover:bg-slate-900/5 dark:hover:bg-white/5">Download</button>
+        <button type="button" onClick={() => setShowDownload(true)} className="border-l border-black/10 px-3 text-[11px] font-semibold opacity-70 transition hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5">Download</button>
       </div>
       {showPreview && <div className="border-t border-current/10 p-2">
         {isImage ? <img className="max-h-64 w-full rounded-lg object-contain" src={url} alt={message.attachmentName || "Shared image"} /> : isPdf ? <iframe title={message.attachmentName || "PDF preview"} src={url} className="h-64 w-full rounded-lg bg-white" /> : <p className="px-2 py-4 text-center text-[11px] opacity-70">Preview isn’t available for this file type. Download it to open.</p>}
@@ -291,8 +291,8 @@ function ChatRoom({ groupId, groupName }: { groupId: string; groupName: string }
   const clock = (seconds: number) => `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col overflow-hidden bg-[#f7f5ff] dark:bg-[#100c1c] lg:bottom-0 lg:left-60">
-      <div className="flex items-center gap-3 border-b border-white/10 bg-[#4c1d95] px-3 pb-3 pt-[max(.75rem,env(safe-area-inset-top))] text-white shadow-lg sm:px-5">
+    <div className="fixed inset-0 z-40 flex flex-col overflow-hidden bg-[#efeae2] text-[#111b21] dark:bg-[#0b141a] dark:text-[#e9edef] lg:bottom-0 lg:left-60">
+      <div className="flex items-center gap-3 border-b border-black/5 bg-[#008069] px-3 pb-3 pt-[max(.75rem,env(safe-area-inset-top))] text-white shadow-lg dark:border-white/5 dark:bg-[#202c33] sm:px-5">
         <Link
           to={`/pots/${id}`}
           className="rounded-full p-2 text-white/75 transition hover:bg-white/10 hover:text-white"
@@ -300,18 +300,18 @@ function ChatRoom({ groupId, groupName }: { groupId: string; groupName: string }
         >
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-violet-400 to-purple-700 font-sora font-extrabold text-white shadow-md shadow-violet-950/30">
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#00a884] font-sora font-extrabold text-white shadow-md shadow-black/10">
           {(groupName || "?").charAt(0).toUpperCase()}
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate font-sora text-sm font-bold text-white">{groupName}</p>
-          <p className="flex items-center gap-1.5 truncate text-[11px] text-violet-100/70">
-            <span className="h-1.5 w-1.5 rounded-full bg-violet-300 shadow-[0_0_8px_#c4b5fd]" /> {participants.length} member{participants.length === 1 ? "" : "s"} · live pot room
+          <p className="flex items-center gap-1.5 truncate text-[11px] text-white/75">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#b9f5d0]" /> {participants.length} member{participants.length === 1 ? "" : "s"} · live pot room
           </p>
         </div>
       </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,.09),_transparent_48%)] px-3 py-4 sm:px-6 sm:py-6">
+      <div className="flex-1 space-y-2.5 overflow-y-auto bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,.35)_0_1px,transparent_1.5px),radial-gradient(circle_at_80%_60%,rgba(255,255,255,.28)_0_1px,transparent_1.5px)] bg-[length:28px_28px] px-3 py-4 sm:px-6 sm:py-6 dark:bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,.035)_0_1px,transparent_1.5px),radial-gradient(circle_at_80%_60%,rgba(255,255,255,.025)_0_1px,transparent_1.5px)]">
         {loading ? (
           <div className="flex justify-center py-10">
             <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
@@ -334,8 +334,8 @@ function ChatRoom({ groupId, groupName }: { groupId: string; groupName: string }
                   className={[
                     "max-w-[90%] rounded-[1.35rem] px-3.5 py-2.5 shadow-sm sm:max-w-[70%]",
                     mine
-                      ? "rounded-br-md bg-gradient-to-br from-violet-700 to-purple-800 text-white shadow-violet-900/10"
-                      : "rounded-bl-md border border-slate-200/80 bg-white text-slate-800 dark:border-white/10 dark:bg-[#142335] dark:text-slate-100",
+                      ? "rounded-br-md bg-[#d9fdd3] text-[#111b21] shadow-black/5 dark:bg-[#005c4b] dark:text-[#e9edef]"
+                      : "rounded-bl-md border border-black/[0.035] bg-white text-[#111b21] dark:border-white/5 dark:bg-[#202c33] dark:text-[#e9edef]",
                   ].join(" ")}
                 >
                   {showName && (
@@ -406,23 +406,23 @@ function ChatRoom({ groupId, groupName }: { groupId: string; groupName: string }
         </div>
       )}
 
-      {error && <p role="status" className="bg-violet-50 px-3 py-2 text-xs text-violet-600 dark:bg-violet-500/10">{error}</p>}
+      {error && <p role="status" className="bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">{error}</p>}
 
-      {voiceDraft && voiceDraftUrl && <div className="flex items-center gap-3 border-t border-violet-100 bg-violet-50/80 px-3 py-2.5 dark:border-violet-300/10 dark:bg-violet-950/30 sm:px-5">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-violet-700 shadow-sm dark:bg-white/10 dark:text-violet-200"><Mic className="h-4 w-4" /></span>
-        <div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">Voice note ready · {clock(recordingSeconds)}</p><audio className="mt-1 h-8 w-full max-w-xs" controls src={voiceDraftUrl} /></div>
+      {voiceDraft && voiceDraftUrl && <div className="flex items-center gap-3 border-t border-[#d9e5dd] bg-[#f0f2f5] px-3 py-2.5 dark:border-white/5 dark:bg-[#202c33] sm:px-5">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#00a884] text-white shadow-sm"><Mic className="h-4 w-4" /></span>
+        <div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">Voice note ready · {clock(recordingSeconds)}</p><AudioAttachment src={voiceDraftUrl} /></div>
         <button type="button" onClick={() => { setVoiceDraft(null); setVoiceDraftUrl(""); setRecordingSeconds(0); }} className="rounded-full p-2 text-slate-500 hover:bg-white dark:hover:bg-white/10" aria-label="Discard voice note"><X className="h-4 w-4" /></button>
-        <button type="button" onClick={sendVoiceNote} disabled={uploading} className="flex shrink-0 items-center gap-1.5 rounded-xl bg-violet-700 px-3.5 py-2.5 text-xs font-bold text-white shadow-md shadow-violet-950/15 transition hover:bg-violet-600 disabled:opacity-50"><Send className="h-3.5 w-3.5" />{uploading ? "Sending" : "Send audio"}</button>
+        <button type="button" onClick={sendVoiceNote} disabled={uploading} className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#008f76] px-3.5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#007e69] disabled:opacity-50 dark:bg-[#00a884] dark:hover:bg-[#00bf9a]"><Send className="h-3.5 w-3.5" />{uploading ? "Sending" : "Send audio"}</button>
       </div>}
 
-      <div className="border-t border-slate-200/80 bg-white/90 p-2.5 pb-[max(.65rem,env(safe-area-inset-bottom))] backdrop-blur-xl dark:border-white/10 dark:bg-[#0c1927]/95 sm:px-5">
+      <div className="border-t border-black/5 bg-[#f0f2f5] p-2.5 pb-[max(.65rem,env(safe-area-inset-bottom))] dark:border-white/5 dark:bg-[#202c33] sm:px-5">
         {recording && <div className="mb-2 flex items-center gap-2 px-1 text-xs font-semibold text-violet-600 dark:text-violet-300"><span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400 opacity-75" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-violet-500" /></span>Recording voice note <span className="font-mono">{clock(recordingSeconds)}</span><span className="ml-auto flex h-4 items-center gap-0.5" aria-hidden="true">{[1, 2, 3, 4, 5, 6, 7].map((n) => <span key={n} className="w-1 animate-pulse rounded-full bg-violet-400" style={{ height: `${6 + (n % 4) * 3}px`, animationDelay: `${n * 90}ms` }} />)}</span></div>}
         <div className="flex items-end gap-2">
         <input ref={fileInput} type="file" className="hidden" onChange={(e) => { void upload(e.target.files?.[0]); e.currentTarget.value = ""; }} />
-        <button type="button" onClick={() => fileInput.current?.click()} disabled={uploading || recording || !!voiceDraft} className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-slate-500 transition hover:bg-violet-50 hover:text-violet-700 disabled:opacity-40 dark:text-slate-300 dark:hover:bg-white/10" aria-label="Attach file">
+        <button type="button" onClick={() => fileInput.current?.click()} disabled={uploading || recording || !!voiceDraft} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-[#54656f] transition hover:bg-white hover:text-[#008f76] disabled:opacity-40 dark:text-[#aebac1] dark:hover:bg-[#2a3942] dark:hover:text-[#00a884]" aria-label="Attach file">
           {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Paperclip className="h-5 w-5" />}
         </button>
-        <button type="button" onClick={recording ? () => stopRecording(false) : startRecording} disabled={!!voiceDraft} className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl transition ${recording ? "bg-violet-500 text-white shadow-lg shadow-violet-900/25" : "text-slate-500 hover:bg-violet-50 hover:text-violet-700 dark:text-slate-300 dark:hover:bg-white/10"}`} aria-label={recording ? "Finish voice note" : "Record voice note"}>
+        <button type="button" onClick={recording ? () => stopRecording(false) : startRecording} disabled={!!voiceDraft} className={`grid h-11 w-11 shrink-0 place-items-center rounded-full transition ${recording ? "bg-rose-500 text-white shadow-lg shadow-rose-900/20" : "text-[#54656f] hover:bg-white hover:text-[#008f76] dark:text-[#aebac1] dark:hover:bg-[#2a3942] dark:hover:text-[#00a884]"}`} aria-label={recording ? "Finish voice note" : "Record voice note"}>
           {recording ? <Square className="h-4 w-4 fill-current" /> : <Mic className="h-5 w-5" />}
         </button>
         {recording && <button type="button" onClick={() => stopRecording(true)} className="grid h-11 w-9 shrink-0 place-items-center rounded-xl text-slate-500 hover:bg-violet-50 hover:text-violet-600 dark:text-slate-300 dark:hover:bg-violet-500/10" aria-label="Cancel recording"><X className="h-4 w-4" /></button>}
@@ -437,14 +437,14 @@ function ChatRoom({ groupId, groupName }: { groupId: string; groupName: string }
           }}
           rows={1}
           placeholder={recording ? "Tap the square to finish your recording" : "Write a message…"}
-          className="max-h-32 min-h-11 flex-1 resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:border-white/10 dark:bg-[#142335] dark:text-white"
+          className="max-h-32 min-h-11 flex-1 resize-none rounded-2xl border border-black/5 bg-white px-4 py-3 text-sm text-[#111b21] placeholder:text-[#667781] focus:border-[#00a884] focus:outline-none focus:ring-2 focus:ring-[#00a884]/20 dark:border-white/5 dark:bg-[#2a3942] dark:text-[#e9edef] dark:placeholder:text-[#8696a0]"
           disabled={recording || !!voiceDraft}
         />
         <button
           type="button"
           onClick={send}
           disabled={sending || !body.trim()}
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-violet-700 to-violet-500 text-white shadow-lg shadow-violet-900/20 transition hover:brightness-105 disabled:opacity-45"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#008f76] text-white shadow-sm transition hover:bg-[#007e69] disabled:opacity-45 dark:bg-[#00a884] dark:hover:bg-[#00bf9a]"
           aria-label="Send"
         >
           {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
