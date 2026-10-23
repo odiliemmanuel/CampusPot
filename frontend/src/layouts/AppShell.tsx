@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import MobileNav from "./MobileNav";
+import InstallButton from "../components/InstallButton";
 
 // Shared authenticated shell: navigation stays violet while the page canvas
 // and shared surfaces follow the selected theme.
@@ -20,6 +21,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
       </div>
 
       <MobileNav />
+      {/* Floating install prompt — only shows while running in a browser tab. */}
+      <InstallButton />
     </div>
   );
 }
