@@ -42,10 +42,19 @@ function dismissed(): boolean {
  * straight from the captured prompt; iOS Safari gets Share → Add to Home
  * Screen instructions since Apple exposes no install prompt.
  */
-export default function InstallButton() {
+export default function InstallButton({ mobileOnly = false, label = "Install app" }: { mobileOnly?: boolean; label?: string }) {
   const [visible, setVisible] = useState(false);
   const [prompt, setPrompt] = useState<InstallPromptEvent | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [installAvailable, setInstallAvailable] = useState(false);
+  const [mobileView, setMobileView] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches);
+
+  useEffect(() => {
+    const updateViewport = () => setMobileView(window.matchMedia("(max-width: 767px)").matches);
+    updateViewport();
+    window.addEventListener("resize", updateViewport);
+    return () => window.removeEventListener("resize", updateViewport);
+  }, []);
 
   useEffect(() => {
     if (isStandalone() || dismissed()) return;
@@ -53,9 +62,10 @@ export default function InstallButton() {
     const onPrompt = (event: Event) => {
       event.preventDefault();
       setPrompt(event as InstallPromptEvent);
-      setVisible(true);
+      setInstallAvailable(true);
     };
     const onInstalled = () => {
+      setInstallAvailable(false);
       setVisible(false);
       setShowHelp(false);
     };
@@ -65,13 +75,19 @@ export default function InstallButton() {
 
     // iOS never fires beforeinstallprompt, but the button is still useful
     // there because it explains how to install from the browser.
-    if (isIOS()) setVisible(true);
+    if (isIOS()) setInstallAvailable(true);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", onPrompt);
       window.removeEventListener("appinstalled", onInstalled);
     };
   }, []);
+
+  useEffect(() => {
+    const shouldShow = installAvailable && (!mobileOnly || mobileView) && !isStandalone() && !dismissed();
+    setVisible(shouldShow);
+    if (!shouldShow) setShowHelp(false);
+  }, [installAvailable, mobileOnly, mobileView]);
 
   const install = async () => {
     if (!prompt) {
@@ -101,7 +117,9 @@ export default function InstallButton() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 16 }}
-            className="fixed bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] right-3 z-40 flex items-center gap-1 sm:bottom-6 sm:right-6"
+            className={mobileOnly
+              ? "fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-3 z-40 flex items-center gap-1 sm:hidden"
+              : "fixed bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] right-3 z-40 flex items-center gap-1 sm:bottom-6 sm:right-6"}
           >
             <button
               type="button"
@@ -109,7 +127,7 @@ export default function InstallButton() {
               className="inline-flex items-center gap-2 rounded-full bg-gradient-to-br from-violet-600 to-purple-800 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-900/30 transition active:scale-95"
             >
               <Download className="h-4 w-4" />
-              Install app
+              {label}
             </button>
             <button
               type="button"

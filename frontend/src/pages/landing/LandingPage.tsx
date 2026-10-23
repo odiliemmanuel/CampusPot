@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import InstallButton from "../../components/InstallButton";
 import {
   ArrowDown, ArrowRight, ArrowUpRight, Check, CheckCircle2, ChevronDown,
   CircleHelp, Eye, HandCoins, LockKeyhole, MessageCircle, PieChart,
@@ -104,6 +105,7 @@ export default function LandingPage() {
 
   return (
     <main className="overflow-hidden bg-white text-slate-900">
+      <InstallButton mobileOnly label="Download app" />
       <header className="relative z-10 border-b border-slate-100/80 bg-white">
         <nav className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-3 sm:px-8 sm:py-4 lg:px-12" aria-label="Main navigation">
           <Brand />
