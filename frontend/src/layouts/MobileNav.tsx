@@ -37,11 +37,6 @@ export default function MobileNav() {
           {t("nav.pots")}
         </NavLink>
 
-        <NavLink to="/pots#discover-public-pots" className={itemClass(false)}>
-          <Compass className="h-5 w-5" />
-          Discover
-        </NavLink>
-
         <button
           type="button"
           onClick={() => navigate("/pots/new")}
@@ -50,6 +45,11 @@ export default function MobileNav() {
         >
           <Plus className="h-6 w-6" />
         </button>
+
+        <NavLink to="/pots#discover-public-pots" className={itemClass(false)}>
+          <Compass className="h-5 w-5" />
+          Discover
+        </NavLink>
 
         <NavLink to="/settings" className={itemClass(settingsActive)}>
           <Settings className="h-5 w-5" />

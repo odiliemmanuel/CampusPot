@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  AlertTriangle, ArrowDownLeft, ArrowUpRight, Banknote, BadgeCheck, Bell, CalendarClock, Compass,
+  AlertTriangle, ArrowDownLeft, ArrowUpRight, Bell, CalendarClock, Compass,
   CheckCircle2, ChevronDown, Check, Copy, Landmark, Loader2, PiggyBank,
   Plus, QrCode, Send, ShieldCheck, Trash2, Wallet, X,
 } from "lucide-react";
@@ -759,45 +759,21 @@ function txMeta(kind: WalletTransaction["kind"], amount: number) {
   }
 }
 
-/** Email + identity verification status, with the actions to fix either. */
+/** Compact email verification prompt shown only while the address is unverified. */
 function VerificationCard() {
   const me = getStoredUser();
-  const emailVerified = me?.emailVerified ?? false;
+  if (me?.emailVerified) return null;
+
   const startEmail = () => window.location.assign(`/verify-email?email=${encodeURIComponent(me?.email ?? "")}`);
-
   return (
-    <section className="cp-card rounded-2xl p-4">
-      <div className="flex items-center gap-2">
-        <ShieldCheck className="h-4 w-4 text-violet-600" />
-        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Email verification</p>
+    <section className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-400/20 dark:bg-amber-500/10">
+      <div className="flex min-w-0 items-center gap-2">
+        <ShieldCheck className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300" />
+        <p className="text-xs font-medium leading-snug text-amber-800 dark:text-amber-200">Verify your email to send money</p>
       </div>
-
-      <div className="mt-3 space-y-2 text-xs">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-slate-500 dark:text-slate-400">Email</span>
-          {emailVerified ? (
-            <span className="inline-flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400">
-              <BadgeCheck className="h-3.5 w-3.5" /> Verified
-            </span>
-          ) : (
-            <button
-              type="button"
-              onClick={() => void startEmail()}
-              className="rounded-full bg-amber-50 px-3 py-1 font-semibold text-amber-700 transition hover:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-300"
-            >
-              Verify now
-            </button>
-          )}
-        </div>
-
-      </div>
-
-      {!emailVerified && (
-        <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
-          Confirm your email before sending money — it's the lock on your wallet.
-        </p>
-      )}
-
+      <button type="button" onClick={startEmail} className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 dark:bg-amber-400/10 dark:text-amber-200">
+        Verify
+      </button>
     </section>
   );
 }
@@ -913,28 +889,28 @@ function WalletHome() {
         </Link>
       </div>
 
-      {/* Compact balance strip keeps the wallet actions and pots in view. */}
-      <div className="relative flex min-h-[126px] items-start gap-3 overflow-hidden rounded-[1.6rem] bg-gradient-to-br from-violet-700 via-violet-700 to-purple-800 px-4 py-4 text-white shadow-md shadow-violet-950/10 sm:items-center sm:rounded-[1.5rem] sm:px-6 sm:py-4">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/10 text-white ring-1 ring-white/15"><Wallet className="h-4 w-4" /></span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-medium text-violet-100/80">Available balance</p>
-          <p className="mt-1 truncate font-sora text-2xl font-extrabold tracking-tight text-white sm:text-3xl">{money(balance)}</p>
-          <div className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[11px]">
-            <span className="shrink-0 text-violet-100/70">Wallet number</span>
-            <span className="truncate font-semibold tracking-wide text-white">{me?.phone || "Add your phone in settings"}</span>
-            {me?.phone && <button type="button" onClick={() => void navigator.clipboard?.writeText(me.phone!)} aria-label="Copy wallet number" className="shrink-0 rounded-md p-1 text-white/80 hover:bg-white/10"><Copy className="h-3 w-3" /></button>}
+      {/* Compact balance card: amount and funding action share the top row. */}
+      <div className="overflow-hidden rounded-[1.4rem] bg-gradient-to-br from-violet-700 via-violet-700 to-purple-800 px-4 py-3.5 text-white shadow-md shadow-violet-950/10 sm:rounded-[1.5rem] sm:px-6 sm:py-4">
+        <div className="flex min-w-0 items-center justify-between gap-2.5">
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-medium text-violet-100/80">Available balance</p>
+            <p className="mt-0.5 truncate font-sora text-xl font-extrabold tracking-tight text-white sm:text-3xl">{money(balance)}</p>
           </div>
+          <button type="button" onClick={() => setSheet("add")} className="shrink-0 rounded-full border border-white/25 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10 sm:px-4 sm:text-sm"><Plus className="mr-1 inline h-4 w-4" />Add money</button>
         </div>
-        <button type="button" onClick={() => setSheet("add")} className="shrink-0 rounded-full border border-white/25 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10 sm:px-4 sm:text-sm"><Plus className="mr-1 inline h-4 w-4" />Add money</button>
+        <div className="mt-2 flex min-w-0 items-center gap-1.5 border-t border-white/15 pt-2 text-[11px]">
+          <span className="shrink-0 text-violet-100/70">Wallet number</span>
+          <span className="truncate font-semibold tracking-wide text-white">{me?.phone || "Add your phone in settings"}</span>
+          {me?.phone && <button type="button" onClick={() => void navigator.clipboard?.writeText(me.phone!)} aria-label="Copy wallet number" className="shrink-0 rounded-md p-1 text-white/80 hover:bg-white/10"><Copy className="h-3 w-3" /></button>}
+        </div>
       </div>
 
       {/* Secondary actions — consistent tiles */}
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5 sm:gap-3">
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
         <QuickAction icon={<Send className="h-4 w-4" />} label="Send" onClick={() => setSheet("send")} />
         <QuickAction icon={<QrCode className="h-4 w-4" />} label="Join pot" to="/join" />
         <QuickAction icon={<Compass className="h-4 w-4" />} label="Find public pots" to="/pots#discover-public-pots" />
         <QuickAction icon={<Landmark className="h-4 w-4" />} label="Connect bank" to="/banks" />
-        <QuickAction icon={<PiggyBank className="h-4 w-4" />} label="My pots" to="/pots" />
       </div>
 
       <div className="mt-3"><VerificationCard /></div>
