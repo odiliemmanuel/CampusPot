@@ -50,9 +50,9 @@ function isInstalledPwa() {
 
 function Brand() {
   return (
-    <Link to="/" className="inline-flex items-center gap-2.5" aria-label="PotKeeper home">
-      <span className="grid h-10 w-10 place-items-center rounded-2xl bg-violet-700 text-white shadow-lg shadow-violet-900/15"><HandCoins className="h-5 w-5" /></span>
-      <span className="font-sora text-xl font-bold tracking-tight text-slate-950">PotKeeper</span>
+    <Link to="/" className="inline-flex shrink-0 items-center gap-2 sm:gap-2.5" aria-label="PotKeeper home">
+      <span className="grid h-9 w-9 place-items-center rounded-xl bg-violet-700 text-white shadow-lg shadow-violet-900/15 sm:h-10 sm:w-10 sm:rounded-2xl"><HandCoins className="h-4 w-4 sm:h-5 sm:w-5" /></span>
+      <span className="font-sora text-lg font-bold tracking-tight text-slate-950 sm:text-xl">PotKeeper</span>
     </Link>
   );
 }
@@ -105,13 +105,13 @@ export default function LandingPage() {
   return (
     <main className="overflow-hidden bg-white text-slate-900">
       <header className="relative z-10 border-b border-slate-100/80 bg-white">
-        <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8 lg:px-12" aria-label="Main navigation">
+        <nav className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-3 sm:px-8 sm:py-4 lg:px-12" aria-label="Main navigation">
           <Brand />
-          <div className="flex items-center gap-2 sm:gap-5">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-5">
             <a href="#how-it-works" className="hidden text-sm font-medium text-slate-600 transition hover:text-violet-700 sm:inline">How it works</a>
             <a href="#features" className="hidden text-sm font-medium text-slate-600 transition hover:text-violet-700 md:inline">Why PotKeeper</a>
-            <Link to="/login" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:px-4">Log in</Link>
-            <Link to="/signup" className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-violet-800 sm:px-5">Create a pot <ArrowUpRight className="h-4 w-4" /></Link>
+            <Link to="/login" className="rounded-lg px-2 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 sm:rounded-xl sm:px-4 sm:text-sm">Log in</Link>
+            <Link to="/signup" className="inline-flex items-center gap-1 rounded-lg bg-violet-700 px-2.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-violet-800 sm:gap-2 sm:rounded-xl sm:px-5 sm:py-2.5 sm:text-sm"><span className="sm:hidden">Sign up</span><span className="hidden sm:inline">Create a pot</span><ArrowUpRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" /></Link>
           </div>
         </nav>
       </header>
