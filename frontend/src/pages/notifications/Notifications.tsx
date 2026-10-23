@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, Bell, CalendarClock, CheckCheck, Gift, Gavel, HandCoins, Loader2,
+  ArrowLeft, Bell, CalendarClock, CheckCheck, Gavel, HandCoins, Loader2,
   Send, ShieldCheck, Undo2, Wallet,
 } from "lucide-react";
 
@@ -30,8 +30,6 @@ function kindIcon(kind: string) {
       return CalendarClock;
     case "refund":
       return Undo2;
-    case "referral":
-      return Gift;
     default:
       return ShieldCheck;
   }
@@ -82,7 +80,7 @@ function ForYouFeed() {
       ) : rows.length === 0 ? (
         <div className="px-4 py-8 text-center">
           <p className="text-sm text-slate-600 dark:text-slate-300">Nothing yet.</p>
-          <p className="mt-1 text-xs text-slate-400">Contributions, payouts, refunds and referral rewards land here.</p>
+          <p className="mt-1 text-xs text-slate-400">Contributions, payouts, refunds and pot updates land here.</p>
         </div>
       ) : (
         <div className="divide-y divide-violet-100/80 dark:divide-white/5">

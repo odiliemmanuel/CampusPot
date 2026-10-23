@@ -1,15 +1,9 @@
 package auth
 
-// Email verification, referral rewards, password reset and KYC live here.
+// Email verification and password reset live here.
 //
-// Security model:
-//   - Verification codes are 6 digits, stored only as a SHA-256 hash, expire
-//     after CodeTTLMinutes and are consumed on first use. Issuing a new code
-//     invalidates the previous one for that purpose.
-//   - A referral bonus is paid only once the referred account proves it owns
-//     the email address, so nobody can farm bonuses with throwaway sign-ups.
-//   - KYC runs through B Moni's Nigeria onboarding; until it passes, the pot
-//     engine caps how much the wallet can send (see internal/pot limits).
+// Verification codes are hashed, expire after CodeTTLMinutes, and are consumed
+// on first use. Issuing a new code invalidates the previous code for that purpose.
 
 import (
 	"context"
@@ -27,27 +21,15 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 
-	"github.com/odiliemmmanuel/campuspot/internal/bmoni"
 	"github.com/odiliemmmanuel/campuspot/internal/models"
 )
 
 // CodeTTLMinutes is how long an emailed verification code stays usable.
 const CodeTTLMinutes = 5
 
-// Referral rewards, in kobo. The referrer earns a bonus for each verified
-// invitee; the invitee gets a little extra welcome balance on top of the
-// standard demo balance.
-const (
-	referralRewardKobo  int64 = 100_000 // ₦1,000 to the referrer
-	referralWelcomeKobo int64 = 50_000  // ₦500 to the new account
-)
-
 // ErrInvalidCode is returned when a submitted code does not match, is expired
 // or was already used. The three cases are deliberately indistinguishable.
 var ErrInvalidCode = errors.New("that code is incorrect or has expired")
-
-// ErrCodeRequired means KYC (or another gated action) needs verification first.
-var ErrCodeRequired = errors.New("verification required")
 
 const otpAlphabet = "0123456789"
 
@@ -60,21 +42,6 @@ func generateOTP() (string, error) {
 			return "", err
 		}
 		b.WriteByte(otpAlphabet[n.Int64()])
-	}
-	return b.String(), nil
-}
-
-// generateReferralCode returns a short, human-typable code with ambiguous
-// characters (0/O, 1/I) removed.
-func generateReferralCode() (string, error) {
-	const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-	var b strings.Builder
-	for i := 0; i < 8; i++ {
-		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(alphabet))))
-		if err != nil {
-			return "", err
-		}
-		b.WriteByte(alphabet[n.Int64()])
 	}
 	return b.String(), nil
 }
@@ -214,8 +181,7 @@ func (s *Service) verifyCode(email, purpose, code string) (*models.User, error) 
 	return &user, nil
 }
 
-// VerifyEmail proves ownership of the address and pays any referral reward
-// that was waiting on it.
+// VerifyEmail proves ownership of the address.
 func (s *Service) VerifyEmail(_ context.Context, req VerifyOTPRequest) (*models.User, error) {
 	user, err := s.verifyCode(req.Email, models.CodePurposeSignup, req.Code)
 	if err != nil {
@@ -228,11 +194,6 @@ func (s *Service) VerifyEmail(_ context.Context, req VerifyOTPRequest) (*models.
 			return nil, err
 		}
 		user.EmailVerified = true
-		if err := s.payReferralReward(user); err != nil {
-			// The verification itself succeeded; a reward hiccup is logged
-			// rather than thrown away.
-			log.Printf("auth: referral reward for %s failed: %v", user.Email, err)
-		}
 	}
 	return user, nil
 }
@@ -251,216 +212,4 @@ func (s *Service) ResetPassword(_ context.Context, req ResetPasswordRequest) err
 	return s.db.Model(&models.User{}).
 		Where("id = ?", user.ID).
 		Update("password_hash", string(hash)).Error
-}
-
-// payReferralReward credits both sides of a verified referral, exactly once.
-// The referee's welcome bonus is keyed to their user id, so a replay is a
-// no-op.
-func (s *Service) payReferralReward(referee *models.User) error {
-	if referee.ReferredBy == nil {
-		return nil
-	}
-	var already int64
-	if err := s.db.Model(&models.WalletTransaction{}).
-		Where("user_id = ? AND kind = ? AND reference = ?", referee.ID, models.WalletBonus, "REF-"+referee.ID.String()).
-		Count(&already).Error; err != nil {
-		return err
-	}
-	if already > 0 {
-		return nil
-	}
-
-	var referrer models.User
-	if err := s.db.First(&referrer, "id = ?", *referee.ReferredBy).Error; err != nil {
-		return err
-	}
-
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		// The referrer's bonus, tracked on their profile for the referral card.
-		if err := tx.Model(&models.User{}).
-			Where("id = ?", referrer.ID).
-			Updates(map[string]interface{}{
-				"wallet_balance_kobo": gorm.Expr("wallet_balance_kobo + ?", referralRewardKobo),
-				"referral_bonus_kobo": gorm.Expr("referral_bonus_kobo + ?", referralRewardKobo),
-			}).Error; err != nil {
-			return err
-		}
-		if err := tx.Create(&models.WalletTransaction{
-			UserID:       referrer.ID,
-			Kind:         models.WalletBonus,
-			AmountKobo:   referralRewardKobo,
-			Counterparty: "Referral bonus",
-			Reference:    "REF-" + referee.ID.String(),
-			Note:         referee.Name + " joined with your code",
-		}).Error; err != nil {
-			return err
-		}
-		// The invitee's welcome boost.
-		if err := tx.Model(&models.User{}).
-			Where("id = ?", referee.ID).
-			Update("wallet_balance_kobo", gorm.Expr("wallet_balance_kobo + ?", referralWelcomeKobo)).Error; err != nil {
-			return err
-		}
-		if err := tx.Create(&models.WalletTransaction{
-			UserID:       referee.ID,
-			Kind:         models.WalletBonus,
-			AmountKobo:   referralWelcomeKobo,
-			Counterparty: "Welcome bonus",
-			Reference:    "REF-" + referee.ID.String(),
-			Note:         "Joined with " + referrer.Name + "'s referral code",
-		}).Error; err != nil {
-			return err
-		}
-		return createNotifications(tx,
-			models.Notification{UserID: referrer.ID, Kind: models.NotifyReferral,
-				Title: "Referral reward earned",
-				Body:  fmt.Sprintf("%s verified their account with your code — %s added to your wallet.", referee.Name, koboNaira(referralRewardKobo)),
-				Link:  "/account"},
-			models.Notification{UserID: referee.ID, Kind: models.NotifyReferral,
-				Title: "Welcome bonus added",
-				Body:  fmt.Sprintf("%s landed in your wallet for joining with a referral code.", koboNaira(referralWelcomeKobo)),
-				Link:  "/account"},
-		)
-	})
-}
-
-// ReferralOverview returns the caller's code, share link and reward stats.
-func (s *Service) ReferralOverview(_ context.Context, userID uuid.UUID) (*ReferralOverview, error) {
-	var user models.User
-	if err := s.db.First(&user, "id = ?", userID).Error; err != nil {
-		return nil, err
-	}
-	if user.ReferralCode == nil || *user.ReferralCode == "" {
-		// Accounts created before the referral feature still get a code.
-		for i := 0; i < 5; i++ {
-			code, err := generateReferralCode()
-			if err != nil {
-				return nil, err
-			}
-			err = s.db.Model(&models.User{}).
-				Where("id = ?", userID).Update("referral_code", code).Error
-			if err == nil {
-				user.ReferralCode = &code
-				break
-			}
-			if i == 4 {
-				return nil, err
-			}
-		}
-	}
-
-	var invited, verified int64
-	if err := s.db.Model(&models.User{}).Where("referred_by = ?", userID).Count(&invited).Error; err != nil {
-		return nil, err
-	}
-	if err := s.db.Model(&models.User{}).
-		Where("referred_by = ? AND email_verified = ?", userID, true).
-		Count(&verified).Error; err != nil {
-		return nil, err
-	}
-
-	return &ReferralOverview{
-		Code:            *user.ReferralCode,
-		Link:            referralLink(*user.ReferralCode),
-		Invited:         invited,
-		Verified:        verified,
-		EarnedKobo:      user.ReferralBonusKobo,
-		RewardEachKobo:  referralRewardKobo,
-		WelcomeEachKobo: referralWelcomeKobo,
-	}, nil
-}
-
-// referralLink builds the sign-up link carrying the code.
-func referralLink(code string) string {
-	return "https://potkeeper.ng/signup?ref=" + code
-}
-
-// SubmitKYC runs B Moni identity verification for the signed-in user. Sandbox
-// only — the BVN is validated for shape and handed to the sandbox rail.
-func (s *Service) SubmitKYC(ctx context.Context, userID uuid.UUID, bvn string) (*models.User, error) {
-	bvn = strings.TrimSpace(bvn)
-	if len(bvn) != 11 || !allDigits(bvn) {
-		return nil, fmt.Errorf("%w: a BVN must be exactly 11 digits", ErrInvalidProfile)
-	}
-	var user models.User
-	if err := s.db.First(&user, "id = ?", userID).Error; err != nil {
-		return nil, err
-	}
-	if user.KYCStatus == models.KYCVerified {
-		return &user, nil
-	}
-	if !user.EmailVerified {
-		return nil, fmt.Errorf("%w: verify your email before starting KYC", ErrCodeRequired)
-	}
-
-	// Make sure the person has a B Moni identity to verify.
-	if user.BMoniUserID == "" {
-		first, last := splitName(user.Name)
-		if bu, err := s.bmoni.CreateUser(ctx, bmoni.CreateUserRequest{
-			FirstName: first, LastName: last, Email: user.Email, Phone: user.Phone,
-		}); err == nil {
-			user.BMoniUserID = bu.ID
-			_ = s.db.Model(&models.User{}).Where("id = ?", userID).Update("bmoni_user_id", bu.ID).Error
-		} else {
-			return nil, fmt.Errorf("identity service is unavailable — try again shortly")
-		}
-	}
-
-	owner := "0x" + shortHex(userID) + strings.Repeat("0", 26)
-	if _, err := s.bmoni.StartNigeriaOnboarding(ctx, bmoni.NigeriaOnboardingRequest{
-		BMoniUserID:   user.BMoniUserID,
-		BVN:           bvn,
-		WalletAddress: owner[:42],
-		WalletIndex:   0,
-	}); err != nil {
-		return nil, fmt.Errorf("identity verification did not complete: %w", err)
-	}
-
-	now := s.now()
-	if err := s.db.Model(&models.User{}).
-		Where("id = ?", userID).
-		Updates(map[string]interface{}{
-			"kyc_status":      models.KYCVerified,
-			"kyc_verified_at": &now,
-		}).Error; err != nil {
-		return nil, err
-	}
-	user.KYCStatus = models.KYCVerified
-	user.KYCVerifiedAt = &now
-	_ = s.db.Create(&models.Notification{
-		UserID: userID, Kind: models.NotifyVerification,
-		Title: "Identity verified",
-		Body:  "KYC complete — your wallet limits have been raised.",
-		Link:  "/account",
-	}).Error
-	return &user, nil
-}
-
-// createNotifications inserts several notifications in one shot. Used by the
-// referral flow; the pot engine has its own helper for money events.
-func createNotifications(tx *gorm.DB, items ...models.Notification) error {
-	for i := range items {
-		if err := tx.Create(&items[i]).Error; err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func koboNaira(kobo int64) string {
-	return fmt.Sprintf("₦%d", kobo/100)
-}
-
-func allDigits(s string) bool {
-	for _, r := range s {
-		if r < '0' || r > '9' {
-			return false
-		}
-	}
-	return len(s) > 0
-}
-
-func shortHex(id uuid.UUID) string {
-	sum := sha256.Sum256([]byte(id.String()))
-	return hex.EncodeToString(sum[:8])
 }

@@ -36,8 +36,6 @@ func (ct *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 	authed.GET("/auth/me", ct.me)
 	authed.PATCH("/auth/me", ct.updateMe)
 	authed.DELETE("/auth/me", ct.deleteMe)
-	authed.POST("/auth/kyc", ct.submitKYC)
-	authed.GET("/auth/referral", ct.referral)
 }
 
 func (ct *Controller) register(c *gin.Context) {
@@ -134,8 +132,6 @@ func publicUser(u *models.User) gin.H {
 		"bmoniUserId":   u.BMoniUserID,
 		"createdAt":     u.CreatedAt,
 		"emailVerified": u.EmailVerified,
-		"kycStatus":     u.KYCStatus,
-		"referralCode":  u.ReferralCode,
 		"locale":        u.Locale,
 	}
 }
@@ -167,8 +163,7 @@ func (ct *Controller) sendOTP(c *gin.Context) {
 	response.OK(c, resp)
 }
 
-// verifyOTP consumes a sign-up code and marks the address verified. It also
-// pays any referral reward that was waiting on verification.
+// verifyOTP consumes a sign-up code and marks the address verified.
 func (ct *Controller) verifyOTP(c *gin.Context) {
 	var req VerifyOTPRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -221,44 +216,11 @@ func (ct *Controller) resetPassword(c *gin.Context) {
 	response.OK(c, gin.H{"reset": true})
 }
 
-// submitKYC runs B Moni identity verification for the signed-in user.
-func (ct *Controller) submitKYC(c *gin.Context) {
-	var req KYCRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "INVALID_BODY", err.Error())
-		return
-	}
-	user, err := ct.svc.SubmitKYC(c.Request.Context(), MustUserID(c), req.BVN)
-	if err != nil {
-		if errors.Is(err, ErrCodeRequired) {
-			response.Error(c, http.StatusPreconditionRequired, "EMAIL_NOT_VERIFIED", err.Error())
-			return
-		}
-		if errors.Is(err, ErrInvalidProfile) {
-			response.Error(c, http.StatusBadRequest, "INVALID_BVN", err.Error())
-			return
-		}
-		response.Error(c, http.StatusBadGateway, "KYC_FAILED", err.Error())
-		return
-	}
-	response.OK(c, publicUser(user))
-}
-
-// referral returns the caller's referral code, link and reward stats.
-func (ct *Controller) referral(c *gin.Context) {
-	resp, err := ct.svc.ReferralOverview(c.Request.Context(), MustUserID(c))
-	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "REFERRAL_FAILED", err.Error())
-		return
-	}
-	response.OK(c, resp)
-}
-
 // authMeta tells the client whether email is really delivered (SMTP) or only
 // logged, so the UI can explain where to find the code in a demo deployment.
 func (ct *Controller) authMeta(c *gin.Context) {
 	response.OK(c, gin.H{
-		"emailMode": map[bool]string{true: "log", false: "smtp"}[ct.svc.mail.IsLog()],
+		"emailMode":      map[bool]string{true: "log", false: "smtp"}[ct.svc.mail.IsLog()],
 		"codeTtlMinutes": CodeTTLMinutes,
 	})
 }

@@ -1,5 +1,5 @@
 // Package email sends transactional email — sign-up verification codes,
-// password resets, referral rewards. Two implementations exist:
+// password resets and account notifications. Two implementations exist:
 //
 //   - SMTPSender delivers real mail through a configured SMTP relay.
 //   - LogSender writes the message to the server log, so the demo works with
@@ -111,7 +111,7 @@ func VerificationEmail(appName, headline, code string, minutes int) string {
 </body></html>`, appName, headline, code, minutes)
 }
 
-// NotificationEmail is a plain notification body (referral rewards, etc.).
+// NotificationEmail is a plain notification body for account notifications.
 func NotificationEmail(appName, headline, body string) string {
 	return fmt.Sprintf(`
 <html><body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#F7F5FF;padding:24px">

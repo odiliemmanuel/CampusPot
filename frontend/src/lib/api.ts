@@ -109,10 +109,6 @@ export interface AuthUser {
   createdAt?: string;
   /** True once the emailed code confirmed this address. Money needs it. */
   emailVerified?: boolean;
-  /** "unverified" | "verified" — identity check, raises send limits. */
-  kycStatus?: string;
-  /** The code to share for referral rewards. */
-  referralCode?: string;
   /** Preferred language: "en" | "fr". */
   locale?: string;
 }
@@ -378,7 +374,7 @@ export interface AccountOverview {
   transactions: MyTransaction[];
 }
 
-export type WalletTxKind = "deposit" | "transfer_in" | "transfer_out" | "pot_payment" | "refund" | "bonus";
+export type WalletTxKind = "deposit" | "transfer_in" | "transfer_out" | "pot_payment" | "refund";
 
 export interface WalletTransaction {
   id: string;
@@ -417,12 +413,11 @@ export const register = (
   email: string,
   phone: string,
   password: string,
-  referralCode = "",
   locale = "en",
 ) =>
   request<{ token: string; user: AuthUser }>("/auth/register", {
     method: "POST",
-    body: JSON.stringify({ name, email, password, phone, referralCode, locale }),
+    body: JSON.stringify({ name, email, password, phone, locale }),
   });
 
 export const login = (email: string, password: string) =>
@@ -862,7 +857,7 @@ export const getAccountOverview = async (): Promise<AccountOverview> => {
   }
 };
 
-// ---------- Email verification, password reset, KYC, referrals ----------
+// ---------- Email verification and password reset ----------
 
 export interface OtpResponse {
   sent: boolean;
@@ -878,7 +873,7 @@ export const sendOtp = (email: string, purpose: "signup" | "reset" = "signup") =
     body: JSON.stringify({ email, purpose }),
   });
 
-/** Consume the emailed code; marks the address verified and pays rewards. */
+/** Consume the emailed code and mark the address verified. */
 export const verifyOtp = (email: string, code: string, purpose: "signup" | "reset" = "signup") =>
   request<{ verified: boolean; user?: AuthUser }>("/auth/otp/verify", {
     method: "POST",
@@ -896,22 +891,6 @@ export const resetPassword = (email: string, code: string, password: string) =>
     method: "POST",
     body: JSON.stringify({ email, code, password }),
   });
-
-/** Submit an 11-digit BVN for identity verification (sandbox only). */
-export const submitKyc = (bvn: string) =>
-  request<AuthUser>("/auth/kyc", { method: "POST", body: JSON.stringify({ bvn }) });
-
-export interface ReferralOverview {
-  code: string;
-  link: string;
-  invited: number;
-  verified: number;
-  earnedKobo: number;
-  rewardEachKobo: number;
-  welcomeEachKobo: number;
-}
-
-export const getReferral = () => request<ReferralOverview>("/auth/referral");
 
 // ---------- Discover public pots ----------
 

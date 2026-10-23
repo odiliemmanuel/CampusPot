@@ -25,6 +25,8 @@ export default function VerifyEmail() {
   // Demo deployments have no SMTP: the API returns the code so the flow can
   // still be completed. We surface it as a hint.
   const [devCode, setDevCode] = useState("");
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [resendLeft, setResendLeft] = useState(0);
   const autoSent = useRef(false);
 
   const request = async (silent = false) => {
@@ -35,6 +37,9 @@ export default function VerifyEmail() {
     try {
       const res = await sendOtp(email, "signup");
       setDevCode(res.devCode ?? "");
+      const expiresAt = res.expiresAt ? Date.parse(res.expiresAt) : Date.now() + 300_000;
+      setSecondsLeft(Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000)));
+      setResendLeft(60);
       if (!silent) setNotice("Code sent — check your inbox.");
     } catch (err) {
       if (!silent) setError(err instanceof Error ? err.message : "Couldn't send the code.");
@@ -42,6 +47,16 @@ export default function VerifyEmail() {
       setSending(false);
     }
   };
+
+  useEffect(() => {
+    if (secondsLeft === 0 && resendLeft === 0) return;
+    const timer = window.setInterval(() => {
+      setSecondsLeft((value) => Math.max(0, value - 1));
+      setResendLeft((value) => Math.max(0, value - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [secondsLeft, resendLeft]);
+  const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
   // Send the first code automatically when we know the address.
   useEffect(() => {
@@ -96,6 +111,10 @@ export default function VerifyEmail() {
           />
         </div>
 
+        <p aria-live="polite" className="text-center text-xs text-slate-500 dark:text-slate-400">
+          {secondsLeft > 0 ? `Code expires in ${clock(secondsLeft)}` : "Code expired — request a new one."}
+        </p>
+
         <div>
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Verification code</label>
           <input
@@ -132,10 +151,10 @@ export default function VerifyEmail() {
         <button
           type="button"
           onClick={() => void request()}
-          disabled={sending || !email}
+          disabled={sending || !email || resendLeft > 0}
           className="flex w-full items-center justify-center gap-2 text-sm font-semibold text-slate-500 transition hover:text-primary-600 disabled:opacity-60 dark:text-slate-400"
         >
-          <RefreshCw className={`h-4 w-4 ${sending ? "animate-spin" : ""}`} /> Resend code
+          <RefreshCw className={`h-4 w-4 ${sending ? "animate-spin" : ""}`} /> {resendLeft > 0 ? `Resend code in ${clock(resendLeft)}` : "Resend code"}
         </button>
       </form>
 

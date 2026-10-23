@@ -240,7 +240,7 @@ function DiscoverSection() {
   };
 
   return (
-    <section aria-label="Discover public pots" className="mt-8">
+    <section id="discover-public-pots" aria-label="Discover public pots" className="mt-8 scroll-mt-20">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="flex items-center gap-1.5 text-sm font-bold text-slate-800 dark:text-slate-100">

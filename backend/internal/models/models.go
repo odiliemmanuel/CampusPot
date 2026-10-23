@@ -70,29 +70,9 @@ type User struct {
 	// one-time code. Unverified accounts can browse but cannot move money.
 	EmailVerified bool `gorm:"not null;default:false" json:"emailVerified"`
 
-	// KYCStatus tracks identity verification (B Moni Nigeria onboarding).
-	// Unverified accounts can send only below the small-limit threshold.
-	KYCStatus     string     `gorm:"not null;default:unverified" json:"kycStatus"` // unverified | verified
-	KYCVerifiedAt *time.Time `json:"kycVerifiedAt,omitempty"`
-
-	// ReferralCode is the unique code this user shares to invite others.
-	// It is a pointer so accounts that do not have one yet (or rows that
-	// predate the feature) store NULL — two NULLs never collide under a unique
-	// index, unlike two empty strings. ReferredBy points at the user whose
-	// code was used at sign-up.
-	ReferralCode      *string    `gorm:"uniqueIndex" json:"referralCode,omitempty"`
-	ReferredBy        *uuid.UUID `gorm:"type:uuid;index" json:"referredBy,omitempty"`
-	ReferralBonusKobo int64      `gorm:"not null;default:0" json:"referralBonusKobo"`
-
 	// Locale is the user's preferred language ("en", "fr", ...).
 	Locale string `gorm:"default:en" json:"locale"`
 }
-
-// KYC statuses for a user's identity verification.
-const (
-	KYCUnverified = "unverified"
-	KYCVerified   = "verified"
-)
 
 // Wallet transaction kinds.
 const (
@@ -101,7 +81,6 @@ const (
 	WalletTransferOut = "transfer_out" // sent to a member/user or an external bank
 	WalletPotPayment  = "pot_payment"  // paid from the wallet into a pot levy
 	WalletRefund      = "refund"       // a pot returned a contribution to the wallet
-	WalletBonus       = "bonus"        // referral reward
 )
 
 // WalletTransaction is one movement in a user's personal wallet. It is an
@@ -418,7 +397,6 @@ const (
 	NotifyDispute      = "dispute"
 	NotifySchedule     = "schedule"
 	NotifyRefund       = "refund"
-	NotifyReferral     = "referral"
 	NotifyVerification = "verification"
 )
 

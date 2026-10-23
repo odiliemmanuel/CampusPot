@@ -94,37 +94,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*models.Us
 		// code we mail them. Unverified accounts can browse, but the pot
 		// engine refuses to move money for them.
 		EmailVerified: false,
-		KYCStatus:     models.KYCUnverified,
 		Locale:        localeOr(req.Locale),
-	}
-
-	// A unique referral code of their own, to share with the next person.
-	for i := 0; i < 5; i++ {
-		code, cerr := generateReferralCode()
-		if cerr != nil {
-			return nil, "", cerr
-		}
-		var taken int64
-		if cerr = s.db.Model(&models.User{}).Where("referral_code = ?", code).Count(&taken).Error; cerr != nil {
-			return nil, "", cerr
-		}
-		if taken == 0 {
-			user.ReferralCode = &code
-			break
-		}
-		if i == 4 {
-			return nil, "", fmt.Errorf("auth: could not allocate a referral code")
-		}
-	}
-
-	// Did someone share their code at sign-up? Remember who, so the reward
-	// can be paid once this account verifies its email.
-	if ref := strings.TrimSpace(req.ReferralCode); ref != "" {
-		var referrer models.User
-		if err := s.db.First(&referrer, "UPPER(referral_code) = ?", strings.ToUpper(ref)).Error; err == nil {
-			uid := referrer.ID
-			user.ReferredBy = &uid
-		}
 	}
 
 	// Provision the B Moni user now so every member has a wallet id from day

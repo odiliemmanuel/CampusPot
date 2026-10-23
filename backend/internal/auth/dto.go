@@ -1,15 +1,12 @@
 package auth
 
 // RegisterRequest is the JSON body for POST /api/v1/auth/register.
-// ReferralCode is optional: when it matches another user's code that user is
-// credited with the referral once the new account verifies its email.
 type RegisterRequest struct {
-	Name         string `json:"name" binding:"required,min=2"`
-	Email        string `json:"email" binding:"required,email"`
-	Phone        string `json:"phone" binding:"required,min=7"`
-	Password     string `json:"password" binding:"required,min=6"`
-	ReferralCode string `json:"referralCode"`
-	Locale       string `json:"locale"`
+	Name     string `json:"name" binding:"required,min=2"`
+	Email    string `json:"email" binding:"required,email"`
+	Phone    string `json:"phone" binding:"required,min=7"`
+	Password string `json:"password" binding:"required,min=6"`
+	Locale   string `json:"locale"`
 }
 
 // LoginRequest is the JSON body for POST /api/v1/auth/login.
@@ -56,7 +53,7 @@ type VerifyOTPRequest struct {
 }
 
 // VerifyOTPResponse reports the result; the refreshed user is included so the
-// client can update its cached session (emailVerified, kycStatus, ...).
+// client can update its cached session (including emailVerified).
 type VerifyOTPResponse struct {
 	Verified bool        `json:"verified"`
 	User     interface{} `json:"user,omitempty"`
@@ -73,22 +70,4 @@ type ResetPasswordRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Code     string `json:"code" binding:"required"`
 	Password string `json:"password" binding:"required,min=6"`
-}
-
-// KYCRequest submits an 11-digit BVN for identity verification through B Moni.
-// Sandbox only: never send a real BVN to this endpoint.
-type KYCRequest struct {
-	BVN string `json:"bvn" binding:"required"`
-}
-
-// ReferralOverview is what the referral screen renders: the caller's code, a
-// ready-made link, how many people joined with it, and the bonus earned.
-type ReferralOverview struct {
-	Code            string `json:"code"`
-	Link            string `json:"link"`
-	Invited         int64  `json:"invited"`
-	Verified        int64  `json:"verified"`
-	EarnedKobo      int64  `json:"earnedKobo"`
-	RewardEachKobo  int64  `json:"rewardEachKobo"`
-	WelcomeEachKobo int64  `json:"welcomeEachKobo"`
 }

@@ -177,66 +177,30 @@ func TestCancelSchedulePreventsSend(t *testing.T) {
 	assertWallet(t, svc, sender.ID, int64(money.FromNaira(2_000)))
 }
 
-// Unverified-email accounts cannot move money at all, and unverified-KYC
-// accounts hit the daily velocity cap.
-func TestTransferLimitsRespectEmailAndKYC(t *testing.T) {
+// Unverified-email accounts cannot move money; verified accounts can transfer without the retired daily caps.
+func TestTransferLimitsRequireVerifiedEmail(t *testing.T) {
 	ctx := context.Background()
 	svc, _ := newTestService(t)
-	_, _, treasurer := setupGroup(t, svc, CreateGroupRequest{
-		Name: "Limits Pot", PerMemberKobo: int64(money.FromNaira(1_000)), ContributionDueDate: dueSoon(),
+	_, _, treasurer := setupGroup(t, CreateGroupRequest{
+		Name: "Email Gate Pot", PerMemberKobo: int64(money.FromNaira(1_000)), ContributionDueDate: dueSoon(),
 	}, 0)
-
 	sender := newUser(t, svc.db, "Nkechi", "nkechi-x@x.ng")
 	if _, err := svc.WalletDeposit(ctx, sender.ID, WalletDepositRequest{AmountKobo: int64(money.FromNaira(200_000))}); err != nil {
 		t.Fatalf("WalletDeposit: %v", err)
 	}
 	setTestPin(t, svc, sender.ID)
-
-	// Unverified email: no movement, whatever the amount.
 	if err := svc.db.Model(&models.User{}).Where("id = ?", sender.ID).Update("email_verified", false).Error; err != nil {
 		t.Fatalf("unverify: %v", err)
 	}
-	_, err := svc.WalletTransfer(ctx, sender.ID, WalletTransferRequest{
-		AmountKobo: int64(money.FromNaira(100)), Recipient: treasurer.Email, Pin: testPin,
-	})
+	_, err := svc.WalletTransfer(ctx, sender.ID, WalletTransferRequest{AmountKobo: int64(money.FromNaira(100)), Recipient: treasurer.Email, Pin: testPin})
 	if !errors.Is(err, ErrForbidden) {
 		t.Fatalf("expected ErrForbidden for unverified email, got %v", err)
 	}
-
-	// Verified email, unverified KYC: single-send cap and daily velocity cap.
 	if err := svc.db.Model(&models.User{}).Where("id = ?", sender.ID).Update("email_verified", true).Error; err != nil {
 		t.Fatalf("verify: %v", err)
 	}
-	_, err = svc.WalletTransfer(ctx, sender.ID, WalletTransferRequest{
-		AmountKobo: unverifiedKYCDailyCap + 1, Recipient: treasurer.Email, Pin: testPin,
-	})
-	if !errors.Is(err, ErrInvalid) {
-		t.Fatalf("expected ErrInvalid above the single-send cap, got %v", err)
-	}
-
-	half := unverifiedKYCDailyCap / 2
-	if _, err := svc.WalletTransfer(ctx, sender.ID, WalletTransferRequest{
-		AmountKobo: half, Recipient: treasurer.Email, Pin: testPin,
-	}); err != nil {
-		t.Fatalf("first half-cap send: %v", err)
-	}
-	// One kobo over the remainder of the daily cap → refused.
-	_, err = svc.WalletTransfer(ctx, sender.ID, WalletTransferRequest{
-		AmountKobo: unverifiedKYCDailyCap - half + 1, Recipient: treasurer.Email, Pin: testPin,
-	})
-	if !errors.Is(err, ErrInvalid) {
-		t.Fatalf("expected the daily velocity cap to bite, got %v", err)
-	}
-
-	// KYC raises the ceiling: the same second send now fits.
-	if err := svc.db.Model(&models.User{}).Where("id = ?", sender.ID).
-		Update("kyc_status", models.KYCVerified).Error; err != nil {
-		t.Fatalf("kyc: %v", err)
-	}
-	if _, err := svc.WalletTransfer(ctx, sender.ID, WalletTransferRequest{
-		AmountKobo: half, Recipient: treasurer.Email, Pin: testPin,
-	}); err != nil {
-		t.Fatalf("verified accounts get headroom: %v", err)
+	if _, err := svc.WalletTransfer(ctx, sender.ID, WalletTransferRequest{AmountKobo: int64(money.FromNaira(100_000)), Recipient: treasurer.Email, Pin: testPin}); err != nil {
+		t.Fatalf("verified account transfer: %v", err)
 	}
 }
 

@@ -1,5 +1,5 @@
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { LayoutGrid, Plus, Settings, Wallet } from "lucide-react";
+import { Compass, LayoutGrid, Plus, Settings, Wallet } from "lucide-react";
 import { useI18n } from "../lib/i18n";
 
 // A wallet-style bottom bar shown only on phones/tablets. The centre "+" is the
@@ -26,10 +26,10 @@ export default function MobileNav() {
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="Primary"
     >
-      <div className="mx-auto grid max-w-md grid-cols-4 items-center px-2 py-1.5">
+      <div className="mx-auto grid max-w-lg grid-cols-5 items-center px-2 py-1.5">
         <NavLink to="/account" className={itemClass(balanceActive)}>
           <Wallet className="h-5 w-5" />
-          {t("nav.wallet")}
+          Home
         </NavLink>
 
         <NavLink to="/pots" className={itemClass(potsActive)}>
@@ -37,11 +37,16 @@ export default function MobileNav() {
           {t("nav.pots")}
         </NavLink>
 
+        <NavLink to="/pots#discover-public-pots" className={itemClass(false)}>
+          <Compass className="h-5 w-5" />
+          Discover
+        </NavLink>
+
         <button
           type="button"
           onClick={() => navigate("/pots/new")}
           aria-label="Create a pot"
-          className="mx-auto -mt-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-purple-800 text-white shadow-lg shadow-violet-900/25 transition active:scale-95"
+          className="mx-auto -mt-5 flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-purple-800 text-white shadow-lg shadow-violet-900/25 transition active:scale-95"
         >
           <Plus className="h-6 w-6" />
         </button>

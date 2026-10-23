@@ -3,7 +3,7 @@ package pot
 // Persisted in-app notifications for money events. The frontend's bell used
 // to be reconstructed from raw payments/expenses on every load; these rows
 // make it a real feed: contributions received, payouts, refunds, scheduled
-// transfers, disputes and referral rewards all land here, attributed to the
+// transfers and disputes all land here, attributed to the
 // exact users who care.
 
 import (

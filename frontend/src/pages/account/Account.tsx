@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  AlertTriangle, ArrowDownLeft, ArrowUpRight, Banknote, BadgeCheck, CalendarClock,
-  CheckCircle2, ChevronDown, Check, Copy, Gift, Landmark, Loader2, PiggyBank,
+  AlertTriangle, ArrowDownLeft, ArrowUpRight, Banknote, BadgeCheck, Bell, CalendarClock, Compass,
+  CheckCircle2, ChevronDown, Check, Copy, Landmark, Loader2, PiggyBank,
   Plus, QrCode, Send, ShieldCheck, Trash2, Wallet, X,
 } from "lucide-react";
 
@@ -11,11 +11,11 @@ import AppShell from "../../layouts/AppShell";
 import AlertError from "../../components/AlertError";
 import PinField from "../../components/PinField";
 import {
-  cancelSchedule, createSchedule, getAccountOverview, getReferral, getStoredUser, getWallet,
-  listBanks, listSchedules, lookupPotAccount, lookupUser, sendOtp, setWalletPin, submitKyc,
+  cancelSchedule, createSchedule, getAccountOverview, getStoredUser, getWallet,
+  listBanks, listSchedules, lookupPotAccount, lookupUser, setWalletPin,
   verifyBankAccount, walletDeposit, walletTransfer,
   walletPayPot, type AccountOverview, type BankOption, type LookedUpUser, type PotAccount,
-  type PotMembership, type ReferralOverview, type ScheduleView, type VerifiedAccount,
+  type PotMembership, type ScheduleView, type VerifiedAccount,
   type WalletOverview, type WalletTransaction,
 } from "../../lib/api";
 import { formatNaira, nairaToKobo } from "../../lib/format";
@@ -751,7 +751,6 @@ function txMeta(kind: WalletTransaction["kind"], amount: number) {
     case "deposit":
     case "transfer_in":
     case "refund":
-    case "bonus":
       return { icon: <ArrowDownLeft className="h-4 w-4" />, tint: "bg-violet-100 text-violet-600 dark:bg-violet-500/15", sign: "+", color: "text-violet-600" };
     case "transfer_out":
       return { icon: <ArrowUpRight className="h-4 w-4" />, tint: "bg-violet-100 text-violet-600 dark:bg-violet-500/15", sign: "-", color: "text-violet-600" };
@@ -764,45 +763,13 @@ function txMeta(kind: WalletTransaction["kind"], amount: number) {
 function VerificationCard() {
   const me = getStoredUser();
   const emailVerified = me?.emailVerified ?? false;
-  const [kycStatus, setKycStatus] = useState(me?.kycStatus ?? "unverified");
-  const [bvn, setBvn] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-
-  const startEmail = async () => {
-    setError("");
-    try {
-      // The verify screen sends (and shows) the code itself.
-      await sendOtp(me?.email ?? "", "signup");
-      window.location.assign(`/verify-email?email=${encodeURIComponent(me?.email ?? "")}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't send the code.");
-    }
-  };
-
-  const submitKycNow = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(""); setNotice(""); setBusy(true);
-    try {
-      const updated = await submitKyc(bvn.trim());
-      setKycStatus(updated.kycStatus ?? "verified");
-      const token = getTokenSafe();
-      if (token) localStorage.setItem("campuspot_user", JSON.stringify(updated));
-      setBvn("");
-      setNotice("Identity verified — your daily send limit is raised.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Verification didn't complete.");
-    } finally {
-      setBusy(false);
-    }
-  };
+  const startEmail = () => window.location.assign(`/verify-email?email=${encodeURIComponent(me?.email ?? "")}`);
 
   return (
     <section className="cp-card rounded-2xl p-4">
       <div className="flex items-center gap-2">
         <ShieldCheck className="h-4 w-4 text-violet-600" />
-        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Security &amp; verification</p>
+        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Email verification</p>
       </div>
 
       <div className="mt-3 space-y-2 text-xs">
@@ -822,16 +789,7 @@ function VerificationCard() {
             </button>
           )}
         </div>
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-slate-500 dark:text-slate-400">Identity (KYC)</span>
-          {kycStatus === "verified" ? (
-            <span className="inline-flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400">
-              <BadgeCheck className="h-3.5 w-3.5" /> Verified
-            </span>
-          ) : (
-            <span className="font-semibold text-amber-600 dark:text-amber-400">Unverified · ₦50k/day limit</span>
-          )}
-        </div>
+
       </div>
 
       {!emailVerified && (
@@ -840,114 +798,6 @@ function VerificationCard() {
         </p>
       )}
 
-      {kycStatus !== "verified" && emailVerified && (
-        <form onSubmit={submitKycNow} className="mt-3 space-y-2">
-          <label className="block">
-            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">BVN (11 digits)</span>
-            <input
-              value={bvn}
-              onChange={(e) => setBvn(e.target.value.replace(/[^0-9]/g, "").slice(0, 11))}
-              placeholder="00000000000"
-              inputMode="numeric"
-              className="cp-input mt-1"
-            />
-          </label>
-          <p className="text-[10px] text-slate-400">Sandbox only — never send a real BVN to a demo build.</p>
-          <button type="submit" disabled={busy || bvn.length !== 11} className="cp-btn-ghost w-full justify-center text-xs">
-            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />} Verify identity
-          </button>
-        </form>
-      )}
-
-      {notice && <p className="mt-2 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">{notice}</p>}
-      {error && <div className="mt-2"><AlertError message={error} /></div>}
-    </section>
-  );
-}
-
-/** Small safe accessor — the card lives outside the session module. */
-function getTokenSafe(): string | null {
-  try {
-    return localStorage.getItem("campuspot_token");
-  } catch {
-    return null;
-  }
-}
-
-/** Referral code, share link, and reward stats. */
-function ReferralCard() {
-  const [data, setData] = useState<ReferralOverview | null>(null);
-  const [copied, setCopied] = useState<"code" | "link" | null>(null);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    getReferral().then(setData).catch((err) => setError(err instanceof Error ? err.message : "Couldn't load your code."));
-  }, []);
-
-  const copy = async (value: string, which: "code" | "link") => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(which);
-      setTimeout(() => setCopied(null), 1500);
-    } catch {
-      /* clipboard unavailable */
-    }
-  };
-
-  return (
-    <section className="cp-card rounded-2xl p-4">
-      <div className="flex items-center gap-2">
-        <Gift className="h-4 w-4 text-violet-600" />
-        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Invite friends, earn bonuses</p>
-      </div>
-
-      {error && <div className="mt-2"><AlertError message={error} /></div>}
-      {!data && !error && <p className="mt-2 text-xs text-slate-400">Loading your code…</p>}
-
-      {data && (
-        <>
-          <div className="mt-3 flex items-center gap-2">
-            <code className="flex-1 rounded-xl border border-dashed border-violet-300 bg-violet-50/50 px-3 py-2 text-center font-mono text-sm font-bold tracking-widest text-violet-800 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200">
-              {data.code}
-            </code>
-            <button
-              type="button"
-              onClick={() => void copy(data.code, "code")}
-              aria-label="Copy referral code"
-              className="rounded-xl border border-slate-200 p-2.5 text-slate-500 transition hover:border-violet-300 hover:text-violet-600 dark:border-white/10"
-            >
-              {copied === "code" ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
-            </button>
-            <button
-              type="button"
-              onClick={() => void copy(data.link, "link")}
-              aria-label="Copy invite link"
-              className="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-600 transition hover:border-violet-300 hover:text-violet-600 dark:border-white/10 dark:text-slate-300"
-            >
-              {copied === "link" ? "Copied!" : "Copy link"}
-            </button>
-          </div>
-
-          <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-            <div>
-              <p className="text-[10px] uppercase tracking-wide text-slate-400">Invited</p>
-              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{data.invited}</p>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wide text-slate-400">Verified</p>
-              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{data.verified}</p>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wide text-slate-400">Earned</p>
-              <p className="text-sm font-semibold text-violet-600">{formatNaira(data.earnedKobo)}</p>
-            </div>
-          </div>
-
-          <p className="mt-2 text-[11px] text-slate-400">
-            You get {formatNaira(data.rewardEachKobo)} when a friend joins with your code and verifies their email — they get {formatNaira(data.welcomeEachKobo)} too.
-          </p>
-        </>
-      )}
     </section>
   );
 }
@@ -1054,38 +904,40 @@ function WalletHome() {
 
   return (
     <>
-      <h1 className="mb-3 font-sora text-lg font-bold text-slate-900 sm:text-2xl dark:text-white">
-        Hi{(me?.name ?? "").trim() ? `, ${me!.name.split(" ")[0]}` : ""} 👋
-      </h1>
+      <div className="mb-3 flex items-center justify-between">
+        <h1 className="font-sora text-lg font-bold text-slate-900 sm:text-2xl dark:text-white">
+          Hi{(me?.name ?? "").trim() ? `, ${me!.name.split(" ")[0]}` : ""} 👋
+        </h1>
+        <Link to="/notifications" aria-label="Open notifications" className="rounded-full border border-slate-200 bg-white p-2 text-slate-500 dark:border-white/10 dark:bg-panel-dark dark:text-slate-300">
+          <Bell className="h-4 w-4" />
+        </Link>
+      </div>
 
       {/* Compact balance strip keeps the wallet actions and pots in view. */}
-      <div className="flex items-center gap-3 rounded-2xl bg-gradient-to-br from-violet-700 via-violet-700 to-purple-800 px-3.5 py-3.5 text-white shadow-md shadow-violet-950/10 sm:rounded-[1.5rem] sm:px-6 sm:py-4">
+      <div className="relative flex min-h-[126px] items-start gap-3 overflow-hidden rounded-[1.6rem] bg-gradient-to-br from-violet-700 via-violet-700 to-purple-800 px-4 py-4 text-white shadow-md shadow-violet-950/10 sm:items-center sm:rounded-[1.5rem] sm:px-6 sm:py-4">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/10 text-white ring-1 ring-white/15"><Wallet className="h-4 w-4" /></span>
         <div className="min-w-0 flex-1">
-          <p className="text-[9px] font-bold uppercase tracking-[.18em] text-violet-100/75 sm:text-[10px]">Wallet balance · NGN</p>
-          <p className="mt-0.5 truncate font-sora text-xl font-extrabold tracking-tight text-white sm:text-2xl">{money(balance)}</p>
+          <p className="text-[10px] font-medium text-violet-100/80">Available balance</p>
+          <p className="mt-1 truncate font-sora text-2xl font-extrabold tracking-tight text-white sm:text-3xl">{money(balance)}</p>
           <div className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[11px]">
             <span className="shrink-0 text-violet-100/70">Wallet number</span>
             <span className="truncate font-semibold tracking-wide text-white">{me?.phone || "Add your phone in settings"}</span>
             {me?.phone && <button type="button" onClick={() => void navigator.clipboard?.writeText(me.phone!)} aria-label="Copy wallet number" className="shrink-0 rounded-md p-1 text-white/80 hover:bg-white/10"><Copy className="h-3 w-3" /></button>}
           </div>
         </div>
-        <span className="hidden items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold text-violet-50 sm:inline-flex"><span className="h-1.5 w-1.5 rounded-full bg-violet-200" /> Available</span>
+        <button type="button" onClick={() => setSheet("add")} className="shrink-0 rounded-full border border-white/25 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10 sm:px-4 sm:text-sm"><Plus className="mr-1 inline h-4 w-4" />Add money</button>
       </div>
 
       {/* Secondary actions — consistent tiles */}
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
-        <QuickAction icon={<Banknote className="h-5 w-5" />} label="Add money" onClick={() => setSheet("add")} />
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5 sm:gap-3">
         <QuickAction icon={<Send className="h-4 w-4" />} label="Send" onClick={() => setSheet("send")} />
         <QuickAction icon={<QrCode className="h-4 w-4" />} label="Join pot" to="/join" />
+        <QuickAction icon={<Compass className="h-4 w-4" />} label="Find public pots" to="/pots#discover-public-pots" />
         <QuickAction icon={<Landmark className="h-4 w-4" />} label="Connect bank" to="/banks" />
+        <QuickAction icon={<PiggyBank className="h-4 w-4" />} label="My pots" to="/pots" />
       </div>
 
-      {/* Account health: verification, referrals, scheduled transfers */}
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <VerificationCard />
-        <ReferralCard />
-      </div>
+      <div className="mt-3"><VerificationCard /></div>
       <SchedulesCard />
 
       {/* Pots — compact, expand for detail */}
