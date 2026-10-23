@@ -1,198 +1,218 @@
-import { Link } from "react-router-dom";
+import { useEffect } from "react";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  HandCoins, ShieldCheck, Eye, Sparkles, ArrowRight, Users,
-  Receipt, TrendingUp, CheckCircle2,
+  ArrowDown, ArrowRight, ArrowUpRight, Check, CheckCircle2, ChevronDown,
+  CircleHelp, Eye, HandCoins, LockKeyhole, MessageCircle, PieChart,
+  ReceiptText, ShieldCheck, Sparkles, Users, Wallet,
 } from "lucide-react";
 
-const problems = [
-  { icon: Users, title: "Money in one person's account", text: "Contributions land in the treasurer's personal bank account — no separation, no visibility." },
-  { icon: Receipt, title: "\"Who has paid?\" by scrolling chat", text: "Reconciling WhatsApp screenshots against bank alerts is manual, slow, and error-prone." },
-  { icon: ShieldCheck, title: "Spending on trust alone", text: "One person decides how the pot is spent, with no record of who approved what." },
+const features = [
+  {
+    icon: Wallet,
+    title: "One pot for the whole group",
+    text: "Collect class dues, plan a trip, or save toward a shared goal. Keep the group’s money activity together and easy to follow.",
+  },
+  {
+    icon: Eye,
+    title: "Everyone sees the same record",
+    text: "Members can check contributions, outstanding dues, payout requests, and decisions without searching through old messages.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Clear steps before payouts",
+    text: "Set approval rules for your pot and keep requests, decisions, and payout status visible to the group.",
+  },
+  {
+    icon: Sparkles,
+    title: "A treasurer that can answer back",
+    text: "Ask about who has paid, upcoming deadlines, spending patterns, and the pot’s recent activity in plain language.",
+  },
 ];
 
 const steps = [
-  { icon: HandCoins, title: "Members pay into one pot", text: "A dedicated Naira account for the group. Money is never mixed with anyone's personal account." },
-  { icon: Sparkles, title: "Payments reconcile themselves", text: "Each member gets a unique reference. Incoming transfers are matched and the ledger updates." },
-  { icon: ShieldCheck, title: "2-of-3 approves every payout", text: "Money can only leave when a quorum of co-signers approves. The requester can't sign off alone." },
+  { number: "01", title: "Create a pot", text: "Choose a one-time goal or a recurring contribution plan that fits your group." },
+  { number: "02", title: "Bring everyone in", text: "Invite classmates with a join link or code, then agree on the plan together." },
+  { number: "03", title: "Keep the plan moving", text: "Track contributions, discuss requests, and see what needs attention before a deadline." },
 ];
 
-export default function LandingPage() {
+const questions = [
+  { q: "Who is PotKeeper for?", a: "Student groups that collect money together: class associations, project teams, clubs, roommates, and trip planners." },
+  { q: "Can members see what is happening?", a: "Pot activity is organized so members can follow contributions, expenses or payout requests, and the decisions attached to them." },
+  { q: "What does the AI Treasurer do?", a: "It answers questions using the selected pot’s available records and can help draft reminders. It does not make payout decisions for your group." },
+  { q: "Does PotKeeper move real money?", a: "The current demo uses sandbox and synthetic data. Don’t use it to make real payments." },
+];
+
+function isInstalledPwa() {
+  return window.matchMedia?.("(display-mode: standalone)").matches ||
+    (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+}
+
+function Brand() {
   return (
-    <div className="min-h-screen overflow-x-hidden bg-canvas dark:bg-[#0b0c1a] transition-colors duration-300">
-      {/* Nav */}
-      <header className="max-w-6xl mx-auto flex items-center justify-between px-6 py-6">
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-xl bg-primary-600 flex items-center justify-center">
-            <HandCoins className="w-5 h-5 text-white" />
+    <Link to="/" className="inline-flex items-center gap-2.5" aria-label="PotKeeper home">
+      <span className="grid h-10 w-10 place-items-center rounded-2xl bg-violet-700 text-white shadow-lg shadow-violet-900/15"><HandCoins className="h-5 w-5" /></span>
+      <span className="font-sora text-xl font-bold tracking-tight text-slate-950">PotKeeper</span>
+    </Link>
+  );
+}
+
+function ProductPreview() {
+  return (
+    <div className="relative mx-auto w-full max-w-[570px]">
+      <div className="absolute -right-5 top-8 h-40 w-40 rounded-full bg-violet-200/70 blur-3xl" />
+      <div className="absolute -bottom-6 -left-7 h-44 w-44 rounded-full bg-fuchsia-100 blur-3xl" />
+      <div className="relative rounded-[2rem] border border-slate-200/80 bg-white p-4 shadow-[0_35px_90px_-40px_rgba(61,36,110,.35)] sm:p-6">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-100 text-violet-700"><Users className="h-5 w-5" /></span>
+            <div><p className="text-[11px] font-medium text-slate-400">YOUR POT</p><p className="truncate text-sm font-bold text-slate-900">Faculty trip fund</p></div>
           </div>
-          <span className="font-sora font-bold text-lg text-slate-900 dark:text-white">PotKeeper</span>
+          <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-[10px] font-semibold text-emerald-700"><span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />On track</span>
         </div>
-        <div className="flex items-center gap-3">
-          <Link to="/login" className="text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-primary-600 px-4 py-2">
-            Log in
-          </Link>
-          <Link to="/signup" className="text-sm font-semibold text-white bg-primary-600 hover:shadow-lg hover:shadow-primary-600/30 px-5 py-2.5 rounded-xl transition">
-            Get started
-          </Link>
+
+        <div className="grid grid-cols-2 gap-3 py-5 sm:grid-cols-3">
+          <div className="rounded-2xl bg-[#f8f7fb] p-3.5 sm:p-4"><p className="text-[11px] text-slate-500">Collected</p><p className="mt-1 font-sora text-lg font-bold text-slate-950 sm:text-xl">₦248,000</p><p className="mt-1 text-[10px] text-emerald-700">18 contributions</p></div>
+          <div className="rounded-2xl bg-[#f8f7fb] p-3.5 sm:p-4"><p className="text-[11px] text-slate-500">Goal</p><p className="mt-1 font-sora text-lg font-bold text-slate-950 sm:text-xl">₦320,000</p><p className="mt-1 text-[10px] text-slate-500">Due in 12 days</p></div>
+          <div className="col-span-2 rounded-2xl border border-violet-100 bg-violet-50/70 p-3.5 sm:col-span-1 sm:p-4"><div className="flex items-center justify-between"><p className="text-[11px] text-violet-800">Progress</p><p className="text-xs font-bold text-violet-800">77%</p></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-violet-100"><div className="h-full w-[77%] rounded-full bg-violet-600" /></div><p className="mt-2 text-[10px] text-violet-700">₦72,000 to reach the goal</p></div>
         </div>
+
+        <div className="rounded-2xl border border-slate-100 p-3.5 sm:p-4">
+          <div className="mb-3 flex items-center justify-between"><div className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-violet-100 text-violet-700"><ReceiptText className="h-4 w-4" /></span><p className="text-xs font-bold text-slate-800">Recent activity</p></div><span className="text-[10px] font-semibold text-violet-700">View all</span></div>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2.5"><span className="grid h-7 w-7 place-items-center rounded-full bg-emerald-50 text-emerald-700"><Check className="h-3.5 w-3.5" /></span><p className="min-w-0 flex-1 truncate text-[11px] text-slate-600"><b className="text-slate-800">Amara</b> contributed</p><span className="text-[11px] font-semibold text-slate-800">+₦8,000</span></div>
+            <div className="flex items-center gap-2.5"><span className="grid h-7 w-7 place-items-center rounded-full bg-amber-50 text-amber-700"><LockKeyhole className="h-3.5 w-3.5" /></span><p className="min-w-0 flex-1 truncate text-[11px] text-slate-600"><b className="text-slate-800">Bus booking</b> awaits approval</p><span className="rounded-full bg-amber-50 px-2 py-1 text-[9px] font-semibold text-amber-700">In review</span></div>
+          </div>
+        </div>
+
+        <div className="absolute -left-4 top-[48%] hidden max-w-[230px] items-start gap-2.5 rounded-2xl border border-violet-100 bg-white p-3.5 shadow-xl shadow-violet-950/10 sm:flex lg:-left-16">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-violet-700 text-white"><Sparkles className="h-4 w-4" /></span>
+          <div><p className="text-[10px] font-bold text-violet-800">AI TREASURER</p><p className="mt-1 text-[11px] leading-relaxed text-slate-600">“Two contributions are due this Friday.”</p></div>
+        </div>
+      </div>
+      <p className="relative mt-4 text-center text-[10px] text-slate-400">Illustrative product preview · demo data</p>
+    </div>
+  );
+}
+
+export default function LandingPage() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (isInstalledPwa()) navigate("/login", { replace: true });
+  }, [navigate]);
+  if (isInstalledPwa()) return <Navigate to="/login" replace />;
+
+  return (
+    <main className="overflow-hidden bg-white text-slate-900">
+      <header className="relative z-10 border-b border-slate-100/80 bg-white">
+        <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8 lg:px-12" aria-label="Main navigation">
+          <Brand />
+          <div className="flex items-center gap-2 sm:gap-5">
+            <a href="#how-it-works" className="hidden text-sm font-medium text-slate-600 transition hover:text-violet-700 sm:inline">How it works</a>
+            <a href="#features" className="hidden text-sm font-medium text-slate-600 transition hover:text-violet-700 md:inline">Why PotKeeper</a>
+            <Link to="/login" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:px-4">Log in</Link>
+            <Link to="/signup" className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-violet-800 sm:px-5">Create a pot <ArrowUpRight className="h-4 w-4" /></Link>
+          </div>
+        </nav>
       </header>
 
-      {/* Hero */}
-      <section className="max-w-6xl mx-auto px-6 pt-10 pb-20 grid lg:grid-cols-2 gap-12 items-center">
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-          <span className="inline-flex items-center gap-2 bg-primary-100 dark:bg-primary-500/15 text-primary-700 dark:text-primary-300 text-xs font-semibold px-3 py-1.5 rounded-full mb-5">
-            <Eye className="w-3.5 h-3.5" /> From Access to Agency
-          </span>
-          <h1 className="font-sora text-4xl sm:text-5xl font-extrabold text-slate-900 dark:text-white leading-tight">
-            One pot. Everyone can see it. No one can run with it.
-          </h1>
-          <p className="mt-5 text-lg text-slate-500 dark:text-slate-400">
-            PotKeeper gives Nigerian campus groups a shared wallet, an AI treasurer
-            that answers "who hasn't paid?", and a 2-of-3 approval rule on every payout.
-          </p>
-          <div className="flex flex-wrap gap-3 mt-8">
-            <Link to="/signup" className="inline-flex items-center gap-2 bg-gradient-to-br from-primary-600 to-primary-800 text-white px-6 py-3.5 rounded-xl font-semibold hover:shadow-lg hover:shadow-primary-600/30 transition">
-              Start your pot <ArrowRight className="w-4 h-4" />
-            </Link>
-            <Link to="/login" className="inline-flex items-center gap-2 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-6 py-3.5 rounded-xl font-semibold hover:bg-white dark:hover:bg-slate-800 transition">
-              I already have one
-            </Link>
-          </div>
-          <div className="flex flex-wrap gap-4 mt-8 text-sm text-slate-500 dark:text-slate-400">
-            {["Sandbox & synthetic data", "No real money", "Built on B Moni"].map((t) => (
-              <span key={t} className="inline-flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-violet-500" /> {t}
-              </span>
+      <section className="relative isolate">
+        <div className="pointer-events-none absolute -right-48 -top-32 -z-10 h-[520px] w-[520px] rounded-full bg-violet-50 blur-3xl" />
+        <div className="mx-auto grid max-w-7xl items-center gap-14 px-5 pb-20 pt-14 sm:px-8 sm:pb-24 sm:pt-20 lg:grid-cols-[.95fr_1.05fr] lg:gap-12 lg:px-12 lg:pb-28 lg:pt-24">
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .45 }}>
+            <span className="inline-flex items-center gap-2 rounded-full border border-violet-100 bg-violet-50/70 px-3.5 py-2 text-xs font-semibold text-violet-800"><Sparkles className="h-3.5 w-3.5" /> Shared money, made clearer</span>
+            <h1 className="mt-6 max-w-xl font-sora text-[2.7rem] font-bold leading-[1.08] tracking-[-.045em] text-slate-950 sm:text-6xl lg:text-[4.15rem]">Your group’s money, <span className="text-violet-700">out in the open.</span></h1>
+            <p className="mt-6 max-w-lg text-base leading-7 text-slate-600 sm:text-lg sm:leading-8">PotKeeper helps student groups collect together, keep a shared record, and make group spending easier to follow—from the first contribution to the final payout.</p>
+            <div className="mt-8 flex flex-col gap-3 min-[430px]:flex-row">
+              <Link to="/signup" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-violet-700 px-6 text-sm font-bold text-white shadow-lg shadow-violet-900/15 transition hover:-translate-y-0.5 hover:bg-violet-800">Start a group pot <ArrowRight className="h-4 w-4" /></Link>
+              <a href="#how-it-works" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-6 text-sm font-bold text-slate-700 transition hover:border-violet-200 hover:bg-violet-50/50">See how it works <ArrowDown className="h-4 w-4" /></a>
+            </div>
+            <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-medium text-slate-500"><span className="inline-flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-emerald-600" /> Built for student groups</span><span className="inline-flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-emerald-600" /> Sandbox demo</span></div>
+          </motion.div>
+          <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .55, delay: .1 }}><ProductPreview /></motion.div>
+        </div>
+      </section>
+
+      <section className="border-y border-slate-100 bg-[#fbfafc]">
+        <div className="mx-auto grid max-w-7xl gap-8 px-5 py-8 sm:grid-cols-3 sm:px-8 sm:py-10 lg:px-12">
+          <div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-violet-700 shadow-sm ring-1 ring-slate-100"><Users className="h-5 w-5" /></span><div><p className="text-sm font-bold text-slate-900">Made for groups</p><p className="mt-1 text-xs leading-5 text-slate-500">Class dues, club plans, trips, and shared goals.</p></div></div>
+          <div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-violet-700 shadow-sm ring-1 ring-slate-100"><PieChart className="h-5 w-5" /></span><div><p className="text-sm font-bold text-slate-900">Progress at a glance</p><p className="mt-1 text-xs leading-5 text-slate-500">See what came in, what’s due, and what’s next.</p></div></div>
+          <div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-violet-700 shadow-sm ring-1 ring-slate-100"><MessageCircle className="h-5 w-5" /></span><div><p className="text-sm font-bold text-slate-900">Less chasing in chat</p><p className="mt-1 text-xs leading-5 text-slate-500">Keep pot questions and activity in one place.</p></div></div>
+        </div>
+      </section>
+
+      <section id="features" className="scroll-mt-10 py-20 sm:py-28">
+        <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-12">
+          <div className="max-w-2xl"><p className="text-xs font-bold uppercase tracking-[.18em] text-violet-700">A better way to manage shared money</p><h2 className="mt-4 font-sora text-3xl font-bold leading-tight tracking-tight text-slate-950 sm:text-4xl">Less uncertainty for the whole group.</h2><p className="mt-4 text-base leading-7 text-slate-600">When money is shared, everyone deserves a clear view of the plan and the progress.</p></div>
+          <div className="mt-12 grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:mt-16 lg:grid-cols-4">
+            {features.map((feature, index) => (
+              <motion.article key={feature.title} initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: .2 }} transition={{ duration: .35, delay: index * .05 }} className="border-t border-slate-200 pt-5">
+                <span className="grid h-11 w-11 place-items-center rounded-2xl bg-violet-50 text-violet-700"><feature.icon className="h-5 w-5" /></span>
+                <h3 className="mt-5 text-base font-bold text-slate-900">{feature.title}</h3><p className="mt-2 text-sm leading-6 text-slate-600">{feature.text}</p>
+              </motion.article>
             ))}
           </div>
-        </motion.div>
+        </div>
+      </section>
 
-        {/* Hero mock */}
-        <motion.div
-          initial={{ opacity: 0, y: 24, rotate: 2 }}
-          animate={{ opacity: 1, y: 0, rotate: 2 }}
-          transition={{ duration: 0.6, delay: 0.15 }}
-          className="relative"
-        >
-          <div className="rounded-3xl bg-white dark:bg-panel-dark shadow-2xl border border-slate-100 dark:border-slate-800 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className="text-xs font-semibold text-slate-400">200L Mass Comm Dues</p>
-                <p className="font-sora text-2xl font-bold text-slate-900 dark:text-white mt-1">₦67,500.00</p>
-              </div>
-              <span className="text-xs font-semibold text-violet-600 bg-violet-50 dark:bg-violet-500/10 px-3 py-1.5 rounded-full">
-                +₦20,000 today
-              </span>
-            </div>
-            <div className="grid grid-cols-3 gap-2 mb-5">
-              <div className="rounded-2xl bg-violet-50 dark:bg-slate-800 p-3">
-                <p className="text-[11px] text-slate-400">Collected</p>
-                <p className="font-bold text-slate-900 dark:text-white text-sm">₦47,000</p>
-              </div>
-              <div className="rounded-2xl bg-violet-50 dark:bg-slate-800 p-3">
-                <p className="text-[11px] text-slate-400">Outstanding</p>
-                <p className="font-bold text-slate-900 dark:text-white text-sm">₦13,000</p>
-              </div>
-              <div className="rounded-2xl bg-violet-50 dark:bg-slate-800 p-3">
-                <p className="text-[11px] text-slate-400">Paid</p>
-                <p className="font-bold text-slate-900 dark:text-white text-sm">5/8</p>
-              </div>
-            </div>
-            <div className="rounded-2xl bg-primary-50 dark:bg-primary-500/10 p-4 flex gap-2.5">
-              <Sparkles className="w-4 h-4 text-primary-600 shrink-0 mt-0.5" />
-              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                <span className="font-semibold text-slate-900 dark:text-white">AI Treasurer: </span>
-                3 members still owing — Chidi (₦5,000), Fatima (₦3,000 partial), Emeka (₦5,000).
-              </p>
-            </div>
-            <div className="mt-3 rounded-2xl border-2 border-violet-300 dark:border-violet-500/40 bg-violet-50 dark:bg-violet-500/10 p-3 flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-violet-600 shrink-0" />
-              <p className="text-xs text-slate-600 dark:text-slate-300">
-                ₦15,000 bus payout — needs 2 of 3 co-signers. <span className="font-semibold">1/2 done.</span>
-              </p>
+      <section id="how-it-works" className="scroll-mt-10 bg-[#f8f7fb] py-20 sm:py-28">
+        <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-12">
+          <div className="mx-auto max-w-2xl text-center"><p className="text-xs font-bold uppercase tracking-[.18em] text-violet-700">Simple from the start</p><h2 className="mt-4 font-sora text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">From group idea to shared progress.</h2><p className="mt-4 text-base leading-7 text-slate-600">Set up the pot around the way your group already plans.</p></div>
+          <div className="mt-14 grid gap-8 md:grid-cols-3 md:gap-10">
+            {steps.map((step, i) => <article key={step.number} className="relative border-t border-violet-200 pt-5">
+              <span className="font-sora text-sm font-bold tracking-widest text-violet-700">{step.number}</span><h3 className="mt-5 text-lg font-bold text-slate-950">{step.title}</h3><p className="mt-2 max-w-sm text-sm leading-6 text-slate-600">{step.text}</p>
+              {i < steps.length - 1 && <ArrowRight className="absolute right-0 top-5 hidden h-4 w-4 text-violet-300 md:block" />}
+            </article>)}
+          </div>
+          <div className="mt-14 flex flex-wrap justify-center gap-2 text-xs font-medium text-slate-600"><span className="rounded-full border border-slate-200 bg-white px-3 py-2">One-time goals</span><span className="rounded-full border border-slate-200 bg-white px-3 py-2">Recurring pots</span><span className="rounded-full border border-slate-200 bg-white px-3 py-2">Group approvals</span><span className="rounded-full border border-slate-200 bg-white px-3 py-2">Pot chat</span></div>
+        </div>
+      </section>
+
+      <section className="py-20 sm:py-28">
+        <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 sm:px-8 lg:grid-cols-2 lg:gap-20 lg:px-12">
+          <div className="order-2 lg:order-1">
+            <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_24px_70px_-45px_rgba(61,36,110,.3)] sm:p-7">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-4"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-violet-100 text-violet-700"><Sparkles className="h-5 w-5" /></span><div><p className="text-sm font-bold">AI Treasurer</p><p className="text-[11px] text-slate-500">For this pot</p></div></div><span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">Ready to help</span></div>
+              <p className="mt-5 max-w-md text-sm leading-6 text-slate-700">“How much is left to reach our trip goal?”</p>
+              <div className="mt-3 rounded-2xl rounded-tl-sm bg-violet-50 p-4 text-sm leading-6 text-slate-700"><p className="font-semibold text-slate-900">₦72,000 remaining</p><p className="mt-1 text-xs text-slate-600">Your pot has collected ₦248,000 toward the ₦320,000 goal. The deadline is in 12 days.</p><p className="mt-3 text-[10px] font-medium text-violet-700">Based on the current pot record</p></div>
+              <div className="mt-4 flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-xs text-slate-400"><span className="flex-1">Ask about your pot…</span><span className="grid h-7 w-7 place-items-center rounded-lg bg-violet-700 text-white"><ArrowRight className="h-3.5 w-3.5" /></span></div>
             </div>
           </div>
-        </motion.div>
-      </section>
-
-      {/* Problem */}
-      <section className="max-w-6xl mx-auto px-6 py-16">
-        <h2 className="font-sora text-3xl font-bold text-slate-900 dark:text-white text-center mb-2">
-          Treasurer shouldn't mean banker, auditor, and debt collector
-        </h2>
-        <p className="text-center text-slate-500 dark:text-slate-400 mb-12 max-w-2xl mx-auto">
-          Every semester, a student you trust ends up managing other people's money
-          with no tools and no record.
-        </p>
-        <div className="grid md:grid-cols-3 gap-6">
-          {problems.map((p, i) => (
-            <motion.div
-              key={p.title}
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.4, delay: i * 0.08 }}
-              className="rounded-3xl cp-card p-6"
-            >
-              <div className="w-11 h-11 rounded-2xl bg-violet-100 dark:bg-violet-500/15 flex items-center justify-center mb-4">
-                <p.icon className="w-5 h-5 text-violet-600" />
-              </div>
-              <h3 className="font-sora font-bold text-slate-900 dark:text-white mb-1.5">{p.title}</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400">{p.text}</p>
-            </motion.div>
-          ))}
+          <div className="order-1 lg:order-2"><p className="text-xs font-bold uppercase tracking-[.18em] text-violet-700">Clarity when you need it</p><h2 className="mt-4 font-sora text-3xl font-bold leading-tight tracking-tight text-slate-950 sm:text-4xl">Ask the pot. Get a useful answer.</h2><p className="mt-5 max-w-xl text-base leading-7 text-slate-600">The AI Treasurer can turn the pot’s activity into a quick answer—so members spend less time calculating totals and more time moving the plan forward.</p><ul className="mt-7 space-y-3 text-sm text-slate-700">{["Check who has contributed and what remains due", "Ask about deadlines, balances, or pending payouts", "Spot spending patterns and likely recurring costs", "Get a reminder draft to review before sharing"].map((item) => <li key={item} className="flex items-start gap-2.5"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />{item}</li>)}</ul><p className="mt-5 text-xs leading-5 text-slate-500">Answers depend on the information recorded in the pot. AI suggestions are there to support your group—not approve payments.</p></div>
         </div>
       </section>
 
-      {/* How it works */}
-      <section className="max-w-6xl mx-auto px-6 py-16">
-        <h2 className="font-sora text-3xl font-bold text-slate-900 dark:text-white text-center mb-12">
-          How PotKeeper works
-        </h2>
-        <div className="grid md:grid-cols-3 gap-6">
-          {steps.map((s, i) => (
-            <motion.div
-              key={s.title}
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.4, delay: i * 0.08 }}
-              className="rounded-3xl cp-card p-6 relative"
-            >
-              <span className="absolute top-6 right-6 font-sora text-3xl font-extrabold text-primary-100 dark:text-primary-500/20">
-                {i + 1}
-              </span>
-              <div className="w-11 h-11 rounded-2xl bg-primary-100 dark:bg-primary-500/15 flex items-center justify-center mb-4">
-                <s.icon className="w-5 h-5 text-primary-600" />
-              </div>
-              <h3 className="font-sora font-bold text-slate-900 dark:text-white mb-1.5">{s.title}</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400">{s.text}</p>
-            </motion.div>
-          ))}
+      <section className="border-y border-violet-100 bg-violet-50/60 py-14 sm:py-16">
+        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-5 sm:px-8 md:flex-row md:items-center md:justify-between lg:px-12">
+          <div className="max-w-2xl"><div className="flex items-center gap-2 text-violet-800"><ShieldCheck className="h-5 w-5" /><p className="text-xs font-bold uppercase tracking-[.16em]">Designed for shared accountability</p></div><h2 className="mt-3 font-sora text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Shared plans should come with shared visibility.</h2><p className="mt-3 text-sm leading-6 text-slate-600">Make contributions and payout decisions easier to follow. Keep the group informed with a visible activity record and clear approval steps.</p></div>
+          <Link to="/signup" className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 self-start rounded-xl bg-violet-700 px-5 text-sm font-bold text-white transition hover:bg-violet-800 md:self-center">See PotKeeper in action <ArrowRight className="h-4 w-4" /></Link>
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="max-w-6xl mx-auto px-6 pb-20">
-        <div className="rounded-[32px] bg-gradient-to-br from-primary-600 to-primary-900 p-10 sm:p-14 text-center relative overflow-hidden">
-          <div className="absolute -top-16 -right-16 w-72 h-72 rounded-full bg-white/10 blur-3xl" />
-          <div className="relative">
-            <TrendingUp className="w-10 h-10 text-primary-200 mx-auto mb-4" />
-            <h2 className="font-sora text-3xl font-bold text-white mb-3">Put your group's money where everyone can see it.</h2>
-            <p className="text-primary-100 max-w-xl mx-auto mb-8">
-              Set up a pot in under a minute, invite your members, and let the AI treasurer
-              handle the awkward asking.
-            </p>
-            <Link to="/signup" className="inline-flex items-center gap-2 bg-white text-primary-700 px-6 py-3.5 rounded-xl font-bold hover:shadow-2xl transition">
-              Get started free <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
+      <section className="py-20 sm:py-28">
+        <div className="mx-auto max-w-3xl px-5 sm:px-8">
+          <div className="text-center"><span className="mx-auto grid h-11 w-11 place-items-center rounded-2xl bg-violet-50 text-violet-700"><CircleHelp className="h-5 w-5" /></span><h2 className="mt-4 font-sora text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">A few useful answers.</h2></div>
+          <div className="mt-10 divide-y divide-slate-200 border-y border-slate-200">{questions.map((item) => <details key={item.q} className="group py-5"><summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-bold text-slate-900 marker:hidden">{item.q}<ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" /></summary><p className="mt-3 max-w-2xl pr-8 text-sm leading-6 text-slate-600">{item.a}</p></details>)}</div>
         </div>
-        <p className="text-center text-sm text-slate-400 mt-8">
-          © 2026 PotKeeper · B Moni x TINC26 · Sandbox & synthetic data only
-        </p>
       </section>
-    </div>
+
+      <section className="px-5 pb-20 sm:px-8 sm:pb-24 lg:px-12">
+        <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-[#24134a] px-6 py-12 text-center sm:px-12 sm:py-16">
+          <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-white/10 text-violet-100"><HandCoins className="h-6 w-6" /></span>
+          <h2 className="mx-auto mt-5 max-w-2xl font-sora text-3xl font-bold tracking-tight text-white sm:text-4xl">Make your next group plan easier to manage.</h2>
+          <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-violet-100/75">Start a pot, bring your group together, and keep the money side clear.</p>
+          <Link to="/signup" className="mt-7 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-white px-6 text-sm font-bold text-violet-800 transition hover:bg-violet-50">Create your first pot <ArrowRight className="h-4 w-4" /></Link>
+        </div>
+      </section>
+
+      <footer className="border-t border-slate-100 bg-white">
+        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-7 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-12">
+          <Brand />
+          <p className="text-xs leading-5 text-slate-500">© 2026 PotKeeper · Student groups, sharing money with clarity.</p>
+          <div className="flex items-center gap-4 text-xs font-semibold text-slate-600"><Link to="/login" className="hover:text-violet-700">Log in</Link><Link to="/signup" className="hover:text-violet-700">Sign up</Link></div>
+        </div>
+        <p className="mx-auto max-w-7xl px-5 pb-5 text-[10px] leading-5 text-slate-400 sm:px-8 lg:px-12">PotKeeper is currently a sandbox demo using synthetic data. No real money is held or transferred through this demo.</p>
+      </footer>
+    </main>
   );
 }
