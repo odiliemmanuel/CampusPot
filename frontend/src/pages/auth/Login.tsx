@@ -36,10 +36,10 @@ export default function Login() {
 
   return (
     <AuthLayout title="Welcome back" subtitle="Log in to your group's pot.">
-      <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-2.5 sm:space-y-4">
         <div>
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Email</label>
-          <div className="mt-1 relative">
+          <label className="text-xs font-medium text-slate-700 dark:text-slate-300 sm:text-sm">Email</label>
+          <div className="relative mt-0.5 sm:mt-1">
             <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="email"
@@ -47,14 +47,14 @@ export default function Login() {
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
               placeholder="you@example.com"
-              className="w-full pl-10 pr-4 py-2.5 sm:py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm sm:text-base text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 transition"
+              className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-10 pr-4 text-sm text-slate-900 transition placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white sm:py-3 sm:text-base"
             />
           </div>
         </div>
 
         <div>
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Password</label>
-          <div className="mt-1 relative">
+          <label className="text-xs font-medium text-slate-700 dark:text-slate-300 sm:text-sm">Password</label>
+          <div className="relative mt-0.5 sm:mt-1">
             <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type={showPassword ? "text" : "password"}
@@ -62,7 +62,7 @@ export default function Login() {
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
               placeholder="Enter your password"
-              className="w-full pl-10 pr-10 py-2.5 sm:py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm sm:text-base text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 transition"
+              className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-10 pr-10 text-sm text-slate-900 transition placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white sm:py-3 sm:text-base"
             />
             <button
               type="button"
@@ -79,7 +79,7 @@ export default function Login() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-gradient-to-br from-primary-600 to-primary-800 text-white py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-primary-600/30 transition disabled:opacity-60 sm:py-3.5"
+          className="w-full rounded-xl bg-gradient-to-br from-primary-600 to-primary-800 py-2.5 text-sm font-semibold text-white transition hover:shadow-lg hover:shadow-primary-600/30 disabled:opacity-60 sm:py-3.5 sm:text-base"
         >
           {loading ? "Logging in..." : "Log in"}
         </button>
@@ -87,12 +87,12 @@ export default function Login() {
 
       <button
         onClick={useDemo}
-        className="mt-4 w-full text-center text-xs font-medium text-slate-400 hover:text-primary-600 transition"
+        className="mt-3 w-full text-center text-[11px] font-medium text-slate-400 transition hover:text-primary-600 sm:mt-4 sm:text-xs"
       >
         Use demo account (ada@potkeeper.ng)
       </button>
 
-      <p className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
+      <p className="mt-4 text-center text-xs text-slate-500 dark:text-slate-400 sm:mt-6 sm:text-sm">
         Don't have an account?{" "}
         <Link to="/signup" state={{ from }} className="font-semibold text-primary-600 hover:text-primary-700">
           Sign up
