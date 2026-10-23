@@ -11,7 +11,7 @@ const features = [
   {
     icon: Wallet,
     title: "One pot for the whole group",
-    text: "Collect class dues, plan a trip, or save toward a shared goal. Keep the group’s money activity together and easy to follow.",
+    text: "Collect membership dues, plan an event, or save toward a shared goal. Keep your group’s money activity together and easy to follow.",
   },
   {
     icon: Eye,
@@ -32,12 +32,12 @@ const features = [
 
 const steps = [
   { number: "01", title: "Create a pot", text: "Choose a one-time goal or a recurring contribution plan that fits your group." },
-  { number: "02", title: "Bring everyone in", text: "Invite classmates with a join link or code, then agree on the plan together." },
+  { number: "02", title: "Bring everyone in", text: "Invite members with a join link or code, then agree on the plan together." },
   { number: "03", title: "Keep the plan moving", text: "Track contributions, discuss requests, and see what needs attention before a deadline." },
 ];
 
 const questions = [
-  { q: "Who is PotKeeper for?", a: "Student groups that collect money together: class associations, project teams, clubs, roommates, and trip planners." },
+  { q: "Who is PotKeeper for?", a: "Any group that manages money together: organizations, associations, clubs, teams, communities, event planners, and more." },
   { q: "Can members see what is happening?", a: "Pot activity is organized so members can follow contributions, expenses or payout requests, and the decisions attached to them." },
   { q: "What does the AI Treasurer do?", a: "It answers questions using the selected pot’s available records and can help draft reminders. It does not make payout decisions for your group." },
   { q: "Does PotKeeper move real money?", a: "The current demo uses sandbox and synthetic data. Don’t use it to make real payments." },
@@ -66,7 +66,7 @@ function ProductPreview() {
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
           <div className="flex min-w-0 items-center gap-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-100 text-violet-700"><Users className="h-5 w-5" /></span>
-            <div><p className="text-[11px] font-medium text-slate-400">YOUR POT</p><p className="truncate text-sm font-bold text-slate-900">Faculty trip fund</p></div>
+            <div><p className="text-[11px] font-medium text-slate-400">YOUR POT</p><p className="truncate text-sm font-bold text-slate-900">Community event fund</p></div>
           </div>
           <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-[10px] font-semibold text-emerald-700"><span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />On track</span>
         </div>
@@ -122,12 +122,12 @@ export default function LandingPage() {
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .45 }}>
             <span className="inline-flex items-center gap-2 rounded-full border border-violet-100 bg-violet-50/70 px-3.5 py-2 text-xs font-semibold text-violet-800"><Sparkles className="h-3.5 w-3.5" /> Shared money, made clearer</span>
             <h1 className="mt-6 max-w-xl font-sora text-[2.7rem] font-bold leading-[1.08] tracking-[-.045em] text-slate-950 sm:text-6xl lg:text-[4.15rem]">Your group’s money, <span className="text-violet-700">out in the open.</span></h1>
-            <p className="mt-6 max-w-lg text-base leading-7 text-slate-600 sm:text-lg sm:leading-8">PotKeeper helps student groups collect together, keep a shared record, and make group spending easier to follow—from the first contribution to the final payout.</p>
+            <p className="mt-6 max-w-lg text-base leading-7 text-slate-600 sm:text-lg sm:leading-8">PotKeeper helps organizations and groups collect together, keep a shared record, and make group spending easier to follow—from the first contribution to the final payout.</p>
             <div className="mt-8 flex flex-col gap-3 min-[430px]:flex-row">
               <Link to="/signup" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-violet-700 px-6 text-sm font-bold text-white shadow-lg shadow-violet-900/15 transition hover:-translate-y-0.5 hover:bg-violet-800">Start a group pot <ArrowRight className="h-4 w-4" /></Link>
               <a href="#how-it-works" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-6 text-sm font-bold text-slate-700 transition hover:border-violet-200 hover:bg-violet-50/50">See how it works <ArrowDown className="h-4 w-4" /></a>
             </div>
-            <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-medium text-slate-500"><span className="inline-flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-emerald-600" /> Built for student groups</span><span className="inline-flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-emerald-600" /> Sandbox demo</span></div>
+            <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-medium text-slate-500"><span className="inline-flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-emerald-600" /> Built for groups and organizations</span><span className="inline-flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-emerald-600" /> Sandbox demo</span></div>
           </motion.div>
           <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .55, delay: .1 }}><ProductPreview /></motion.div>
         </div>
@@ -135,7 +135,7 @@ export default function LandingPage() {
 
       <section className="border-y border-slate-100 bg-[#fbfafc]">
         <div className="mx-auto grid max-w-7xl gap-8 px-5 py-8 sm:grid-cols-3 sm:px-8 sm:py-10 lg:px-12">
-          <div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-violet-700 shadow-sm ring-1 ring-slate-100"><Users className="h-5 w-5" /></span><div><p className="text-sm font-bold text-slate-900">Made for groups</p><p className="mt-1 text-xs leading-5 text-slate-500">Class dues, club plans, trips, and shared goals.</p></div></div>
+          <div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-violet-700 shadow-sm ring-1 ring-slate-100"><Users className="h-5 w-5" /></span><div><p className="text-sm font-bold text-slate-900">Made for groups</p><p className="mt-1 text-xs leading-5 text-slate-500">Membership dues, team plans, events, and shared goals.</p></div></div>
           <div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-violet-700 shadow-sm ring-1 ring-slate-100"><PieChart className="h-5 w-5" /></span><div><p className="text-sm font-bold text-slate-900">Progress at a glance</p><p className="mt-1 text-xs leading-5 text-slate-500">See what came in, what’s due, and what’s next.</p></div></div>
           <div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-violet-700 shadow-sm ring-1 ring-slate-100"><MessageCircle className="h-5 w-5" /></span><div><p className="text-sm font-bold text-slate-900">Less chasing in chat</p><p className="mt-1 text-xs leading-5 text-slate-500">Keep pot questions and activity in one place.</p></div></div>
         </div>
@@ -208,7 +208,7 @@ export default function LandingPage() {
       <footer className="border-t border-slate-100 bg-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-7 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-12">
           <Brand />
-          <p className="text-xs leading-5 text-slate-500">© 2026 PotKeeper · Student groups, sharing money with clarity.</p>
+          <p className="text-xs leading-5 text-slate-500">© 2026 PotKeeper · Groups and organizations, sharing money with clarity.</p>
           <div className="flex items-center gap-4 text-xs font-semibold text-slate-600"><Link to="/login" className="hover:text-violet-700">Log in</Link><Link to="/signup" className="hover:text-violet-700">Sign up</Link></div>
         </div>
         <p className="mx-auto max-w-7xl px-5 pb-5 text-[10px] leading-5 text-slate-400 sm:px-8 lg:px-12">PotKeeper is currently a sandbox demo using synthetic data. No real money is held or transferred through this demo.</p>
