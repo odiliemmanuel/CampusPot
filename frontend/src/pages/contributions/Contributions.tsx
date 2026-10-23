@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  Loader2, CheckCircle2, ArrowDownLeft, RefreshCw,
+  Loader2, CheckCircle2, ArrowDownLeft, BookOpen, ChevronDown, RefreshCw, Undo2,
 } from "lucide-react";
 
 import AppShell from "../../layouts/AppShell";
@@ -12,9 +12,10 @@ import AlertError from "../../components/AlertError";
 import PinField from "../../components/PinField";
 import { useGroup } from "../../providers/GroupProvider";
 import {
-  listPayments, listMembers,
+  listPayments, listMembers, listJournals, refundPayment,
   walletPayPot, getStoredUser, getContributions, getWallet, setWalletPin,
   type Payment, type Membership, type ContributionsResponse, type ContributionRow,
+  type ContributionJournal,
 } from "../../lib/api";
 import { formatNaira, nairaToKobo } from "../../lib/format";
 
@@ -45,6 +46,7 @@ export function ContributionsInner() {
 
   const [payAmount, setPayAmount] = useState("");
   const [payBusy, setPayBusy] = useState(false);
+  const [refundBusy, setRefundBusy] = useState("");
   // Transaction PIN authorises the wallet debit; first-time payers set it here.
   const [pinSet, setPinSet] = useState<boolean | null>(null);
   const [pin, setPin] = useState("");
@@ -84,6 +86,20 @@ export function ContributionsInner() {
     ? Math.max(0, mine.amountKobo - mine.paidKobo)
     : 0;
   const unpaid = rows.filter((r) => r.state !== "paid");
+
+  const handleRefund = async (paymentId: string) => {
+    if (!window.confirm("Return this contribution to the member's wallet? Their outstanding will go back up.")) return;
+    setError(""); setNotice(""); setRefundBusy(paymentId);
+    try {
+      await refundPayment(gid, paymentId);
+      setNotice("Contribution refunded to the member's wallet.");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't refund that contribution.");
+    } finally {
+      setRefundBusy("");
+    }
+  };
 
   const handlePayFromWallet = async (full: boolean) => {
     setError(""); setNotice("");
@@ -198,18 +214,35 @@ export function ContributionsInner() {
                 <p className="text-sm text-slate-400">No payments yet.</p>
               ) : (
                 <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {payments.slice(0, 8).map((p) => (
-                    <div key={p.id} className="flex items-center gap-2 py-1.5 first:pt-0">
-                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-violet-100 dark:bg-violet-500/15">
-                        <ArrowDownLeft className="h-3.5 w-3.5 text-violet-700 dark:text-violet-300" />
+                  {payments.slice(0, 8).map((p) => {
+                    const refundable = !!p.userId && !p.refundedAt && ["matched", "partial"].includes(p.status);
+                    return (
+                      <div key={p.id} className="flex items-center gap-2 py-1.5 first:pt-0">
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-violet-100 dark:bg-violet-500/15">
+                          <ArrowDownLeft className="h-3.5 w-3.5 text-violet-700 dark:text-violet-300" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs text-slate-700 dark:text-slate-200">{p.payerName || p.quotedReference || "Deposit"}</p>
+                          <p className="text-[10px] text-slate-400">
+                            {new Date(p.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}
+                            {p.refundedAt && " · refunded"}
+                          </p>
+                        </div>
+                        <span className="shrink-0 text-xs font-semibold text-violet-700 dark:text-violet-300">{formatNaira(p.amountKobo)}</span>
+                        {refundable && (
+                          <button
+                            type="button"
+                            onClick={() => void handleRefund(p.id)}
+                            disabled={refundBusy === p.id}
+                            title="Refund this contribution"
+                            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-60 dark:hover:bg-rose-500/10"
+                          >
+                            <Undo2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-xs text-slate-700 dark:text-slate-200">{p.payerName || p.quotedReference || "Deposit"}</p>
-                        <p className="text-[10px] text-slate-400">{new Date(p.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}</p>
-                      </div>
-                      <span className="shrink-0 text-xs font-semibold text-violet-700 dark:text-violet-300">{formatNaira(p.amountKobo)}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -235,7 +268,129 @@ export function ContributionsInner() {
           )}
         </div>
       </div>
+
+      <JournalsCard gid={gid} />
     </>
+  );
+}
+
+// One book per contribution period: a rotating pot opens a new journal every
+// day/week/month, and each closed cycle stays readable forever.
+function JournalsCard({ gid }: { gid: string }) {
+  const [journals, setJournals] = useState<ContributionJournal[] | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    listJournals(gid)
+      .then(setJournals)
+      .catch((err) => setError(err instanceof Error ? err.message : "Couldn't load the journals."));
+  }, [gid]);
+
+  if (error) return <div className="mt-4"><AlertError message={error} /></div>;
+  if (journals === null) return null;
+  if (journals.length === 0) {
+    return (
+      <p className="mt-4 rounded-xl border border-dashed border-slate-200 px-4 py-4 text-center text-xs text-slate-500 dark:border-white/10 dark:text-slate-400">
+        No cycles yet — the first journal opens when a contribution period starts.
+      </p>
+    );
+  }
+
+  // Newest cycle first; the pot reads as one book per period.
+  const ordered = [...journals].reverse();
+
+  return (
+    <section className="mt-6">
+      <div className="mb-2 flex items-center gap-2">
+        <BookOpen className="h-4 w-4 text-violet-600" />
+        <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">Journals</h2>
+        <span className="text-[11px] text-slate-400">one book per contribution period</span>
+      </div>
+
+      <div className="space-y-2">
+        {ordered.map((j) => {
+          const open = openId === j.levyId;
+          return (
+            <div key={j.levyId} className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm dark:border-white/10 dark:bg-panel-dark">
+              <button
+                type="button"
+                onClick={() => setOpenId(open ? null : j.levyId)}
+                aria-expanded={open}
+                className="flex w-full items-center gap-3 p-3.5 text-left"
+              >
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
+                  <BookOpen className="h-4 w-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+                    {j.periodLabel}
+                    <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">{j.cadence.replace("_", " ")}</span>
+                  </p>
+                  <p className="truncate text-xs text-slate-400">
+                    {j.paidCount}/{j.rows.length} paid · {formatNaira(j.collectedKobo)} of {formatNaira(j.expectedKobo)} expected
+                  </p>
+                </div>
+                <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                  j.status === "open"
+                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
+                    : "bg-slate-100 text-slate-500 dark:bg-white/10"
+                }`}>
+                  {j.status === "open" ? "Open" : "Closed"}
+                </span>
+                <ChevronDown className={`h-4 w-4 shrink-0 text-slate-300 transition-transform ${open ? "rotate-180" : ""}`} />
+              </button>
+
+              {open && (
+                <div className="border-t border-slate-100 px-3.5 pb-3.5 pt-3 dark:border-white/10">
+                  <div className="mb-2 grid grid-cols-3 gap-2 text-center">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-slate-400">Per member</p>
+                      <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{formatNaira(j.amountKobo)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-slate-400">Collected</p>
+                      <p className="text-sm font-semibold text-violet-600">{formatNaira(j.collectedKobo)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-slate-400">Closing bal.</p>
+                      <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{formatNaira(j.closingBalanceKobo)}</p>
+                    </div>
+                  </div>
+
+                  <div className="divide-y divide-slate-100 dark:divide-white/5">
+                    {j.rows.map((row) => (
+                      <div key={row.userId} className="flex items-center gap-2 py-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-semibold text-slate-700 dark:text-slate-200">{row.name || "Member"}</p>
+                          <p className="text-[10px] text-slate-400">
+                            {row.payments.length > 0
+                              ? `${row.payments.length} payment${row.payments.length === 1 ? "" : "s"} · ${row.payments.map((p) => new Date(p.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short" })).join(", ")}`
+                              : "no payment this cycle"}
+                          </p>
+                        </div>
+                        <span className="shrink-0 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                          {formatNaira(row.paidKobo)} / {formatNaira(row.amountKobo)}
+                        </span>
+                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                          row.state === "paid"
+                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
+                            : row.state === "partial"
+                            ? "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300"
+                            : "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300"
+                        }`}>
+                          {row.state}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

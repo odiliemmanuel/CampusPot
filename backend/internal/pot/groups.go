@@ -27,6 +27,12 @@ type CreateGroupRequest struct {
 	// PerMemberKobo is the amount every member pays in. When > 0 the pot opens
 	// with a matching levy, so the collection target is per-member × members.
 	PerMemberKobo int64 `json:"perMemberKobo"`
+	// Presentation: how the pot shows itself when public, and the savings
+	// goal it is aiming at (0 = no fixed goal).
+	Description string `json:"description"`
+	Category    string `json:"category"`
+	Visibility  string `json:"visibility"` // private (default) | public
+	TargetKobo  int64  `json:"targetKobo"`
 }
 
 // CreateGroup creates a pot, makes the caller its treasurer, and provisions
@@ -56,6 +62,16 @@ func (s *Service) CreateGroup(ctx context.Context, treasurerID uuid.UUID, req Cr
 	validFrequency := map[string]bool{"one_time": true, "daily": true, "weekly": true, "monthly": true, "quarterly": true}
 	if !validFrequency[req.ContributionFrequency] || (req.PotType == "goal" && req.ContributionFrequency != "one_time") || (req.PotType == "rotating" && req.ContributionFrequency == "one_time") {
 		return nil, fmt.Errorf("%w: contribution frequency does not match pot type", ErrInvalid)
+	}
+	visibility := strings.TrimSpace(req.Visibility)
+	if visibility == "" {
+		visibility = models.VisibilityPrivate
+	}
+	if visibility != models.VisibilityPrivate && visibility != models.VisibilityPublic {
+		return nil, fmt.Errorf("%w: visibility must be private or public", ErrInvalid)
+	}
+	if req.TargetKobo < 0 {
+		return nil, fmt.Errorf("%w: a savings goal cannot be negative", ErrInvalid)
 	}
 	if req.PerMemberKobo <= 0 {
 		return nil, fmt.Errorf("%w: contribution amount must be greater than zero", ErrInvalid)
@@ -90,6 +106,10 @@ func (s *Service) CreateGroup(ctx context.Context, treasurerID uuid.UUID, req Cr
 		ApprovalTotal:          req.ApprovalTotal,
 		LargeExpenseKobo:       req.LargeExpenseKobo,
 		BMoniUserID:            treasurer.BMoniUserID,
+		Description:            strings.TrimSpace(req.Description),
+		Category:               strings.TrimSpace(req.Category),
+		Visibility:             visibility,
+		TargetKobo:             req.TargetKobo,
 	}
 
 	for i := 0; i < 5; i++ {
@@ -278,6 +298,13 @@ type UpdateGroupRequest struct {
 	ApprovalTotal       *int      `json:"approvalTotal"`
 	LargeExpenseKobo    *int64    `json:"largeExpenseKobo"`
 	ContributionDueDate *FlexTime `json:"contributionDueDate"`
+	Description         *string   `json:"description"`
+	Category            *string   `json:"category"`
+	Visibility          *string   `json:"visibility"` // private | public
+	TargetKobo          *int64    `json:"targetKobo"`  // 0 clears the goal
+	// HideTreasury keeps the pot's balance visible only to the treasurer and
+	// co-signers.
+	HideTreasury *bool `json:"hideTreasury"`
 }
 
 // UpdateGroup changes a pot's name and spending rules. Treasurer only.
@@ -315,6 +342,28 @@ func (s *Service) UpdateGroup(_ context.Context, groupID, actorID uuid.UUID, req
 			return nil, fmt.Errorf("%w: contribution deadline must be today or later", ErrInvalid)
 		}
 		group.ContributionDueDate = &due
+	}
+	if req.Description != nil {
+		group.Description = strings.TrimSpace(*req.Description)
+	}
+	if req.Category != nil {
+		group.Category = strings.TrimSpace(*req.Category)
+	}
+	if req.Visibility != nil {
+		v := strings.TrimSpace(*req.Visibility)
+		if v != models.VisibilityPrivate && v != models.VisibilityPublic {
+			return nil, fmt.Errorf("%w: visibility must be private or public", ErrInvalid)
+		}
+		group.Visibility = v
+	}
+	if req.TargetKobo != nil {
+		if *req.TargetKobo < 0 {
+			return nil, fmt.Errorf("%w: a savings goal cannot be negative", ErrInvalid)
+		}
+		group.TargetKobo = *req.TargetKobo
+	}
+	if req.HideTreasury != nil {
+		group.HideTreasury = *req.HideTreasury
 	}
 
 	if group.ApprovalThreshold <= 0 || group.ApprovalTotal <= 0 {

@@ -4,6 +4,7 @@ import {
   ArrowRight, HandCoins, PiggyBank, Settings, Sparkles, Wallet, X,
 } from "lucide-react";
 import { useGroup } from "../providers/GroupProvider";
+import { useI18n } from "../lib/i18n";
 
 // Top-level navigation is the pots list, the personal Balance & History screen,
 // and app settings. A pot's sections (dashboard, contributions, levies, payouts,
@@ -42,6 +43,7 @@ function PromoCard({ to, onNavigate }: { to: string; onNavigate?: () => void }) 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { activeGroup } = useGroup();
   const { pathname } = useLocation();
+  const { t } = useI18n();
 
   // A pot is "open" when the URL is /pots/<id> (not the list or the new-pot page).
   const potOpen =
@@ -66,11 +68,11 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <nav className="mt-6 flex flex-col gap-1" aria-label="Primary">
         <NavLink to="/pots" end onClick={onNavigate} className={navClass}>
           <PiggyBank className="h-4 w-4 shrink-0" />
-          Pots
+          {t("nav.pots")}
         </NavLink>
         <NavLink to="/account" onClick={onNavigate} className={navClass}>
           <Wallet className="h-4 w-4 shrink-0" />
-          Balance &amp; History
+          {t("nav.balance")}
         </NavLink>
       </nav>
 
@@ -93,7 +95,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         )}
         <NavLink to="/settings" onClick={onNavigate} className={navClass}>
           <Settings className="h-4 w-4 shrink-0" />
-          Settings
+          {t("nav.settings")}
         </NavLink>
       </div>
     </div>

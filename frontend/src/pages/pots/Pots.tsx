@@ -1,11 +1,11 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronRight, Loader2, PiggyBank, Plus, Repeat2, Target } from "lucide-react";
+import { CheckCircle2, ChevronRight, Compass, Loader2, PiggyBank, Plus, Search, Repeat2, Target, Users } from "lucide-react";
 
 import AppShell from "../../layouts/AppShell";
 import PageHeader from "../../components/PageHeader";
 import { useGroup } from "../../providers/GroupProvider";
-import { getSummary, type Group, type GroupSummary } from "../../lib/api";
+import { discoverPots, getSummary, joinPublicPot, type DiscoverablePot, type Group, type GroupSummary } from "../../lib/api";
 import { formatNaira } from "../../lib/format";
 
 const PotPortfolioCharts = lazy(() => import("./PotPortfolioCharts"));
@@ -207,10 +207,131 @@ function PotsGrid() {
   );
 }
 
+// Public pots anyone can join — searchable by name, category or purpose.
+function DiscoverSection() {
+  const { refresh, setActiveGroupById } = useGroup();
+  const navigate = useNavigate();
+  const [query, setQuery] = useState("");
+  const [pots, setPots] = useState<DiscoverablePot[] | null>(null);
+  const [busyId, setBusyId] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      discoverPots(query)
+        .then(setPots)
+        .catch(() => setPots([]));
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  const join = async (pot: DiscoverablePot) => {
+    setError(""); setBusyId(pot.id);
+    try {
+      await joinPublicPot(pot.id);
+      await refresh();
+      setActiveGroupById(pot.id);
+      navigate(`/pots/${pot.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't join that pot.");
+    } finally {
+      setBusyId("");
+    }
+  };
+
+  return (
+    <section aria-label="Discover public pots" className="mt-8">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="flex items-center gap-1.5 text-sm font-bold text-slate-800 dark:text-slate-100">
+            <Compass className="h-4 w-4 text-violet-600" /> Discover public pots
+          </p>
+          <p className="mt-0.5 text-xs text-slate-400">Open pots anyone can join — or keep yours invite-only.</p>
+        </div>
+        <div className="relative w-full sm:w-64">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search name or category…"
+            aria-label="Search public pots"
+            className="cp-input pl-9"
+          />
+        </div>
+      </div>
+
+      {error && <p role="alert" className="mb-2 text-xs text-rose-600 dark:text-rose-400">{error}</p>}
+
+      {pots === null ? (
+        <div className="flex items-center gap-2 text-xs text-slate-400"><Loader2 className="h-4 w-4 animate-spin" /> Looking for public pots…</div>
+      ) : pots.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-slate-200 px-4 py-5 text-center text-xs text-slate-500 dark:border-white/10 dark:text-slate-400">
+          {query ? "No public pots match that search." : "No public pots yet — create one and set it public to appear here."}
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {pots.map((pot) => (
+            <div key={pot.id} className="flex flex-col rounded-[1.4rem] border border-slate-200/70 bg-white p-4 shadow-[0_8px_24px_-18px_rgba(76,29,149,.25)] dark:border-white/10 dark:bg-[#171626]">
+              <div className="flex items-start gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-fuchsia-500 to-violet-700 text-white">
+                  <PiggyBank className="h-5 w-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold text-slate-900 dark:text-white">{pot.name}</p>
+                  <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-slate-400">
+                    <Users className="h-3 w-3" /> {pot.members} member{pot.members === 1 ? "" : "s"}
+                    {pot.category && <span className="ml-1 rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 dark:bg-violet-500/10 dark:text-violet-300">{pot.category}</span>}
+                  </p>
+                </div>
+              </div>
+
+              {pot.description && (
+                <p className="mt-2 line-clamp-2 text-xs text-slate-500 dark:text-slate-400">{pot.description}</p>
+              )}
+
+              {pot.targetKobo > 0 ? (
+                <div className="mt-3">
+                  <div className="mb-1 flex items-center justify-between text-[10px] text-slate-400">
+                    <span>Goal · {formatNaira(pot.targetKobo)}</span>
+                    <span className="font-semibold text-violet-600">{formatNaira(pot.balanceKobo)}</span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+                    <div className="h-full rounded-full bg-gradient-to-r from-fuchsia-500 to-violet-600" style={{ width: `${Math.min(100, Math.round((pot.balanceKobo / pot.targetKobo) * 100))}%` }} />
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-3 text-xs text-slate-400">
+                  {pot.contributionAmountKobo > 0 ? `${formatNaira(pot.contributionAmountKobo)} per member` : "No fixed contribution"}
+                </p>
+              )}
+
+              {pot.joined ? (
+                <Link to={`/pots/${pot.id}`} className="mt-3 inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Open
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void join(pot)}
+                  disabled={busyId === pot.id}
+                  className="mt-3 inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-br from-violet-600 to-purple-800 py-2 text-xs font-bold text-white transition hover:shadow-lg disabled:opacity-60"
+                >
+                  {busyId === pot.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Join pot
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function Pots() {
   return (
     <AppShell>
       <PotsGrid />
+      <DiscoverSection />
     </AppShell>
   );
 }

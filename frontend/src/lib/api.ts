@@ -107,6 +107,14 @@ export interface AuthUser {
   phone?: string;
   bmoniUserId?: string;
   createdAt?: string;
+  /** True once the emailed code confirmed this address. Money needs it. */
+  emailVerified?: boolean;
+  /** "unverified" | "verified" — identity check, raises send limits. */
+  kycStatus?: string;
+  /** The code to share for referral rewards. */
+  referralCode?: string;
+  /** Preferred language: "en" | "fr". */
+  locale?: string;
 }
 
 export type Role = "treasurer" | "cosigner" | "member";
@@ -121,6 +129,14 @@ export interface Group {
   contributionFrequency: "one_time" | "daily" | "weekly" | "monthly" | "quarterly";
   contributionAmountKobo: number;
   contributionDueDate?: string;
+  /** How the pot presents itself when public. */
+  description?: string;
+  category?: string;
+  visibility: "private" | "public";
+  /** Savings goal in kobo; 0 = no fixed goal. */
+  targetKobo: number;
+  /** Treasurer-only pot balance: ordinary members do not see it. */
+  hideTreasury: boolean;
   bmoniUserId?: string;
   bmoniWalletId?: string;
   bmoniWalletAddress?: string;
@@ -166,6 +182,8 @@ export interface Payment {
   status: string;
   quotedReference?: string;
   matchedBy?: string;
+  /** Set once the treasurer returned this contribution to the member. */
+  refundedAt?: string;
   createdAt: string;
 }
 
@@ -251,6 +269,12 @@ export interface GroupSummary {
   pendingExpenses: number;
   openDisputes: number;
   spendingFrozen: boolean;
+  /** Savings goal (0 = none) and the balance as a share of it. */
+  targetKobo: number;
+  goalPercent: number;
+  visibility: "private" | "public";
+  /** True when the treasurer hid the balance from ordinary members. */
+  treasuryHidden: boolean;
 }
 
 export interface ChatMessage {
@@ -278,6 +302,9 @@ export interface Dispute {
   status: DisputeStatus;
   resolvedBy?: string;
   resolvedAt?: string;
+  /** Set when the dispute was escalated to customer support. */
+  escalatedAt?: string;
+  escalationNote?: string;
   createdAt: string;
 }
 
@@ -330,6 +357,8 @@ export interface PotMembership {
   virtualAccountBank?: string;
   virtualAccountName?: string;
   bmoniWalletAddress?: string;
+  /** True when the treasurer hid this pot's balance from ordinary members. */
+  treasuryHidden: boolean;
 }
 
 export interface MyTransaction {
@@ -349,7 +378,7 @@ export interface AccountOverview {
   transactions: MyTransaction[];
 }
 
-export type WalletTxKind = "deposit" | "transfer_in" | "transfer_out" | "pot_payment";
+export type WalletTxKind = "deposit" | "transfer_in" | "transfer_out" | "pot_payment" | "refund" | "bonus";
 
 export interface WalletTransaction {
   id: string;
@@ -383,10 +412,17 @@ export interface AnswerResponse {
 
 // ---------- Auth ----------
 
-export const register = (name: string, email: string, phone: string, password: string) =>
+export const register = (
+  name: string,
+  email: string,
+  phone: string,
+  password: string,
+  referralCode = "",
+  locale = "en",
+) =>
   request<{ token: string; user: AuthUser }>("/auth/register", {
     method: "POST",
-    body: JSON.stringify({ name, email, password, phone }),
+    body: JSON.stringify({ name, email, password, phone, referralCode, locale }),
   });
 
 export const login = (email: string, password: string) =>
@@ -397,7 +433,7 @@ export const login = (email: string, password: string) =>
 
 export const getMe = () => request<AuthUser>("/auth/me");
 
-export const updateProfile = (patch: { name?: string; phone?: string }) =>
+export const updateProfile = (patch: { name?: string; phone?: string; locale?: string }) =>
   request<AuthUser>("/auth/me", { method: "PATCH", body: JSON.stringify(patch) });
 
 export const deleteAccount = () => request<{ deleted: boolean }>("/auth/me", { method: "DELETE" });
@@ -411,7 +447,15 @@ export const createGroup = (
   approvalTotal = 3,
   largeExpenseKobo = 0,
   perMemberKobo = 0,
-  options: { potType?: "goal" | "rotating"; contributionFrequency?: "one_time" | "daily" | "weekly" | "monthly" | "quarterly"; contributionDueDate?: string } = {},
+  options: {
+    potType?: "goal" | "rotating";
+    contributionFrequency?: "one_time" | "daily" | "weekly" | "monthly" | "quarterly";
+    contributionDueDate?: string;
+    description?: string;
+    category?: string;
+    visibility?: "private" | "public";
+    targetKobo?: number;
+  } = {},
 ) =>
   request<Group>("/groups", {
     method: "POST",
@@ -420,7 +464,21 @@ export const createGroup = (
 export const getGroup = (id: string) => request<Group>(`/groups/${id}`);
 export const updateGroup = (
   id: string,
-  patch: Partial<Pick<Group, "name" | "approvalThreshold" | "approvalTotal" | "largeExpenseKobo" | "contributionDueDate">>
+  patch: Partial<
+    Pick<
+      Group,
+      | "name"
+      | "approvalThreshold"
+      | "approvalTotal"
+      | "largeExpenseKobo"
+      | "contributionDueDate"
+      | "description"
+      | "category"
+      | "visibility"
+      | "targetKobo"
+      | "hideTreasury"
+    >
+  >
 ) => request<Group>(`/groups/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
 export const regenerateJoinCode = (id: string) =>
   request<Group>(`/groups/${id}/join-code`, { method: "POST" });
@@ -758,6 +816,7 @@ async function localAccountOverview(): Promise<AccountOverview> {
       virtualAccountBank: g.virtualAccountBank,
       virtualAccountName: g.virtualAccountName,
       bmoniWalletAddress: g.bmoniWalletAddress,
+      treasuryHidden: false,
     });
 
     totalContributedKobo += paidKobo;
@@ -802,6 +861,228 @@ export const getAccountOverview = async (): Promise<AccountOverview> => {
     throw err;
   }
 };
+
+// ---------- Email verification, password reset, KYC, referrals ----------
+
+export interface OtpResponse {
+  sent: boolean;
+  expiresAt?: string;
+  /** Present only on demo deployments with no SMTP — lets the flow complete. */
+  devCode?: string;
+}
+
+/** Ask for a sign-up verification code (or a password-reset one). */
+export const sendOtp = (email: string, purpose: "signup" | "reset" = "signup") =>
+  request<OtpResponse>("/auth/otp/send", {
+    method: "POST",
+    body: JSON.stringify({ email, purpose }),
+  });
+
+/** Consume the emailed code; marks the address verified and pays rewards. */
+export const verifyOtp = (email: string, code: string, purpose: "signup" | "reset" = "signup") =>
+  request<{ verified: boolean; user?: AuthUser }>("/auth/otp/verify", {
+    method: "POST",
+    body: JSON.stringify({ email, code, purpose }),
+  });
+
+export const forgotPassword = (email: string) =>
+  request<OtpResponse>("/auth/password/forgot", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+
+export const resetPassword = (email: string, code: string, password: string) =>
+  request<{ reset: boolean }>("/auth/password/reset", {
+    method: "POST",
+    body: JSON.stringify({ email, code, password }),
+  });
+
+/** Submit an 11-digit BVN for identity verification (sandbox only). */
+export const submitKyc = (bvn: string) =>
+  request<AuthUser>("/auth/kyc", { method: "POST", body: JSON.stringify({ bvn }) });
+
+export interface ReferralOverview {
+  code: string;
+  link: string;
+  invited: number;
+  verified: number;
+  earnedKobo: number;
+  rewardEachKobo: number;
+  welcomeEachKobo: number;
+}
+
+export const getReferral = () => request<ReferralOverview>("/auth/referral");
+
+// ---------- Discover public pots ----------
+
+export interface DiscoverablePot {
+  id: string;
+  name: string;
+  description?: string;
+  category?: string;
+  currency: string;
+  potType: "goal" | "rotating";
+  contributionAmountKobo: number;
+  targetKobo: number;
+  balanceKobo: number;
+  members: number;
+  open: boolean;
+  joined: boolean;
+  createdAt: string;
+}
+
+export const discoverPots = (q = "", category = "") =>
+  request<DiscoverablePot[] | null>(
+    `/pots/discover?q=${encodeURIComponent(q)}&category=${encodeURIComponent(category)}`
+  ).then((p) => p ?? []);
+
+/** Join a public pot directly — no invite code needed. */
+export const joinPublicPot = (groupId: string) =>
+  request<Group>(`/pots/${groupId}/join`, { method: "POST" });
+
+// ---------- Scheduled & recurring transfers ----------
+
+export interface ScheduleView {
+  id: string;
+  amountKobo: number;
+  recipient?: string;
+  bankName?: string;
+  note?: string;
+  groupId?: string;
+  groupName?: string;
+  executeAt: string;
+  cadence: "once" | "weekly" | "monthly";
+  status: "scheduled" | "completed" | "failed" | "cancelled";
+  attempts: number;
+  lastError?: string;
+  createdAt: string;
+}
+
+export interface ScheduleInput {
+  amountKobo: number;
+  recipient?: string;
+  bankName?: string;
+  bankCode?: string;
+  note?: string;
+  /** Set instead of recipient to contribute into a pot. */
+  groupId?: string;
+  executeAt: string;
+  cadence: "once" | "weekly" | "monthly";
+  pin: string;
+}
+
+export const listSchedules = () =>
+  request<ScheduleView[] | null>("/wallet/schedules").then((s) => s ?? []);
+
+export const createSchedule = (input: ScheduleInput) =>
+  request<ScheduleView>("/wallet/schedules", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+
+export const cancelSchedule = (id: string) =>
+  request<ScheduleView>(`/wallet/schedules/${id}`, { method: "DELETE" });
+
+// ---------- Notifications (server feed) ----------
+
+export interface ServerNotification {
+  id: string;
+  groupId?: string;
+  kind: string;
+  title: string;
+  body?: string;
+  link?: string;
+  read: boolean;
+  createdAt: string;
+}
+
+export const listNotifications = (unreadOnly = false) =>
+  request<ServerNotification[] | null>(`/notifications${unreadOnly ? "?unread=1" : ""}`).then(
+    (n) => n ?? []
+  );
+
+export const markNotificationRead = (id: string) =>
+  request<{ status: string }>(`/notifications/${id}/read`, { method: "POST" });
+
+export const markAllNotificationsRead = () =>
+  request<{ status: string }>("/notifications/read-all", { method: "POST" });
+
+// ---------- Contribution journals (one per paid cycle) ----------
+
+export interface JournalPayment {
+  id: string;
+  userId?: string;
+  payerName?: string;
+  amountKobo: number;
+  status: string;
+  method?: string;
+  refunded: boolean;
+  createdAt: string;
+}
+
+export interface JournalRow {
+  userId: string;
+  name: string;
+  reference: string;
+  state: "paid" | "partial" | "unpaid";
+  paidKobo: number;
+  amountKobo: number;
+  payments: JournalPayment[];
+}
+
+export interface ContributionJournal {
+  levyId: string;
+  title: string;
+  status: "open" | "closed";
+  cadence: string;
+  periodLabel: string;
+  dueDate?: string;
+  amountKobo: number;
+  collectedKobo: number;
+  expectedKobo: number;
+  paidCount: number;
+  partialCount: number;
+  unpaidCount: number;
+  closingBalanceKobo: number;
+  createdAt: string;
+  rows: JournalRow[];
+  payments: JournalPayment[];
+}
+
+export const listJournals = (groupId: string) =>
+  request<ContributionJournal[] | null>(`/groups/${groupId}/journals`).then((j) => j ?? []);
+
+export const getJournal = (groupId: string, levyId: string) =>
+  request<ContributionJournal>(`/groups/${groupId}/journals/${levyId}`);
+
+// ---------- Refunds & support ----------
+
+/** Treasurer: return a member's contribution to their wallet. */
+export const refundPayment = (groupId: string, paymentId: string) =>
+  request<Payment>(`/groups/${groupId}/payments/${paymentId}/refund`, { method: "POST" });
+
+export interface SupportCase {
+  id: string;
+  groupId: string;
+  disputeId?: string;
+  expenseRequestId?: string;
+  raisedBy: string;
+  subject: string;
+  detail?: string;
+  status: "open" | "resolved";
+  resolvedAt?: string;
+  createdAt: string;
+}
+
+/** Send a dispute to customer support (raiser or treasurer only). */
+export const escalateDispute = (groupId: string, disputeId: string, note = "") =>
+  request<SupportCase>(`/groups/${groupId}/disputes/${disputeId}/escalate`, {
+    method: "POST",
+    body: JSON.stringify({ note }),
+  });
+
+export const listSupportCases = (groupId: string) =>
+  request<SupportCase[] | null>(`/groups/${groupId}/support-cases`).then((c) => c ?? []);
 
 // ---------- Meta ----------
 

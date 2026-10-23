@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 
 	"github.com/odiliemmmanuel/campuspot/internal/models"
 )
@@ -103,6 +104,88 @@ func (s *Service) ListDisputes(_ context.Context, groupID, actorID uuid.UUID) ([
 		out = append(out, DisputeView{Dispute: d, Name: names[d.UserID]})
 	}
 	return out, nil
+}
+
+// EscalateDispute sends a dispute to customer support: a SupportCase is
+// opened and stamped on the dispute, so the escalation has a paper trail the
+// raiser and the pot's leadership can both see.
+func (s *Service) EscalateDispute(_ context.Context, groupID, disputeID, actorID uuid.UUID, note string) (*models.SupportCase, error) {
+	m, err := s.requireMember(groupID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	var d models.Dispute
+	if err := s.db.First(&d, "id = ? AND group_id = ?", disputeID, groupID).Error; err != nil {
+		return nil, ErrNotFound
+	}
+	if d.Status != models.DisputeOpen {
+		return nil, fmt.Errorf("%w: only an open dispute can be escalated", ErrConflict)
+	}
+	if d.UserID != actorID && m.Role != models.RoleTreasurer {
+		return nil, fmt.Errorf("%w: only the member who raised it or the treasurer can escalate a dispute", ErrForbidden)
+	}
+	if d.EscalatedAt != nil {
+		return nil, fmt.Errorf("%w: this dispute is already with support", ErrConflict)
+	}
+
+	subject := "Dispute escalated"
+	if d.ExpenseRequestID != nil {
+		subject = "Payout dispute escalated"
+	}
+	sc := &models.SupportCase{
+		GroupID:          groupID,
+		DisputeID:        &d.ID,
+		ExpenseRequestID: d.ExpenseRequestID,
+		RaisedBy:         actorID,
+		Subject:          subject,
+		Detail:           strings.TrimSpace(note),
+		Status:           models.CaseOpen,
+	}
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(sc).Error; err != nil {
+			return err
+		}
+		now := s.now()
+		if err := tx.Model(&models.Dispute{}).
+			Where("id = ? AND escalated_at IS NULL", d.ID).
+			Updates(map[string]interface{}{
+				"escalated_at": &now, "escalation_note": strings.TrimSpace(note),
+			}).Error; err != nil {
+			return err
+		}
+		return s.notifyLeaders(tx, groupID, models.Notification{
+			Kind:  models.NotifyDispute,
+			Title: "A dispute was escalated to support",
+			Body:  firstNonEmpty(subject, "A member asked customer support to review a dispute."),
+			Link:  "/pots/" + groupID.String() + "?tab=payouts",
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	return sc, nil
+}
+
+// ListSupportCases returns a pot's support cases. The pot's leadership sees
+// every case; an ordinary member sees only the ones they raised, so
+// escalation is transparent on both sides without leaking others' disputes.
+func (s *Service) ListSupportCases(_ context.Context, groupID, actorID uuid.UUID) ([]models.SupportCase, error) {
+	m, err := s.requireMember(groupID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	q := s.db.Where("group_id = ?", groupID)
+	if m.Role == models.RoleMember {
+		q = q.Where("raised_by = ?", actorID)
+	}
+	var cases []models.SupportCase
+	if err := q.Order("created_at DESC").Find(&cases).Error; err != nil {
+		return nil, err
+	}
+	if cases == nil {
+		cases = []models.SupportCase{}
+	}
+	return cases, nil
 }
 
 // ResolveDispute closes a dispute. The treasurer can resolve any dispute; a

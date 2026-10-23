@@ -92,6 +92,14 @@ type GroupSummary struct {
 	// reaches DisputeThreshold the pot's spending is frozen.
 	OpenDisputes   int  `json:"openDisputes"`
 	SpendingFrozen bool `json:"spendingFrozen"`
+	// TargetKobo is the savings goal the pot is aiming at (0 = no goal), and
+	// GoalPercent is the balance as a share of it (0–100).
+	TargetKobo   int64  `json:"targetKobo"`
+	GoalPercent  int    `json:"goalPercent"`
+	Visibility   string `json:"visibility"`
+	// TreasuryHidden is true when the treasurer hid the pot's balance from
+	// ordinary members; BalanceKobo/Collected/Spent are then zeroed for them.
+	TreasuryHidden bool `json:"treasuryHidden"`
 }
 
 // Summary builds the group's weekly-summary numbers.
@@ -116,6 +124,14 @@ func (s *Service) Summary(ctx context.Context, groupID uuid.UUID, levyID *uuid.U
 		BalanceKobo:   balance,
 		CollectedKobo: collected,
 		SpentKobo:     spent,
+		TargetKobo:    group.TargetKobo,
+		Visibility:    group.Visibility,
+	}
+	if group.TargetKobo > 0 {
+		sum.GoalPercent = int(float64(balance) / float64(group.TargetKobo) * 100)
+		if sum.GoalPercent > 100 {
+			sum.GoalPercent = 100
+		}
 	}
 
 	var memberCount int64
@@ -153,6 +169,30 @@ func (s *Service) Summary(ctx context.Context, groupID uuid.UUID, levyID *uuid.U
 	}
 
 	return sum, nil
+}
+
+// MaskTreasury zeroes a summary's pot-balance figures for a viewer who is an
+// ordinary member of a pot whose treasurer chose to hide the treasury. Anyone
+// else (treasurer, co-signer, or a pot without the setting) sees it unchanged.
+// The savings-goal percentage stays: publishing a goal is a deliberate act.
+func (s *Service) MaskTreasury(sum *GroupSummary, groupID, viewerID uuid.UUID) *GroupSummary {
+	if sum == nil {
+		return nil
+	}
+	var group models.Group
+	if err := s.db.Select("hide_treasury").First(&group, "id = ?", groupID).Error; err != nil || !group.HideTreasury {
+		return sum
+	}
+	m, err := s.requireMember(groupID, viewerID)
+	if err != nil || m.Role == models.RoleTreasurer || m.Role == models.RoleCosigner {
+		return sum
+	}
+	masked := *sum
+	masked.BalanceKobo = 0
+	masked.CollectedKobo = 0
+	masked.SpentKobo = 0
+	masked.TreasuryHidden = true
+	return &masked
 }
 
 func (s *Service) collectedSpent(groupID uuid.UUID) (int64, int64, error) {

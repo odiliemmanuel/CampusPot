@@ -65,7 +65,34 @@ type User struct {
 	// WalletBalanceKobo is the user's own spendable balance, separate from any
 	// pot. Money added here can be sent to another member or paid into a pot.
 	WalletBalanceKobo int64 `gorm:"not null;default:0" json:"walletBalanceKobo"`
+
+	// EmailVerified is set once the owner proves control of the email with a
+	// one-time code. Unverified accounts can browse but cannot move money.
+	EmailVerified bool `gorm:"not null;default:false" json:"emailVerified"`
+
+	// KYCStatus tracks identity verification (B Moni Nigeria onboarding).
+	// Unverified accounts can send only below the small-limit threshold.
+	KYCStatus     string     `gorm:"not null;default:unverified" json:"kycStatus"` // unverified | verified
+	KYCVerifiedAt *time.Time `json:"kycVerifiedAt,omitempty"`
+
+	// ReferralCode is the unique code this user shares to invite others.
+	// It is a pointer so accounts that do not have one yet (or rows that
+	// predate the feature) store NULL — two NULLs never collide under a unique
+	// index, unlike two empty strings. ReferredBy points at the user whose
+	// code was used at sign-up.
+	ReferralCode      *string    `gorm:"uniqueIndex" json:"referralCode,omitempty"`
+	ReferredBy        *uuid.UUID `gorm:"type:uuid;index" json:"referredBy,omitempty"`
+	ReferralBonusKobo int64      `gorm:"not null;default:0" json:"referralBonusKobo"`
+
+	// Locale is the user's preferred language ("en", "fr", ...).
+	Locale string `gorm:"default:en" json:"locale"`
 }
+
+// KYC statuses for a user's identity verification.
+const (
+	KYCUnverified = "unverified"
+	KYCVerified   = "verified"
+)
 
 // Wallet transaction kinds.
 const (
@@ -73,6 +100,8 @@ const (
 	WalletTransferIn  = "transfer_in"  // received from another PotKeeper user
 	WalletTransferOut = "transfer_out" // sent to a member/user or an external bank
 	WalletPotPayment  = "pot_payment"  // paid from the wallet into a pot levy
+	WalletRefund      = "refund"       // a pot returned a contribution to the wallet
+	WalletBonus       = "bonus"        // referral reward
 )
 
 // WalletTransaction is one movement in a user's personal wallet. It is an
@@ -92,6 +121,13 @@ type WalletTransaction struct {
 	Note               string     `json:"note,omitempty"`
 }
 
+// Pot visibility: private pots are reachable only by join code or invite;
+// public pots are discoverable and can be joined directly.
+const (
+	VisibilityPrivate = "private"
+	VisibilityPublic  = "public"
+)
+
 // Group is a shared pot (e.g. "200L Mass Comm Dues").
 type Group struct {
 	Base
@@ -103,6 +139,14 @@ type Group struct {
 	ContributionFrequency     string     `gorm:"not null;default:one_time" json:"contributionFrequency"`
 	ContributionAmountKobo    int64      `gorm:"not null;default:0" json:"contributionAmountKobo"`
 	ContributionDueDate       *time.Time `json:"contributionDueDate,omitempty"`
+
+	// Description, Category and Visibility shape how a pot presents itself when
+	// it is public; TargetKobo is the savings goal the pot is aiming at (0 = no
+	// fixed goal), so progress can be shown to members and discoverers.
+	Description string `json:"description,omitempty"`
+	Category    string `gorm:"index" json:"category,omitempty"`
+	Visibility  string `gorm:"not null;default:private;index" json:"visibility"`
+	TargetKobo  int64  `gorm:"not null;default:0" json:"targetKobo"`
 
 	// B Moni wallet + virtual Naira account (NUBAN) that members pay into.
 	// BMoniUserID is the owner (treasurer) B Moni user id that owns the
@@ -118,6 +162,10 @@ type Group struct {
 	ApprovalThreshold int   `gorm:"not null;default:2" json:"approvalThreshold"`
 	ApprovalTotal     int   `gorm:"not null;default:3" json:"approvalTotal"`
 	LargeExpenseKobo  int64 `gorm:"not null;default:0" json:"largeExpenseKobo"`
+
+	// HideTreasury keeps the pot's balance visible only to the treasurer and
+	// co-signers; ordinary members see the collection progress but not the pot.
+	HideTreasury bool `gorm:"not null;default:false" json:"hideTreasury"`
 }
 
 // Membership links a user to a group with a role.
@@ -152,6 +200,7 @@ const (
 	PaymentMatched   = "matched"   // fully paid by the matched member
 	PaymentPartial   = "partial"   // paid less than the levy amount
 	PaymentUnmatched = "unmatched" // landed but no member/reference matched
+	PaymentRefunded  = "refunded"  // returned to the member (failed payout)
 )
 
 // Payment is one deposit credited to a group pot.
@@ -173,6 +222,10 @@ type Payment struct {
 	MatchedBy string `json:"matchedBy,omitempty"` // reference | payer_name | manual
 	// LedgerEntryID links the payment to the ledger credit it produced.
 	LedgerEntryID *uuid.UUID `gorm:"type:uuid" json:"ledgerEntryId,omitempty"`
+	// RefundedAt is set once this contribution has been returned to the member
+	// (e.g. because the payout it funded failed). A refunded payment is never
+	// refunded twice.
+	RefundedAt *time.Time `json:"refundedAt,omitempty"`
 }
 
 // Ledger kinds.
@@ -333,6 +386,106 @@ type Dispute struct {
 	Status           string     `gorm:"not null;default:open" json:"status"`
 	ResolvedBy       *uuid.UUID `gorm:"type:uuid" json:"resolvedBy,omitempty"`
 	ResolvedAt       *time.Time `json:"resolvedAt,omitempty"`
+	// EscalatedAt is set when the dispute is escalated to customer support,
+	// which opens a support case the pot's leadership can track.
+	EscalatedAt     *time.Time `json:"escalatedAt,omitempty"`
+	EscalationNote  string     `json:"escalationNote,omitempty"`
+}
+
+// Verification code purposes.
+const (
+	CodePurposeSignup = "signup" // prove control of the email at sign-up
+	CodePurposeReset  = "reset"  // password reset
+)
+
+// VerificationCode is a one-time code sent to a user's email. Only a hash is
+// stored, it expires after CodeTTLMinutes, and it is consumed on first use.
+type VerificationCode struct {
+	Base
+	UserID     uuid.UUID  `gorm:"type:uuid;index" json:"userId"`
+	Email      string     `gorm:"index;not null" json:"email"`
+	Hash       string     `gorm:"not null" json:"-"`
+	Purpose    string     `gorm:"not null;index" json:"purpose"`
+	ExpiresAt  time.Time  `json:"expiresAt"`
+	ConsumedAt *time.Time `json:"consumedAt,omitempty"`
+}
+
+// Notification kinds.
+const (
+	NotifyPayment      = "payment"
+	NotifyTransferIn   = "transfer_in"
+	NotifyPayout       = "payout"
+	NotifyDispute      = "dispute"
+	NotifySchedule     = "schedule"
+	NotifyRefund       = "refund"
+	NotifyReferral     = "referral"
+	NotifyVerification = "verification"
+)
+
+// Notification is a persisted in-app message for one user. Money events
+// (contributions received, payouts, refunds, scheduled transfers) write here
+// so the bell shows them even after a refresh.
+type Notification struct {
+	Base
+	UserID  uuid.UUID  `gorm:"type:uuid;index;not null" json:"userId"`
+	GroupID *uuid.UUID `gorm:"type:uuid;index" json:"groupId,omitempty"`
+	Kind    string     `gorm:"not null" json:"kind"`
+	Title   string     `gorm:"not null" json:"title"`
+	Body    string     `json:"body,omitempty"`
+	Link    string     `json:"link,omitempty"`
+	ReadAt  *time.Time `json:"readAt,omitempty"`
+}
+
+// Scheduled transfer statuses.
+const (
+	ScheduleScheduled = "scheduled"
+	ScheduleCompleted = "completed"
+	ScheduleFailed    = "failed"
+	ScheduleCancelled = "cancelled"
+)
+
+// ScheduledTransfer is a wallet send (or pot contribution) that will execute
+// automatically at ExecuteAt. It was authorised with the owner's PIN at
+// creation time; the sweeper runs it without asking again. A recurring
+// (weekly/monthly) schedule advances ExecuteAt after each run.
+type ScheduledTransfer struct {
+	Base
+	UserID     uuid.UUID  `gorm:"type:uuid;index;not null" json:"userId"`
+	AmountKobo int64      `gorm:"not null" json:"amountKobo"`
+	Recipient  string     `json:"recipient,omitempty"` // email/phone or bank account number
+	BankName   string     `json:"bankName,omitempty"`
+	BankCode   string     `json:"bankCode,omitempty"`
+	Note       string     `json:"note,omitempty"`
+	// GroupID, when set, makes this a contribution into that pot instead of a
+	// send to a person or bank account.
+	GroupID    *uuid.UUID `gorm:"type:uuid;index" json:"groupId,omitempty"`
+	ExecuteAt  time.Time  `gorm:"index;not null" json:"executeAt"`
+	Cadence    string     `gorm:"not null;default:once" json:"cadence"` // once | weekly | monthly
+	Status     string     `gorm:"not null;default:scheduled;index" json:"status"`
+	Attempts   int        `gorm:"not null;default:0" json:"attempts"`
+	LastError  string     `json:"lastError,omitempty"`
+	CompletedAt *time.Time `json:"completedAt,omitempty"`
+}
+
+// Support case statuses.
+const (
+	CaseOpen     = "open"
+	CaseResolved = "resolved"
+)
+
+// SupportCase is a dispute escalated to customer support. It is visible to the
+// member who raised it and to the pot's treasurers, so escalation has a paper
+// trail on both sides.
+type SupportCase struct {
+	Base
+	GroupID         uuid.UUID  `gorm:"type:uuid;index;not null" json:"groupId"`
+	DisputeID       *uuid.UUID `gorm:"type:uuid;index" json:"disputeId,omitempty"`
+	ExpenseRequestID *uuid.UUID `gorm:"type:uuid" json:"expenseRequestId,omitempty"`
+	RaisedBy        uuid.UUID  `gorm:"type:uuid;index;not null" json:"raisedBy"`
+	Subject         string     `gorm:"not null" json:"subject"`
+	Detail          string     `json:"detail,omitempty"`
+	Status          string     `gorm:"not null;default:open;index" json:"status"`
+	ResolvedAt      *time.Time `json:"resolvedAt,omitempty"`
 }
 
 // AllModels is the AutoMigrate list. Order does not strictly matter for
@@ -353,5 +506,9 @@ func AllModels() []interface{} {
 		&ChatMessage{},
 		&ChatReadReceipt{},
 		&Dispute{},
+		&VerificationCode{},
+		&Notification{},
+		&ScheduledTransfer{},
+		&SupportCase{},
 	}
 }

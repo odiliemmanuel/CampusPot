@@ -1,5 +1,6 @@
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { LayoutGrid, Plus, Settings, Wallet } from "lucide-react";
+import { useI18n } from "../lib/i18n";
 
 // A wallet-style bottom bar shown only on phones/tablets. The centre "+" is the
 // always-reachable create-pot action; the rest mirror the desktop sidebar.
@@ -13,6 +14,7 @@ function itemClass(active: boolean) {
 export default function MobileNav() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const { t } = useI18n();
 
   const potsActive = pathname === "/pots" || pathname.startsWith("/pots/");
   const balanceActive = pathname.startsWith("/account");
@@ -27,12 +29,12 @@ export default function MobileNav() {
       <div className="mx-auto grid max-w-md grid-cols-4 items-center px-2 py-1.5">
         <NavLink to="/account" className={itemClass(balanceActive)}>
           <Wallet className="h-5 w-5" />
-          Wallet
+          {t("nav.wallet")}
         </NavLink>
 
         <NavLink to="/pots" className={itemClass(potsActive)}>
           <LayoutGrid className="h-5 w-5" />
-          Pots
+          {t("nav.pots")}
         </NavLink>
 
         <button
@@ -46,7 +48,7 @@ export default function MobileNav() {
 
         <NavLink to="/settings" className={itemClass(settingsActive)}>
           <Settings className="h-5 w-5" />
-          Settings
+          {t("nav.settings")}
         </NavLink>
       </div>
     </nav>

@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, Loader2, LogOut, PiggyBank, Save, ShieldCheck, Trash2, UserRound } from "lucide-react";
+import { CheckCircle2, Languages, Loader2, LogOut, PiggyBank, Save, ShieldCheck, Trash2, UserRound } from "lucide-react";
 
 import AppShell from "../../layouts/AppShell";
 import AlertError from "../../components/AlertError";
 import PageHeader from "../../components/PageHeader";
 import PinField from "../../components/PinField";
 import { useGroup } from "../../providers/GroupProvider";
+import { LOCALES, useI18n } from "../../lib/i18n";
 import {
   clearSession, deleteAccount, getMe, getStoredUser, getWallet, getToken, setSession, setWalletPin, updateProfile,
   type AuthUser,
@@ -14,6 +15,7 @@ import {
 
 export default function Settings() {
   const { activeGroup } = useGroup();
+  const { locale, setLocale } = useI18n();
 
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -207,6 +209,36 @@ export default function Settings() {
         </section>
 
         <div className="space-y-4 sm:space-y-6">
+          {/* Language — applies across the app and syncs to the profile */}
+          <section className="cp-card rounded-3xl p-4 sm:p-6">
+            <div className="mb-4 flex items-center gap-2.5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-500/15">
+                <Languages className="h-4 w-4" />
+              </span>
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Language</p>
+            </div>
+            <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">
+              Applies across the app and is saved to your profile.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {LOCALES.map((option) => (
+                <button
+                  key={option.code}
+                  type="button"
+                  aria-pressed={locale === option.code}
+                  onClick={() => setLocale(option.code)}
+                  className={`rounded-xl border px-3 py-2.5 text-sm font-semibold transition ${
+                    locale === option.code
+                      ? "border-violet-500 bg-violet-50 text-violet-800 dark:bg-violet-500/10 dark:text-violet-200"
+                      : "border-slate-200 text-slate-500 hover:border-slate-300 dark:border-white/10 dark:text-slate-400"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </section>
+
           {/* Pot rules */}
           {activeGroup && (
             <section className="cp-card rounded-3xl p-4 sm:p-6">

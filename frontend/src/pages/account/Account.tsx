@@ -2,18 +2,21 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  AlertTriangle, ArrowDownLeft, ArrowUpRight, Banknote, CheckCircle2, ChevronDown,
-  Check, Copy, Landmark, Loader2, PiggyBank, Plus, QrCode, Send, Wallet, X,
+  AlertTriangle, ArrowDownLeft, ArrowUpRight, Banknote, BadgeCheck, CalendarClock,
+  CheckCircle2, ChevronDown, Check, Copy, Gift, Landmark, Loader2, PiggyBank,
+  Plus, QrCode, Send, ShieldCheck, Trash2, Wallet, X,
 } from "lucide-react";
 
 import AppShell from "../../layouts/AppShell";
 import AlertError from "../../components/AlertError";
 import PinField from "../../components/PinField";
 import {
-  getAccountOverview, getStoredUser, getWallet, listBanks, lookupPotAccount, lookupUser, setWalletPin, verifyBankAccount,
-  walletDeposit, walletTransfer,
-  walletPayPot, type AccountOverview, type BankOption, type LookedUpUser, type PotAccount, type PotMembership,
-  type VerifiedAccount, type WalletOverview, type WalletTransaction,
+  cancelSchedule, createSchedule, getAccountOverview, getReferral, getStoredUser, getWallet,
+  listBanks, listSchedules, lookupPotAccount, lookupUser, sendOtp, setWalletPin, submitKyc,
+  verifyBankAccount, walletDeposit, walletTransfer,
+  walletPayPot, type AccountOverview, type BankOption, type LookedUpUser, type PotAccount,
+  type PotMembership, type ReferralOverview, type ScheduleView, type VerifiedAccount,
+  type WalletOverview, type WalletTransaction,
 } from "../../lib/api";
 import { formatNaira, nairaToKobo } from "../../lib/format";
 
@@ -236,6 +239,10 @@ function SendSheet({ balanceKobo, pinSet, onClose, onDone }: { balanceKobo: numb
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Scheduling: send now, or once/recurring at a future date.
+  const [when, setWhen] = useState<"now" | "later">("now");
+  const [scheduleAt, setScheduleAt] = useState("");
+  const [cadence, setCadence] = useState<"once" | "weekly" | "monthly">("once");
 
   // Name enquiry results — the recipient is confirmed before money moves.
   const [verified, setVerified] = useState<VerifiedAccount | null>(null);
@@ -303,7 +310,8 @@ function SendSheet({ balanceKobo, pinSet, onClose, onDone }: { balanceKobo: numb
   // The PIN authorises the debit; first-time senders also type their password
   // once so the PIN can be created as part of this same send.
   const pinOk = pinSet ? pin.length >= 4 : pin.length >= 4 && password.length > 0;
-  const canSend = confirmed && !checking && !memberBlocked && amountKobo > 0 && !overBalance && pinOk;
+  const scheduleOk = when === "now" || !!scheduleAt;
+  const canSend = confirmed && !checking && !memberBlocked && amountKobo > 0 && !overBalance && pinOk && scheduleOk;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -327,6 +335,25 @@ function SendSheet({ balanceKobo, pinSet, onClose, onDone }: { balanceKobo: numb
     try {
       // First-time senders create the PIN here, then spend with it.
       if (!pinSet) await setWalletPin(pin, "", password);
+
+      // Scheduled sends are stored instead of moving money now; the sweeper
+      // runs them at the chosen time (weekly/monthly repeat until cancelled).
+      if (when === "later") {
+        const chosen = banks.find((b) => b.name === bank);
+        await createSchedule({
+          amountKobo: kobo,
+          recipient: recipient.trim(),
+          bankName: mode === "bank" ? (chosen?.name ?? bank) : undefined,
+          bankCode: mode === "bank" ? (chosen?.code ?? verified?.bankCode) : undefined,
+          note: note || undefined,
+          executeAt: scheduleAt,
+          cadence,
+          pin,
+        });
+        onDone();
+        return;
+      }
+
       if (mode === "member") {
         await walletTransfer(kobo, recipient.trim(), note || `Sent to ${lookedUp!.name}`, "", "", pin);
       } else if (mode === "pot") {
@@ -449,6 +476,51 @@ function SendSheet({ balanceKobo, pinSet, onClose, onDone }: { balanceKobo: numb
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="What's it for?" className="cp-input mt-1" />
         </label>
 
+        {/* Send now, or schedule once / weekly / monthly. */}
+        <div>
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">When</span>
+          <div className="mt-1 grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1 dark:bg-white/5">
+            {([["now", "Send now"], ["later", "Schedule"]] as const).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setWhen(key)}
+                className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                  when === key ? "bg-white text-brand-700 shadow-sm dark:bg-white/15 dark:text-white" : "text-slate-500 dark:text-slate-400"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {when === "later" && (
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              <label className="block">
+                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Run on</span>
+                <input
+                  type="date"
+                  required
+                  min={new Date().toLocaleDateString("en-CA")}
+                  value={scheduleAt}
+                  onChange={(e) => setScheduleAt(e.target.value)}
+                  className="cp-input mt-1"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Repeat</span>
+                <select value={cadence} onChange={(e) => setCadence(e.target.value as typeof cadence)} className="cp-input mt-1">
+                  <option value="once">Just once</option>
+                  <option value="weekly">Every week</option>
+                  <option value="monthly">Every month</option>
+                </select>
+              </label>
+              <p className="text-[11px] text-slate-400 sm:col-span-2">
+                You authorise it once with your PIN. Cancel any time before it runs — recurring sends can be stopped after each run too.
+              </p>
+            </div>
+          )}
+        </div>
+
         {/* Transaction PIN — every send is authorised by the wallet owner. */}
         <PinField
           value={pin}
@@ -474,7 +546,11 @@ function SendSheet({ balanceKobo, pinSet, onClose, onDone }: { balanceKobo: numb
           Wallet balance: {money(balanceKobo)}. We check the recipient's name before any money leaves your wallet.
         </p>
         {error && <AlertError message={error} />}
-        <SubmitButton busy={busy} disabled={!canSend} label={canSend ? "Send money" : checking ? "Checking…" : memberBlocked ? "Not a member" : confirmed && !pinOk ? "Enter PIN to send" : "Confirm recipient to send"} />
+        <SubmitButton busy={busy} disabled={!canSend} label={
+          canSend
+            ? when === "later" ? "Schedule transfer" : "Send money"
+            : checking ? "Checking…" : memberBlocked ? "Not a member" : confirmed && !pinOk ? "Enter PIN to send" : "Confirm recipient to send"
+        } />
       </form>
     </Sheet>
   );
@@ -674,12 +750,279 @@ function txMeta(kind: WalletTransaction["kind"], amount: number) {
   switch (kind) {
     case "deposit":
     case "transfer_in":
+    case "refund":
+    case "bonus":
       return { icon: <ArrowDownLeft className="h-4 w-4" />, tint: "bg-violet-100 text-violet-600 dark:bg-violet-500/15", sign: "+", color: "text-violet-600" };
     case "transfer_out":
       return { icon: <ArrowUpRight className="h-4 w-4" />, tint: "bg-violet-100 text-violet-600 dark:bg-violet-500/15", sign: "-", color: "text-violet-600" };
     default:
       return { icon: <PiggyBank className="h-4 w-4" />, tint: WALLET_SOFT, sign: "-", color: "text-slate-600 dark:text-slate-300" };
   }
+}
+
+/** Email + identity verification status, with the actions to fix either. */
+function VerificationCard() {
+  const me = getStoredUser();
+  const emailVerified = me?.emailVerified ?? false;
+  const [kycStatus, setKycStatus] = useState(me?.kycStatus ?? "unverified");
+  const [bvn, setBvn] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  const startEmail = async () => {
+    setError("");
+    try {
+      // The verify screen sends (and shows) the code itself.
+      await sendOtp(me?.email ?? "", "signup");
+      window.location.assign(`/verify-email?email=${encodeURIComponent(me?.email ?? "")}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't send the code.");
+    }
+  };
+
+  const submitKycNow = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(""); setNotice(""); setBusy(true);
+    try {
+      const updated = await submitKyc(bvn.trim());
+      setKycStatus(updated.kycStatus ?? "verified");
+      const token = getTokenSafe();
+      if (token) localStorage.setItem("campuspot_user", JSON.stringify(updated));
+      setBvn("");
+      setNotice("Identity verified — your daily send limit is raised.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Verification didn't complete.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="cp-card rounded-2xl p-4">
+      <div className="flex items-center gap-2">
+        <ShieldCheck className="h-4 w-4 text-violet-600" />
+        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Security &amp; verification</p>
+      </div>
+
+      <div className="mt-3 space-y-2 text-xs">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-slate-500 dark:text-slate-400">Email</span>
+          {emailVerified ? (
+            <span className="inline-flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400">
+              <BadgeCheck className="h-3.5 w-3.5" /> Verified
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void startEmail()}
+              className="rounded-full bg-amber-50 px-3 py-1 font-semibold text-amber-700 transition hover:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-300"
+            >
+              Verify now
+            </button>
+          )}
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-slate-500 dark:text-slate-400">Identity (KYC)</span>
+          {kycStatus === "verified" ? (
+            <span className="inline-flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400">
+              <BadgeCheck className="h-3.5 w-3.5" /> Verified
+            </span>
+          ) : (
+            <span className="font-semibold text-amber-600 dark:text-amber-400">Unverified · ₦50k/day limit</span>
+          )}
+        </div>
+      </div>
+
+      {!emailVerified && (
+        <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+          Confirm your email before sending money — it's the lock on your wallet.
+        </p>
+      )}
+
+      {kycStatus !== "verified" && emailVerified && (
+        <form onSubmit={submitKycNow} className="mt-3 space-y-2">
+          <label className="block">
+            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">BVN (11 digits)</span>
+            <input
+              value={bvn}
+              onChange={(e) => setBvn(e.target.value.replace(/[^0-9]/g, "").slice(0, 11))}
+              placeholder="00000000000"
+              inputMode="numeric"
+              className="cp-input mt-1"
+            />
+          </label>
+          <p className="text-[10px] text-slate-400">Sandbox only — never send a real BVN to a demo build.</p>
+          <button type="submit" disabled={busy || bvn.length !== 11} className="cp-btn-ghost w-full justify-center text-xs">
+            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />} Verify identity
+          </button>
+        </form>
+      )}
+
+      {notice && <p className="mt-2 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">{notice}</p>}
+      {error && <div className="mt-2"><AlertError message={error} /></div>}
+    </section>
+  );
+}
+
+/** Small safe accessor — the card lives outside the session module. */
+function getTokenSafe(): string | null {
+  try {
+    return localStorage.getItem("campuspot_token");
+  } catch {
+    return null;
+  }
+}
+
+/** Referral code, share link, and reward stats. */
+function ReferralCard() {
+  const [data, setData] = useState<ReferralOverview | null>(null);
+  const [copied, setCopied] = useState<"code" | "link" | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    getReferral().then(setData).catch((err) => setError(err instanceof Error ? err.message : "Couldn't load your code."));
+  }, []);
+
+  const copy = async (value: string, which: "code" | "link") => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(which);
+      setTimeout(() => setCopied(null), 1500);
+    } catch {
+      /* clipboard unavailable */
+    }
+  };
+
+  return (
+    <section className="cp-card rounded-2xl p-4">
+      <div className="flex items-center gap-2">
+        <Gift className="h-4 w-4 text-violet-600" />
+        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Invite friends, earn bonuses</p>
+      </div>
+
+      {error && <div className="mt-2"><AlertError message={error} /></div>}
+      {!data && !error && <p className="mt-2 text-xs text-slate-400">Loading your code…</p>}
+
+      {data && (
+        <>
+          <div className="mt-3 flex items-center gap-2">
+            <code className="flex-1 rounded-xl border border-dashed border-violet-300 bg-violet-50/50 px-3 py-2 text-center font-mono text-sm font-bold tracking-widest text-violet-800 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200">
+              {data.code}
+            </code>
+            <button
+              type="button"
+              onClick={() => void copy(data.code, "code")}
+              aria-label="Copy referral code"
+              className="rounded-xl border border-slate-200 p-2.5 text-slate-500 transition hover:border-violet-300 hover:text-violet-600 dark:border-white/10"
+            >
+              {copied === "code" ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
+            </button>
+            <button
+              type="button"
+              onClick={() => void copy(data.link, "link")}
+              aria-label="Copy invite link"
+              className="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-600 transition hover:border-violet-300 hover:text-violet-600 dark:border-white/10 dark:text-slate-300"
+            >
+              {copied === "link" ? "Copied!" : "Copy link"}
+            </button>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-slate-400">Invited</p>
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{data.invited}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-slate-400">Verified</p>
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{data.verified}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-slate-400">Earned</p>
+              <p className="text-sm font-semibold text-violet-600">{formatNaira(data.earnedKobo)}</p>
+            </div>
+          </div>
+
+          <p className="mt-2 text-[11px] text-slate-400">
+            You get {formatNaira(data.rewardEachKobo)} when a friend joins with your code and verifies their email — they get {formatNaira(data.welcomeEachKobo)} too.
+          </p>
+        </>
+      )}
+    </section>
+  );
+}
+
+/** Scheduled & recurring transfers, with cancel. */
+function SchedulesCard() {
+  const [rows, setRows] = useState<ScheduleView[] | null>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = () => {
+    listSchedules().then(setRows).catch((err) => setError(err instanceof Error ? err.message : "Couldn't load scheduled transfers."));
+  };
+  useEffect(load, []);
+
+  const cancel = async (id: string) => {
+    setBusy(true); setError("");
+    try {
+      await cancelSchedule(id);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't cancel it.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const active = (rows ?? []).filter((r) => r.status === "scheduled");
+  if (rows !== null && active.length === 0 && !error) return null;
+
+  return (
+    <section className="cp-card mt-3 rounded-2xl p-4">
+      <div className="flex items-center gap-2">
+        <CalendarClock className="h-4 w-4 text-violet-600" />
+        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Scheduled transfers</p>
+      </div>
+
+      {error && <div className="mt-2"><AlertError message={error} /></div>}
+      {rows === null && !error && <p className="mt-2 text-xs text-slate-400">Loading…</p>}
+
+      {active.length > 0 && (
+        <ul className="mt-3 divide-y divide-slate-100 dark:divide-white/5">
+          {active.map((r) => (
+            <li key={r.id} className="flex items-center gap-3 py-2.5">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-500/15">
+                <CalendarClock className="h-4 w-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  {formatNaira(r.amountKobo)} → {r.groupName || r.recipient || "bank"}
+                </p>
+                <p className="truncate text-xs text-slate-400">
+                  {r.cadence === "once" ? "Once" : r.cadence === "weekly" ? "Weekly" : "Monthly"}
+                  {" · "}runs {new Date(r.executeAt).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}
+                  {r.lastError ? ` · retrying (${r.lastError})` : ""}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void cancel(r.id)}
+                disabled={busy}
+                aria-label="Cancel scheduled transfer"
+                className="rounded-lg p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-60 dark:hover:bg-rose-500/10"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {rows !== null && active.length === 0 && !error && (
+        <p className="mt-2 text-xs text-slate-400">Nothing scheduled. Use “Schedule” when sending to plan a future or recurring transfer.</p>
+      )}
+    </section>
+  );
 }
 
 function WalletHome() {
@@ -737,6 +1080,13 @@ function WalletHome() {
         <QuickAction icon={<QrCode className="h-4 w-4" />} label="Join pot" to="/join" />
         <QuickAction icon={<Landmark className="h-4 w-4" />} label="Connect bank" to="/banks" />
       </div>
+
+      {/* Account health: verification, referrals, scheduled transfers */}
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <VerificationCard />
+        <ReferralCard />
+      </div>
+      <SchedulesCard />
 
       {/* Pots — compact, expand for detail */}
         <div className="mt-8 flex items-end justify-between">

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 import AuthLayout from "../../layouts/AuthLayout";
 import { login, setSession } from "../../lib/api";
 import { homeRoute } from "../../lib/device";
@@ -10,6 +10,8 @@ export default function Login() {
   const location = useLocation();
   // Where to go after login — set by ProtectedRoute (e.g. a scanned join link).
   const from = (location.state as { from?: string } | null)?.from ?? homeRoute();
+  // A fresh password reset lands here with a confirmation notice.
+  const reset = (location.state as { reset?: boolean } | null)?.reset === true;
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
@@ -74,6 +76,11 @@ export default function Login() {
           </div>
         </div>
 
+        {reset && (
+          <p className="flex items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+            <CheckCircle2 className="h-4 w-4 shrink-0" /> Password updated — log in with your new one.
+          </p>
+        )}
         {error && <p className="text-sm text-violet-600">{error}</p>}
 
         <button
@@ -83,6 +90,12 @@ export default function Login() {
         >
           {loading ? "Logging in..." : "Log in"}
         </button>
+
+        <p className="text-right text-sm">
+          <Link to="/forgot-password" className="font-semibold text-primary-600 hover:text-primary-700">
+            Forgot password?
+          </Link>
+        </p>
       </form>
 
       <button

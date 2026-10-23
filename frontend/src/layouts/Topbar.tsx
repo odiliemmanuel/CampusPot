@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Bell, CalendarDays, ChevronDown, LogOut, Menu, Search, Settings } from "lucide-react";
-import { clearSession, getStoredUser, listMembers, type AuthUser, type Role } from "../lib/api";
+import { clearSession, getStoredUser, listMembers, listNotifications, type AuthUser, type Role } from "../lib/api";
 import { useGroup } from "../providers/GroupProvider";
 import ModeBadges from "../components/ModeBadges";
 import ThemeToggle from "../components/ThemeToggle";
-import { loadPotNotifications, notificationReadKey, readNotificationIds as loadReadNotificationIds } from "../lib/notifications";
+import { useI18n } from "../lib/i18n";
 
 const roleLabel = (role: Role | null) =>
   role ? role.charAt(0).toUpperCase() + role.slice(1) : "Member";
@@ -16,44 +16,37 @@ export default function Topbar({ onMenu }: { onMenu: () => void }) {
   const location = useLocation();
   const user = getStoredUser<AuthUser>();
   const { activeGroup } = useGroup();
+  const { t } = useI18n();
 
   const [role, setRole] = useState<Role | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [notificationIds, setNotificationIds] = useState<string[]>([]);
-  const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
+  // Server-side unread notifications: money events land here whether or not
+  // the viewer is in the pot they happened in.
+  const [unreadCount, setUnreadCount] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const readKey = user && activeGroup ? notificationReadKey(user.id, activeGroup.id) : "";
 
   useEffect(() => {
-    if (!activeGroup || !user || !readKey) {
-      setNotificationIds([]);
-      setReadNotificationIds([]);
+    if (!user) {
+      setUnreadCount(0);
       return;
     }
     let alive = true;
     const load = async () => {
       try {
-        const { notifications } = await loadPotNotifications(activeGroup.id);
-        if (!alive) return;
-        const ids = notifications.map((item) => item.id);
-        setNotificationIds(ids);
-        setReadNotificationIds(loadReadNotificationIds(readKey).filter((id) => ids.includes(id)));
-      } catch { /* Keep the bell usable when the activity API is temporarily offline. */ }
+        const rows = await listNotifications(true);
+        if (alive) setUnreadCount(rows.length);
+      } catch { /* Keep the bell usable when the API is temporarily offline. */ }
     };
     void load();
     const timer = window.setInterval(() => void load(), 60_000);
-    const onRead = (event: Event) => {
-      const detail = (event as CustomEvent<{ key: string; ids: string[] }>).detail;
-      if (detail?.key === readKey) setReadNotificationIds(detail.ids);
-    };
-    window.addEventListener("campuspot-notifications-read", onRead);
     return () => {
       alive = false;
       window.clearInterval(timer);
-      window.removeEventListener("campuspot-notifications-read", onRead);
     };
-  }, [activeGroup?.id, user?.id, readKey]);
+    // Refetch when navigating so the badge settles after reading.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, location.pathname]);
 
   // Ctrl/⌘+K focuses the search box.
   useEffect(() => {
@@ -93,8 +86,6 @@ export default function Topbar({ onMenu }: { onMenu: () => void }) {
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, [menuOpen]);
-
-  const unreadCount = notificationIds.filter((id) => !readNotificationIds.includes(id)).length;
 
   const logout = () => {
     clearSession();
@@ -149,7 +140,7 @@ export default function Topbar({ onMenu }: { onMenu: () => void }) {
         {/* Notifications */}
         <button
           type="button"
-          aria-label={unreadCount ? `Open notifications, ${unreadCount} unread` : "Open notifications"}
+          aria-label={unreadCount ? `${t("nav.notifications")}, ${unreadCount} unread` : t("nav.notifications")}
           onClick={() => navigate("/notifications", { state: { from: `${location.pathname}${location.search}` } })}
           className="relative flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-slate-300 dark:hover:bg-slate-800"
         >

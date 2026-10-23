@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2, Loader2, Lock, LogOut, RefreshCw, Save, ShieldAlert } from "lucide-react";
+import { CheckCircle2, EyeOff, Globe, Loader2, Lock, LogOut, RefreshCw, Save, ShieldAlert } from "lucide-react";
 
 import PageHeader from "../../components/PageHeader";
 import JoinCard from "../../components/JoinCard";
@@ -24,6 +24,13 @@ export default function PotSettings() {
 
   // Draft settings
   const [name, setName] = useState(activeGroup!.name);
+  const [description, setDescription] = useState(activeGroup!.description ?? "");
+  const [category, setCategory] = useState(activeGroup!.category ?? "");
+  const [visibility, setVisibility] = useState<"private" | "public">(activeGroup!.visibility ?? "private");
+  const [target, setTarget] = useState(
+    activeGroup!.targetKobo > 0 ? String(activeGroup!.targetKobo / 100) : ""
+  );
+  const [hideTreasury, setHideTreasury] = useState(activeGroup!.hideTreasury ?? false);
   const [threshold, setThreshold] = useState(activeGroup!.approvalThreshold);
   const [total, setTotal] = useState(activeGroup!.approvalTotal);
   const [largeLimit, setLargeLimit] = useState(
@@ -48,6 +55,11 @@ export default function PotSettings() {
     try {
       await updateGroup(gid, {
         name,
+        description,
+        category,
+        visibility,
+        targetKobo: target.trim() ? nairaToKobo(target) : 0,
+        hideTreasury,
         approvalThreshold: threshold,
         approvalTotal: total,
         largeExpenseKobo: largeLimit.trim() ? nairaToKobo(largeLimit) : 0,
@@ -118,6 +130,82 @@ export default function PotSettings() {
               className="cp-input mt-1 disabled:opacity-60"
             />
           </div>
+
+          <div>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Description</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              disabled={!canManage}
+              placeholder="What is this pot for?"
+              className="cp-input mt-1 resize-none disabled:opacity-60"
+            />
+          </div>
+
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Category</label>
+              <input
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                disabled={!canManage}
+                placeholder="e.g. Transport"
+                className="cp-input mt-1 disabled:opacity-60"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Savings goal (₦, 0 = none)</label>
+              <input
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
+                disabled={!canManage}
+                placeholder="e.g. 200000"
+                inputMode="numeric"
+                className="cp-input mt-1 disabled:opacity-60"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Visibility</label>
+            <div className="mt-1 grid grid-cols-2 gap-2">
+              {([
+                { key: "private", label: "Invite only", icon: Lock },
+                { key: "public", label: "Public", icon: Globe },
+              ] as const).map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  disabled={!canManage}
+                  onClick={() => setVisibility(opt.key)}
+                  className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition disabled:opacity-60 ${
+                    visibility === opt.key
+                      ? "border-violet-500 bg-violet-50 text-violet-800 dark:bg-violet-500/10 dark:text-violet-200"
+                      : "border-slate-200 text-slate-500 dark:border-white/10 dark:text-slate-400"
+                  }`}
+                >
+                  <opt.icon className="h-3.5 w-3.5" /> {opt.label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-slate-400">
+              Public pots appear in Discover and can be joined without a code.
+            </p>
+          </div>
+
+          <label className="flex items-center gap-2.5 rounded-xl border border-slate-200 px-3 py-2.5 dark:border-white/10">
+            <input
+              type="checkbox"
+              checked={hideTreasury}
+              onChange={(e) => setHideTreasury(e.target.checked)}
+              disabled={!canManage}
+              className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500 disabled:opacity-60"
+            />
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200">
+              <EyeOff className="h-3.5 w-3.5 text-slate-400" /> Hide treasury from ordinary members
+            </span>
+          </label>
 
           <div className="grid gap-5 sm:grid-cols-2">
             <div>

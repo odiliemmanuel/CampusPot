@@ -32,6 +32,10 @@ type PotMembership struct {
 	VirtualAccountBank   string `json:"virtualAccountBank,omitempty"`
 	VirtualAccountName   string `json:"virtualAccountName,omitempty"`
 	BMoniWalletAddress   string `json:"bmoniWalletAddress,omitempty"`
+
+	// TreasuryHidden is true when the treasurer hid the pot's balance from
+	// ordinary members; BalanceKobo is then zero for the viewer.
+	TreasuryHidden bool `json:"treasuryHidden"`
 }
 
 // MyTransaction is one of the user's own deposits across every pot.
@@ -85,6 +89,11 @@ func (s *Service) AccountOverview(ctx context.Context, userID uuid.UUID) (*Accou
 		}
 		if bal, err := s.Balance(ctx, group.ID); err == nil {
 			pot.BalanceKobo = bal
+		}
+		// A treasurer may hide the treasury from ordinary members.
+		if group.HideTreasury && m.Role != models.RoleTreasurer && m.Role != models.RoleCosigner {
+			pot.BalanceKobo = 0
+			pot.TreasuryHidden = true
 		}
 
 		// Position against the pot's latest open levy, if any.

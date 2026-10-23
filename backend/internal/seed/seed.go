@@ -18,6 +18,7 @@ import (
 	"github.com/odiliemmmanuel/campuspot/config"
 	"github.com/odiliemmmanuel/campuspot/internal/auth"
 	"github.com/odiliemmmanuel/campuspot/internal/bmoni"
+	"github.com/odiliemmmanuel/campuspot/internal/email"
 	"github.com/odiliemmmanuel/campuspot/internal/models"
 	"github.com/odiliemmmanuel/campuspot/internal/pot"
 )
@@ -52,17 +53,17 @@ func IsEmpty(db *gorm.DB) (bool, error) {
 func Run(ctx context.Context, db *gorm.DB, cfg *config.Config) (*Result, error) {
 	client := bmoni.NewMockClient()
 	potSvc := pot.NewService(db, cfg, client)
-	authSvc := auth.NewService(db, cfg, client)
+	authSvc := auth.NewService(db, cfg, client, email.NewLogSender(cfg.EmailFrom))
 
-	treasurer, err := register(ctx, authSvc, "Ada Okafor", "ada@potkeeper.ng")
+	treasurer, err := register(ctx, db, authSvc, "Ada Okafor", "ada@potkeeper.ng")
 	if err != nil {
 		return nil, err
 	}
-	cos1, err := register(ctx, authSvc, "Tunde Bello", "tunde@potkeeper.ng")
+	cos1, err := register(ctx, db, authSvc, "Tunde Bello", "tunde@potkeeper.ng")
 	if err != nil {
 		return nil, err
 	}
-	cos2, err := register(ctx, authSvc, "Ngozi Eze", "ngozi@potkeeper.ng")
+	cos2, err := register(ctx, db, authSvc, "Ngozi Eze", "ngozi@potkeeper.ng")
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +78,7 @@ func Run(ctx context.Context, db *gorm.DB, cfg *config.Config) (*Result, error) 
 	}
 	members := make([]*models.User, 0, len(memberSpecs))
 	for _, spec := range memberSpecs {
-		u, err := register(ctx, authSvc, spec.name, spec.email)
+		u, err := register(ctx, db, authSvc, spec.name, spec.email)
 		if err != nil {
 			return nil, err
 		}
@@ -190,13 +191,21 @@ func Run(ctx context.Context, db *gorm.DB, cfg *config.Config) (*Result, error) 
 	}, nil
 }
 
-func register(ctx context.Context, svc *auth.Service, name, email string) (*models.User, error) {
+func register(ctx context.Context, db *gorm.DB, svc *auth.Service, name, email string) (*models.User, error) {
 	u, _, err := svc.Register(ctx, auth.RegisterRequest{
 		Name: name, Email: email, Phone: seedPhone(email), Password: Password,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("register %s: %w", email, err)
 	}
+	// Demo accounts skip the inbox: the point of the dataset is to exercise
+	// money flows immediately, so they are marked email-verified up front.
+	if err := db.Model(&models.User{}).
+		Where("id = ?", u.ID).
+		Update("email_verified", true).Error; err != nil {
+		return nil, fmt.Errorf("verify %s: %w", email, err)
+	}
+	u.EmailVerified = true
 	return u, nil
 }
 

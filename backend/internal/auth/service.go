@@ -17,6 +17,7 @@ import (
 
 	"github.com/odiliemmmanuel/campuspot/config"
 	"github.com/odiliemmmanuel/campuspot/internal/bmoni"
+	"github.com/odiliemmmanuel/campuspot/internal/email"
 	"github.com/odiliemmmanuel/campuspot/internal/models"
 )
 
@@ -42,11 +43,16 @@ type Service struct {
 	db    *gorm.DB
 	cfg   *config.Config
 	bmoni bmoni.Client
+	mail  email.Sender
+	now   func() time.Time
 }
 
 // NewService wires the dependencies.
-func NewService(db *gorm.DB, cfg *config.Config, client bmoni.Client) *Service {
-	return &Service{db: db, cfg: cfg, bmoni: client}
+func NewService(db *gorm.DB, cfg *config.Config, client bmoni.Client, mail email.Sender) *Service {
+	if mail == nil {
+		mail = email.NewLogSender(cfg.EmailFrom)
+	}
+	return &Service{db: db, cfg: cfg, bmoni: client, mail: mail, now: time.Now}
 }
 
 // Register creates a user, hashes the password, best-effort provisions a
@@ -84,6 +90,41 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*models.Us
 		Phone:             req.Phone,
 		PasswordHash:      string(hash),
 		WalletBalanceKobo: demoWelcomeKobo,
+		// Unverified until the owner proves control of the address with the
+		// code we mail them. Unverified accounts can browse, but the pot
+		// engine refuses to move money for them.
+		EmailVerified: false,
+		KYCStatus:     models.KYCUnverified,
+		Locale:        localeOr(req.Locale),
+	}
+
+	// A unique referral code of their own, to share with the next person.
+	for i := 0; i < 5; i++ {
+		code, cerr := generateReferralCode()
+		if cerr != nil {
+			return nil, "", cerr
+		}
+		var taken int64
+		if cerr = s.db.Model(&models.User{}).Where("referral_code = ?", code).Count(&taken).Error; cerr != nil {
+			return nil, "", cerr
+		}
+		if taken == 0 {
+			user.ReferralCode = &code
+			break
+		}
+		if i == 4 {
+			return nil, "", fmt.Errorf("auth: could not allocate a referral code")
+		}
+	}
+
+	// Did someone share their code at sign-up? Remember who, so the reward
+	// can be paid once this account verifies its email.
+	if ref := strings.TrimSpace(req.ReferralCode); ref != "" {
+		var referrer models.User
+		if err := s.db.First(&referrer, "UPPER(referral_code) = ?", strings.ToUpper(ref)).Error; err == nil {
+			uid := referrer.ID
+			user.ReferredBy = &uid
+		}
 	}
 
 	// Provision the B Moni user now so every member has a wallet id from day
@@ -114,7 +155,29 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*models.Us
 	if err != nil {
 		return nil, "", err
 	}
+
+	// Mail the sign-up verification code. Best-effort: the user can always
+	// ask for a resend, and in log-email (dev) mode the code comes back in
+	// the send-otp response instead.
+	if _, serr := s.SendVerification(ctx, user.Email); serr != nil {
+		log.Printf("auth: could not send verification email to %s: %v", user.Email, serr)
+	}
+
 	return user, token, nil
+}
+
+// localeOr normalises an optional locale, defaulting to English.
+func localeOr(l string) string {
+	l = strings.ToLower(strings.TrimSpace(l))
+	switch l {
+	case "", "en", "fr":
+		if l == "" {
+			return "en"
+		}
+		return l
+	default:
+		return "en"
+	}
 }
 
 // Login verifies credentials and returns a signed token.
@@ -145,7 +208,10 @@ func (s *Service) UpdateProfile(_ context.Context, userID uuid.UUID, req UpdateP
 	if err := s.db.First(&user, "id = ?", userID).Error; err != nil {
 		return nil, err
 	}
-	if req.Name == nil && req.Phone == nil {
+	if req.Name != nil && req.Phone != nil && req.Locale == nil {
+		return nil, ErrInvalidProfile
+	}
+	if req.Name == nil && req.Phone == nil && req.Locale == nil {
 		return nil, ErrInvalidProfile
 	}
 	if req.Name != nil {
@@ -157,6 +223,9 @@ func (s *Service) UpdateProfile(_ context.Context, userID uuid.UUID, req UpdateP
 	}
 	if req.Phone != nil {
 		user.Phone = strings.TrimSpace(*req.Phone)
+	}
+	if req.Locale != nil {
+		user.Locale = localeOr(*req.Locale)
 	}
 	if err := s.db.Save(&user).Error; err != nil {
 		return nil, err

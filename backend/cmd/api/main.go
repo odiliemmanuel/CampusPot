@@ -24,6 +24,7 @@ import (
 	"github.com/odiliemmmanuel/campuspot/internal/ai"
 	"github.com/odiliemmmanuel/campuspot/internal/auth"
 	"github.com/odiliemmmanuel/campuspot/internal/bmoni"
+	"github.com/odiliemmmanuel/campuspot/internal/email"
 	"github.com/odiliemmmanuel/campuspot/internal/models"
 	"github.com/odiliemmmanuel/campuspot/internal/pot"
 	"github.com/odiliemmmanuel/campuspot/internal/seed"
@@ -55,7 +56,7 @@ func main() {
 
 	client := buildBMoniClient(cfg)
 	potSvc := pot.NewService(db, cfg, client)
-	authSvc := auth.NewService(db, cfg, client)
+	authSvc := auth.NewService(db, cfg, client, email.New(cfg))
 	aiSvc := ai.NewService(db, potSvc, cfg)
 	webhookHandler := webhook.NewHandler(db, potSvc, cfg.BMoniWebhookSecret)
 
@@ -92,6 +93,9 @@ func main() {
 	})
 
 	// Public auth routes + protected /auth/me.
+	// Scheduled and recurring transfers: one background sweeper, in-process.
+	go runTransferScheduler(potSvc)
+
 	auth.NewController(authSvc).RegisterRoutes(api)
 
 	// Public webhook endpoint.
@@ -106,6 +110,24 @@ func main() {
 	ai.NewController(aiSvc).RegisterRoutes(authed)
 
 	runServer(cfg, router)
+}
+
+// runTransferScheduler sweeps for due scheduled transfers once a minute. The
+// process is single-instance (one Render dyno), so an in-process ticker is
+// enough; every run is idempotent at the row level.
+func runTransferScheduler(potSvc *pot.Service) {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		n, err := potSvc.RunDueSchedules(context.Background())
+		if err != nil {
+			log.Printf("scheduler: %v", err)
+			continue
+		}
+		if n > 0 {
+			log.Printf("scheduler: ran %d due transfer(s)", n)
+		}
+	}
 }
 
 func buildBMoniClient(cfg *config.Config) bmoni.Client {

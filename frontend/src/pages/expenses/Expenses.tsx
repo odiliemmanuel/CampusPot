@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { motion } from "framer-motion";
 import {
-  AlertTriangle, CheckCircle2, Clock, Gavel, Landmark, Loader2, Plus,
-  Send, ShieldCheck, ThumbsDown, ThumbsUp, User, Users, X,
+  AlertTriangle, CheckCircle2, Clock, Gavel, Headphones, Landmark, LifeBuoy,
+  Loader2, Plus, Send, ShieldCheck, ThumbsDown, ThumbsUp, User, Users, X,
 } from "lucide-react";
 
 import AppShell from "../../layouts/AppShell";
@@ -12,10 +12,10 @@ import AlertError from "../../components/AlertError";
 import { useGroup } from "../../providers/GroupProvider";
 import {
   listExpenses, listApprovals, listMembers, listDisputes, createExpense,
-  decideExpense, executeExpense, raiseDispute, getStoredUser, getSummary,
-  listBanks, lookupUser, verifyBankAccount,
+  decideExpense, escalateDispute, executeExpense, listSupportCases, raiseDispute,
+  getStoredUser, getSummary, listBanks, lookupUser, verifyBankAccount,
   type AuthUser, type ExpenseRequest, type Approval, type Role, type Membership,
-  type Dispute, type BankOption, type LookedUpUser, type VerifiedAccount,
+  type Dispute, type BankOption, type LookedUpUser, type SupportCase, type VerifiedAccount,
 } from "../../lib/api";
 import { formatNaira, nairaToKobo } from "../../lib/format";
 
@@ -43,6 +43,7 @@ export function ExpensesInner() {
   const [expenses, setExpenses] = useState<ExpenseRequest[]>([]);
   const [approvals, setApprovals] = useState<Record<string, Approval[]>>({});
   const [disputes, setDisputes] = useState<Dispute[]>([]);
+  const [cases, setCases] = useState<SupportCase[]>([]);
   const [members, setMembers] = useState<Membership[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -72,14 +73,16 @@ export function ExpensesInner() {
   const isTreasurer = myRole === "treasurer";
 
   const load = async () => {
-    const [list, people, openDisputes] = await Promise.all([
+    const [list, people, openDisputes, supportCases] = await Promise.all([
       listExpenses(gid),
       listMembers(gid),
       listDisputes(gid).catch(() => [] as Dispute[]),
+      listSupportCases(gid).catch(() => [] as SupportCase[]),
     ]);
     setExpenses(list);
     setMembers(people);
     setDisputes(openDisputes);
+    setCases(supportCases);
     setMyRole((people.find((m) => m.userId === uid)?.role as Role) ?? null);
     const entries = await Promise.all(
       list
@@ -216,6 +219,20 @@ export function ExpensesInner() {
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't raise the dispute.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Send a dispute to customer support — opens a case both sides can track.
+  const handleEscalate = async (disputeId: string) => {
+    const note = window.prompt("What should support review? (optional)") ?? "";
+    setError(""); setBusy(true);
+    try {
+      await escalateDispute(gid, disputeId, note);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't escalate the dispute.");
     } finally {
       setBusy(false);
     }
@@ -422,12 +439,30 @@ export function ExpensesInner() {
                 )}
 
                 {disputed && (
-                  <p className="mt-1 rounded-md bg-violet-50 px-2 py-1.5 text-[11px] text-violet-700 dark:bg-violet-500/10 dark:text-violet-400">
-                    {expenseDisputes.length} member{expenseDisputes.length === 1 ? "" : "s"} disputed this payout
-                    {expenseDisputes.map((d) => d.name).filter(Boolean).length
-                      ? `: ${expenseDisputes.map((d) => d.name).filter(Boolean).join(", ")}`
-                      : ""}. It can't be paid until resolved.
-                  </p>
+                  <div className="mt-1 space-y-1">
+                    <p className="rounded-md bg-violet-50 px-2 py-1.5 text-[11px] text-violet-700 dark:bg-violet-500/10 dark:text-violet-400">
+                      {expenseDisputes.length} member{expenseDisputes.length === 1 ? "" : "s"} disputed this payout
+                      {expenseDisputes.map((d) => d.name).filter(Boolean).length
+                        ? `: ${expenseDisputes.map((d) => d.name).filter(Boolean).join(", ")}`
+                        : ""}. It can't be paid until resolved.
+                    </p>
+                    {expenseDisputes.filter((d) => !d.escalatedAt && (d.userId === uid || isTreasurer)).map((d) => (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => void handleEscalate(d.id)}
+                        disabled={busy}
+                        className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-violet-600 transition hover:bg-violet-50 disabled:opacity-60 dark:border-violet-900/50 dark:bg-slate-800 dark:text-violet-300"
+                      >
+                        <Headphones className="h-3 w-3" /> Escalate to support
+                      </button>
+                    ))}
+                    {expenseDisputes.some((d) => d.escalatedAt) && (
+                      <p className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                        <CheckCircle2 className="h-3 w-3" /> Escalated to support
+                      </p>
+                    )}
+                  </div>
                 )}
 
                 {/* Approval progress */}
@@ -519,6 +554,36 @@ export function ExpensesInner() {
             );
           })}
         </div>
+      )}
+
+      {/* Cases escalated to customer support — the paper trail both sides see. */}
+      {cases.length > 0 && (
+        <section className="mt-6">
+          <div className="mb-2 flex items-center gap-2">
+            <LifeBuoy className="h-4 w-4 text-violet-600" />
+            <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">With customer support</h2>
+          </div>
+          <div className="space-y-2">
+            {cases.map((sc) => (
+              <div key={sc.id} className="rounded-xl border border-slate-200/80 bg-white/80 p-3 dark:border-white/10 dark:bg-[#171626]/70">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{sc.subject}</h3>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                    sc.status === "open"
+                      ? "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300"
+                      : "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
+                  }`}>
+                    {sc.status}
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    opened {new Date(sc.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}
+                  </span>
+                </div>
+                {sc.detail && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{sc.detail}</p>}
+              </div>
+            ))}
+          </div>
+        </section>
       )}
     </>
   );

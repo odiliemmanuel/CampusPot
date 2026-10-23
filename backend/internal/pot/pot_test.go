@@ -51,7 +51,10 @@ func newUser(t *testing.T, db *gorm.DB, name, email string) *models.User {
 	if err != nil {
 		t.Fatalf("hash password: %v", err)
 	}
-	u := &models.User{Name: name, Email: email, PasswordHash: string(hash), BMoniUserID: "bmoni_" + email[:3]}
+	// EmailVerified: the engine refuses wallet movements from unverified
+	// accounts, and test accounts are created directly (they skip the OTP
+	// flow that real sign-ups go through).
+	u := &models.User{Name: name, Email: email, PasswordHash: string(hash), BMoniUserID: "bmoni_" + email[:3], EmailVerified: true}
 	if err := db.Create(u).Error; err != nil {
 		t.Fatalf("create user: %v", err)
 	}

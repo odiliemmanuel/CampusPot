@@ -1,7 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
 import ThemeProvider from "./providers/ThemeProvider";
 import { GroupProvider } from "./providers/GroupProvider";
+import { I18nProvider } from "./lib/i18n";
 import ProtectedRoute from "./components/ProtectedRoute";
+import VerifyEmail from "./pages/auth/VerifyEmail";
+import ForgotPassword from "./pages/auth/ForgotPassword";
 
 import LandingPage from "./pages/landing/LandingPage";
 import SignUp from "./pages/auth/SignUp";
@@ -32,6 +35,7 @@ function LegacyPotTab() {
 export default function App() {
   return (
     <ThemeProvider>
+      <I18nProvider>
       <BrowserRouter>
         <GroupProvider>
           <Routes>
@@ -39,6 +43,8 @@ export default function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/signup" element={<SignUp />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
 
             {/* Authenticated — the pots list and creating a pot */}
             <Route path="/pots" element={<ProtectedRoute><Pots /></ProtectedRoute>} />
@@ -73,6 +79,7 @@ export default function App() {
           </Routes>
         </GroupProvider>
       </BrowserRouter>
+      </I18nProvider>
     </ThemeProvider>
   );
 }

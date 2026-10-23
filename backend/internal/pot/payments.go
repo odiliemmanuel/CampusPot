@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/odiliemmmanuel/campuspot/common/money"
 	"github.com/odiliemmmanuel/campuspot/internal/models"
 )
 
@@ -157,6 +158,17 @@ func (s *Service) reconcileTx(tx *gorm.DB, ev *DepositEvent, out *models.Payment
 		return err
 	}
 	*out = payment
+	// A real member's contribution just landed: tell the pot's leadership.
+	if payment.UserID != nil {
+		title, body := paymentReceivedNotification(payment.PayerName, payment.AmountKobo)
+		if err := s.notifyLeaders(tx, ev.GroupID, models.Notification{
+			Kind:  models.NotifyPayment,
+			Title: title, Body: body,
+			Link:  "/pots/" + ev.GroupID.String() + "?tab=contributions",
+		}); err != nil {
+			return err
+		}
+	}
 	if payment.LevyID != nil {
 		if err := s.advanceRecurringContributionTx(tx, payment.GroupID, *payment.LevyID); err != nil {
 			return err
@@ -290,4 +302,97 @@ func (s *Service) ListLedger(_ context.Context, groupID, actorID uuid.UUID) ([]m
 	var entries []models.LedgerEntry
 	err := s.db.Where("group_id = ?", groupID).Order("created_at ASC").Find(&entries).Error
 	return entries, err
+}
+
+// RefundPayment returns one member's contribution to their own wallet. It is
+// the treasurer's answer to "the payout failed / the collection was
+// cancelled": the pot ledger is debited, the payer's wallet is credited, and
+// the Payment is marked refunded so it no longer counts toward their
+// standing (outstanding recomputes immediately). Treasurer only, and never
+// twice for the same payment.
+func (s *Service) RefundPayment(_ context.Context, groupID, actorID, paymentID uuid.UUID) (*models.Payment, error) {
+	if _, err := s.requireRole(groupID, actorID, models.RoleTreasurer); err != nil {
+		return nil, err
+	}
+	var payment models.Payment
+	if err := s.db.First(&payment, "id = ? AND group_id = ?", paymentID, groupID).Error; err != nil {
+		return nil, ErrNotFound
+	}
+	if payment.RefundedAt != nil || payment.Status == models.PaymentRefunded {
+		return nil, fmt.Errorf("%w: this payment has already been refunded", ErrConflict)
+	}
+	if payment.UserID == nil {
+		return nil, fmt.Errorf("%w: only a payment matched to a member can be refunded — clear the unmatched deposit instead", ErrInvalid)
+	}
+	balance, err := s.Balance(context.Background(), groupID)
+	if err != nil {
+		return nil, err
+	}
+	if payment.AmountKobo > balance {
+		return nil, fmt.Errorf("%w: the pot holds %s but this refund is %s — the pot cannot refund money it no longer has",
+			ErrConflict, money.Kobo(balance).Format(), money.Kobo(payment.AmountKobo).Format())
+	}
+
+	var group models.Group
+	_ = s.db.First(&group, "id = ?", groupID).Error
+
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		entry := &models.LedgerEntry{
+			GroupID:     groupID,
+			Kind:        models.LedgerDebit,
+			AmountKobo:  payment.AmountKobo,
+			Description: "Refund: " + payerNameTx(tx, payment),
+			RefType:     "payment",
+			RefID:       payment.ID.String(),
+			ActorUserID: &actorID,
+		}
+		if err := s.appendLedger(tx, entry); err != nil {
+			return err
+		}
+		if err := creditWallet(tx, *payment.UserID, payment.AmountKobo); err != nil {
+			return err
+		}
+		if err := tx.Create(&models.WalletTransaction{
+			UserID:       *payment.UserID,
+			Kind:         models.WalletRefund,
+			AmountKobo:   payment.AmountKobo,
+			Counterparty: "Refund · " + firstNonEmpty(group.Name, "pot"),
+			GroupID:      &groupID,
+			LevyID:       payment.LevyID,
+			Note:         "Contribution returned by the treasurer",
+		}).Error; err != nil {
+			return err
+		}
+		now := s.now()
+		payment.RefundedAt = &now
+		payment.Status = models.PaymentRefunded
+		if err := tx.Model(&models.Payment{}).
+			Where("id = ? AND refunded_at IS NULL", payment.ID).
+			Updates(map[string]interface{}{
+				"status": models.PaymentRefunded, "refunded_at": &now,
+			}).Error; err != nil {
+			return err
+		}
+		// Tell the payer their money is back.
+		return s.notifyMember(tx, *payment.UserID, &groupID, models.NotifyRefund,
+			"Contribution refunded",
+			fmt.Sprintf("%s was returned to your wallet by %s.",
+				money.Kobo(payment.AmountKobo).Format(), firstNonEmpty(group.Name, "the pot")),
+			"/account")
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &payment, nil
+}
+
+// payerNameTx reads the matched member's display name for copy.
+func payerNameTx(tx *gorm.DB, payment models.Payment) string {
+	if payment.PayerName != "" {
+		return payment.PayerName
+	}
+	if payment.UserID == nil {
+		return ""
+	}
+	return userName(tx, *payment.UserID)
 }

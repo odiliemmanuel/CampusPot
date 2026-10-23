@@ -89,9 +89,7 @@ type WalletTransferRequest struct {
 	// PIN, whether the money goes to a member or an external bank account.
 	Pin string `json:"pin"`
 	Note string `json:"note"`
-}
-
-// WalletTransfer moves money to another PotKeeper user, into a pot's collection
+}// WalletTransfer moves money to another PotKeeper user, into a pot's collection
 // account, or out to a bank account. Every path resolves the recipient before
 // any debit:
 //
@@ -117,6 +115,20 @@ func (s *Service) WalletTransfer(ctx context.Context, userID uuid.UUID, req Wall
 	if err := s.requireTransactionPin(userID, req.Pin); err != nil {
 		return nil, err
 	}
+	if err := s.checkTransferLimits(userID, req.AmountKobo); err != nil {
+		return nil, err
+	}
+	if err := s.transferFunds(ctx, userID, req); err != nil {
+		return nil, err
+	}
+	return s.Wallet(ctx, userID)
+}
+
+// transferFunds is the PIN-free core of a send — the part a scheduled
+// transfer re-runs when its moment arrives (the PIN was captured once, at
+// schedule time). It moves the money or returns the resolution error.
+func (s *Service) transferFunds(ctx context.Context, userID uuid.UUID, req WalletTransferRequest) error {
+	recipient := strings.TrimSpace(req.Recipient)
 
 	// A 10-digit recipient may be a pot's dedicated collection account. Paying
 	// into a pot is a contribution, not a bank payout — so resolve it first.
@@ -124,10 +136,11 @@ func (s *Service) WalletTransfer(ctx context.Context, userID uuid.UUID, req Wall
 		var pot models.Group
 		err := s.db.Where("virtual_account_number = ?", recipient).First(&pot).Error
 		if err == nil {
-			return s.payIntoPot(ctx, userID, &pot, req)
+			_, err = s.payIntoPot(ctx, userID, &pot, req)
+			return err
 		}
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, err
+			return err
 		}
 	}
 
@@ -138,7 +151,7 @@ func (s *Service) WalletTransfer(ctx context.Context, userID uuid.UUID, req Wall
 		// Name enquiry: confirm the account exists and remember who holds it.
 		v, err := s.VerifyBankAccount(ctx, userID, recipient, req.BankName, req.BankCode)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		verified = v
 	} else {
@@ -148,17 +161,17 @@ func (s *Service) WalletTransfer(ctx context.Context, userID uuid.UUID, req Wall
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				// No user and no bank: refuse rather than send into the void.
-				return nil, fmt.Errorf("%w: no PotKeeper account matches %s — check the email or phone, or send to a bank account", ErrAccountNotFound, recipient)
+				return fmt.Errorf("%w: no PotKeeper account matches %s — check the email or phone, or send to a bank account", ErrAccountNotFound, recipient)
 			}
-			return nil, err
+			return err
 		}
 		to = &match
 	}
 	if to != nil && to.ID == userID {
-		return nil, fmt.Errorf("%w: you cannot send money to yourself", ErrInvalid)
+		return fmt.Errorf("%w: you cannot send money to yourself", ErrInvalid)
 	}
 
-	err := s.db.Transaction(func(tx *gorm.DB) error {
+	return s.db.Transaction(func(tx *gorm.DB) error {
 		if err := debitWallet(tx, userID, req.AmountKobo); err != nil {
 			return err
 		}
@@ -185,6 +198,16 @@ func (s *Service) WalletTransfer(ctx context.Context, userID uuid.UUID, req Wall
 			}).Error; err != nil {
 				return err
 			}
+			// A landed transfer is money the recipient can spend now — tell them.
+			if err := notifyTx(tx, models.Notification{
+				UserID: to.ID, Kind: models.NotifyTransferIn,
+				Title: "Money received",
+				Body: fmt.Sprintf("%s sent you %s.",
+					userName(tx, userID), money.Kobo(req.AmountKobo).Format()),
+				Link: "/account",
+			}); err != nil {
+				return err
+			}
 		} else {
 			// Record the verified account holder's name, not just the number,
 			// so the wallet history shows exactly who was paid.
@@ -192,10 +215,15 @@ func (s *Service) WalletTransfer(ctx context.Context, userID uuid.UUID, req Wall
 		}
 		return tx.Create(out).Error
 	})
-	if err != nil {
-		return nil, err
+}
+
+// userName reads a display name for notification copy.
+func userName(tx *gorm.DB, userID uuid.UUID) string {
+	var u models.User
+	if err := tx.Select("name").First(&u, "id = ?", userID).Error; err == nil {
+		return u.Name
 	}
-	return s.Wallet(context.Background(), userID)
+	return "Someone"
 }
 
 // WalletPayRequest pays a member's contribution into a pot from their wallet.
@@ -216,6 +244,9 @@ func (s *Service) WalletPayPot(_ context.Context, userID uuid.UUID, req WalletPa
 		return nil, fmt.Errorf("%w: amount must be positive", ErrInvalid)
 	}
 	if err := s.requireTransactionPin(userID, req.Pin); err != nil {
+		return nil, err
+	}
+	if err := s.checkTransferLimits(userID, req.AmountKobo); err != nil {
 		return nil, err
 	}
 	if _, err := s.requireMember(req.GroupID, userID); err != nil {
@@ -247,30 +278,24 @@ func (s *Service) payIntoPot(ctx context.Context, userID uuid.UUID, group *model
 		return nil, fmt.Errorf("%w: only members of %s can pay into it — join the pot first, then send", ErrForbidden, group.Name)
 	}
 
+	// payPotTx records the whole movement: the wallet debit, the pot_payment
+	// row in the sender's history (counterparty + group id), the ledger credit
+	// and the contribution itself.
+	if _, err := s.payPotTxTx(userID, group.ID, req.AmountKobo); err != nil {
+		return nil, err
+	}
+	return s.Wallet(ctx, userID)
+}
+
+// payPotTxTx runs payPotTx inside its own transaction.
+func (s *Service) payPotTxTx(userID, groupID uuid.UUID, amountKobo int64) (models.Payment, error) {
 	var payment models.Payment
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		var err error
-		payment, err = s.payPotTx(tx, userID, group.ID, req.AmountKobo, nil)
-		if err != nil {
-			return err
-		}
-		// Mirror the sender's own activity: mark the outgoing wallet leg too,
-		// referencing the pot, so their wallet history reads "Sent to <pot>".
-		gid := group.ID
-		return tx.Create(&models.WalletTransaction{
-			UserID:       userID,
-			Kind:         models.WalletTransferOut,
-			AmountKobo:   req.AmountKobo,
-			Counterparty: "Pot contribution · " + group.Name,
-			GroupID:      &gid,
-			Note:         req.Note,
-		}).Error
+		payment, err = s.payPotTx(tx, userID, groupID, amountKobo, nil)
+		return err
 	})
-	if err != nil {
-		return nil, err
-	}
-	_ = payment // recorded as the sender's contribution on this pot
-	return s.Wallet(ctx, userID)
+	return payment, err
 }
 
 // payPotTx records a member's wallet contribution into a pot, inside an open
@@ -321,7 +346,7 @@ func (s *Service) payPotTx(tx *gorm.DB, userID, groupID uuid.UUID, amountKobo in
 	}
 
 	var m models.Membership
-	_ = tx.Select("reference").Where("group_id = ? AND user_id = ?", groupID, userID).First(&m).Error
+	_ = tx.Preload("User").Where("group_id = ? AND user_id = ?", groupID, userID).First(&m).Error
 
 	payment = models.Payment{
 		GroupID:         groupID,
@@ -335,6 +360,19 @@ func (s *Service) payPotTx(tx *gorm.DB, userID, groupID uuid.UUID, amountKobo in
 		LedgerEntryID:   &entry.ID,
 	}
 	if err := tx.Create(&payment).Error; err != nil {
+		return payment, err
+	}
+	// Tell the pot's leadership that a contribution landed from the app.
+	payer := "A member"
+	if m.User != nil {
+		payer = m.User.Name
+	}
+	title, body := paymentReceivedNotification(payer, amountKobo)
+	if err := s.notifyLeaders(tx, groupID, models.Notification{
+		Kind:  models.NotifyPayment,
+		Title: title, Body: body,
+		Link:  "/pots/" + groupID.String() + "?tab=contributions",
+	}); err != nil {
 		return payment, err
 	}
 	if err := tx.Create(&models.WalletTransaction{

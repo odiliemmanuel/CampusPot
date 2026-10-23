@@ -50,6 +50,8 @@ func (ct *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 	g.GET("/:id/disputes", ct.listDisputes)
 	g.POST("/:id/disputes", ct.raiseDispute)
 	g.POST("/:id/disputes/:disputeId/resolve", ct.resolveDispute)
+	g.POST("/:id/disputes/:disputeId/escalate", ct.escalateDispute)
+	g.GET("/:id/support-cases", ct.listSupportCases)
 
 	g.GET("/:id/contributions", ct.contributions)
 
@@ -60,8 +62,14 @@ func (ct *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 
 	g.GET("/:id/payments", ct.listPayments)
 	g.POST("/:id/payments/manual", ct.recordManualPayment)
+	g.POST("/:id/payments/:paymentId/refund", ct.refundPayment)
 	g.POST("/:id/deposits", ct.simulateDeposit)
 	g.GET("/:id/ledger", ct.listLedger)
+
+	// Per-cycle contribution journals — one book per contribution period.
+	g.GET("/:id/journals", ct.journals)
+	g.GET("/:id/journals/:levyId", ct.journal)
+	g.GET("/:id/goal", ct.goal)
 
 	g.POST("/:id/expenses", ct.createExpense)
 	g.GET("/:id/expenses", ct.listExpenses)
@@ -87,6 +95,20 @@ func (ct *Controller) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.POST("/banks/verify", ct.verifyBankAccount)
 	rg.GET("/users/lookup", ct.lookupUser)
 	rg.GET("/pots/lookup", ct.lookupPotAccount)
+
+	// Discoverable public pots — browse and join without an invite code.
+	rg.GET("/pots/discover", ct.discoverPots)
+	rg.POST("/pots/:id/join", ct.joinPublicPot)
+
+	// Scheduled and recurring transfers.
+	rg.GET("/wallet/schedules", ct.listSchedules)
+	rg.POST("/wallet/schedules", ct.createSchedule)
+	rg.DELETE("/wallet/schedules/:id", ct.cancelSchedule)
+
+	// The signed-in user's notifications (server-side feed).
+	rg.GET("/notifications", ct.listNotifications)
+	rg.POST("/notifications/read-all", ct.markAllNotificationsRead)
+	rg.POST("/notifications/:id/read", ct.markNotificationRead)
 }
 
 func (ct *Controller) listBanks(c *gin.Context) {
@@ -590,7 +612,8 @@ func (ct *Controller) summary(c *gin.Context) {
 		respondErr(c, err)
 		return
 	}
-	response.OK(c, sum)
+	// A treasurer may hide the pot's balance from ordinary members.
+	response.OK(c, ct.svc.MaskTreasury(sum, groupID, auth.MustUserID(c)))
 }
 
 func (ct *Controller) outstanding(c *gin.Context) {
@@ -810,6 +833,207 @@ func pathID(c *gin.Context, name string) (uuid.UUID, bool) {
 		return uuid.Nil, false
 	}
 	return id, true
+}
+
+// discoverPots lists public pots by text query and/or category.
+func (ct *Controller) discoverPots(c *gin.Context) {
+	pots, err := ct.svc.DiscoverPots(c.Request.Context(), auth.MustUserID(c), c.Query("q"), c.Query("category"))
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, pots)
+}
+
+// joinPublicPot joins a public pot directly, without a join code.
+func (ct *Controller) joinPublicPot(c *gin.Context) {
+	groupID, ok := pathID(c, "id")
+	if !ok {
+		return
+	}
+	group, err := ct.svc.JoinPublicPot(c.Request.Context(), auth.MustUserID(c), groupID)
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, group)
+}
+
+// goal reports a pot's savings-goal position.
+func (ct *Controller) goal(c *gin.Context) {
+	groupID, ok := pathID(c, "id")
+	if !ok {
+		return
+	}
+	if _, err := ct.svc.requireMember(groupID, auth.MustUserID(c)); err != nil {
+		respondErr(c, err)
+		return
+	}
+	target, balance, percent, err := ct.svc.GoalProgress(c.Request.Context(), groupID)
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, gin.H{"targetKobo": target, "balanceKobo": balance, "goalPercent": percent})
+}
+
+// listSchedules returns the caller's scheduled transfers.
+func (ct *Controller) listSchedules(c *gin.Context) {
+	rows, err := ct.svc.ListSchedules(c.Request.Context(), auth.MustUserID(c))
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, rows)
+}
+
+// createSchedule stores a scheduled or recurring transfer.
+func (ct *Controller) createSchedule(c *gin.Context) {
+	var req ScheduleTransferRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "INVALID_BODY", err.Error())
+		return
+	}
+	row, err := ct.svc.ScheduleTransfer(c.Request.Context(), auth.MustUserID(c), req)
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.Created(c, row)
+}
+
+// cancelSchedule stops a future run.
+func (ct *Controller) cancelSchedule(c *gin.Context) {
+	id, ok := pathID(c, "id")
+	if !ok {
+		return
+	}
+	row, err := ct.svc.CancelSchedule(c.Request.Context(), auth.MustUserID(c), id)
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, row)
+}
+
+// listNotifications returns the caller's server-side notification feed.
+func (ct *Controller) listNotifications(c *gin.Context) {
+	unreadOnly := c.Query("unread") == "1" || c.Query("unread") == "true"
+	rows, err := ct.svc.ListNotifications(c.Request.Context(), auth.MustUserID(c), unreadOnly)
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, rows)
+}
+
+// markNotificationRead marks one notification read.
+func (ct *Controller) markNotificationRead(c *gin.Context) {
+	id, ok := pathID(c, "id")
+	if !ok {
+		return
+	}
+	if err := ct.svc.MarkNotificationRead(c.Request.Context(), auth.MustUserID(c), id); err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, gin.H{"status": "read"})
+}
+
+// markAllNotificationsRead marks every unread notification read.
+func (ct *Controller) markAllNotificationsRead(c *gin.Context) {
+	if err := ct.svc.MarkAllNotificationsRead(c.Request.Context(), auth.MustUserID(c)); err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, gin.H{"status": "read"})
+}
+
+// journals returns every contribution period's journal for a pot.
+func (ct *Controller) journals(c *gin.Context) {
+	groupID, ok := pathID(c, "id")
+	if !ok {
+		return
+	}
+	rows, err := ct.svc.ContributionJournals(c.Request.Context(), groupID, auth.MustUserID(c))
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, rows)
+}
+
+// journal returns one contribution period's journal in full.
+func (ct *Controller) journal(c *gin.Context) {
+	groupID, ok := pathID(c, "id")
+	if !ok {
+		return
+	}
+	levyID, ok := pathID(c, "levyId")
+	if !ok {
+		return
+	}
+	row, err := ct.svc.ContributionJournal(c.Request.Context(), groupID, levyID, auth.MustUserID(c))
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, row)
+}
+
+// refundPayment returns a member's contribution to their wallet.
+func (ct *Controller) refundPayment(c *gin.Context) {
+	groupID, ok := pathID(c, "id")
+	if !ok {
+		return
+	}
+	paymentID, ok := pathID(c, "paymentId")
+	if !ok {
+		return
+	}
+	p, err := ct.svc.RefundPayment(c.Request.Context(), groupID, auth.MustUserID(c), paymentID)
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, p)
+}
+
+// escalateDispute sends a dispute to customer support.
+func (ct *Controller) escalateDispute(c *gin.Context) {
+	groupID, ok := pathID(c, "id")
+	if !ok {
+		return
+	}
+	disputeID, ok := pathID(c, "disputeId")
+	if !ok {
+		return
+	}
+	var req struct {
+		Note string `json:"note"`
+	}
+	_ = c.ShouldBindJSON(&req) // note is optional
+	sc, err := ct.svc.EscalateDispute(c.Request.Context(), groupID, disputeID, auth.MustUserID(c), req.Note)
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.Created(c, sc)
+}
+
+// listSupportCases returns a pot's support cases (own for members, all for
+// the pot's leadership).
+func (ct *Controller) listSupportCases(c *gin.Context) {
+	groupID, ok := pathID(c, "id")
+	if !ok {
+		return
+	}
+	cases, err := ct.svc.ListSupportCases(c.Request.Context(), groupID, auth.MustUserID(c))
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	response.OK(c, cases)
 }
 
 func respondErr(c *gin.Context, err error) {

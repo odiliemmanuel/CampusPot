@@ -67,7 +67,21 @@ type Config struct {
 	AIBaseURL string
 	AIAPIKey  string
 	AIModel   string
+
+	// Email (SMTP). Used for sign-up verification codes, password resets and
+	// referral notifications. When SMTPHost is empty the application logs
+	// outbound mail to the console instead, so the demo works with no mail
+	// server at all.
+	SMTPHost     string
+	SMTPPort     string
+	SMTPUser     string
+	SMTPPassword string
+	EmailFrom    string
 }
+
+// UseLogEmail reports whether outbound email should be written to the server
+// log instead of sent through SMTP (no mail server configured).
+func (c *Config) UseLogEmail() bool { return c.SMTPHost == "" }
 
 // Load reads a .env file if present (local dev), then builds a Config from
 // the process environment. In production real env vars are injected by the
@@ -110,6 +124,12 @@ func Load() *Config {
 		AIBaseURL: getEnv("AI_BASE_URL", "https://api.openai.com/v1"),
 		AIAPIKey:  getEnv("AI_API_KEY", ""),
 		AIModel:   getEnv("AI_MODEL", "gpt-4o-mini"),
+
+		SMTPHost:     getEnv("SMTP_HOST", ""),
+		SMTPPort:     getEnv("SMTP_PORT", "587"),
+		SMTPUser:     getEnv("SMTP_USER", ""),
+		SMTPPassword: getEnv("SMTP_PASSWORD", ""),
+		EmailFrom:    getEnv("EMAIL_FROM", "PotKeeper <no-reply@potkeeper.ng>"),
 	}
 
 	if cfg.AppEnv == "production" && cfg.JWTSecret == "dev-only-change-me" {
